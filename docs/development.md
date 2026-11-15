@@ -1,0 +1,78 @@
+# Development and model notes
+
+See the [README](../README.md) for an overview and planned features.
+
+## Local development
+
+Node.js 22.12+ and npm are required.
+
+```sh
+npm ci
+npm run dev
+```
+
+Open http://127.0.0.1:5173/tpe-playground/.
+
+For sound development, open [the dedicated audition pane](../sound-preview.html) at
+http://127.0.0.1:5173/tpe-playground/sound-preview.html. It uses the Lab's own
+synthesis and playback code. The original Felt piano C3 is the confirmed split piano.
+Compare nine sustained alpha directions B1–B9; pitch stays fixed within each
+candidate. Drag or hold an arrow key to smoothly change timbre without restarting
+the voice; release to fade out. Button and assistive-technology edits fade after
+inactivity. Candidate buttons enable audio; mute and stop are available. Adjust volume on your device.
+Selections affect this audition only. The Lab uses the confirmed B1 (Velvet). Split slider edits blend piano tails
+and avoid repeating the same pitch; explicit split confirmations still strike a note. This separate entry point is excluded from production builds.
+
+## Checks
+
+```sh
+npm run check
+```
+
+Runs TypeScript checking, numerical tests and a server-rendered React smoke test, and the production build. The smoke test checks page content, not browser behavior. Individual commands: `npm run typecheck`, `npm test`, `npm run build`. Use `npm run preview` to serve the production build locally.
+
+## Deployment
+
+GitHub Actions tests and builds pull requests. Pushes to `main` deploy `dist/` to GitHub Pages. Set repository Settings → Pages → Source to GitHub Actions.
+
+Public URL: https://kaichi-irie.github.io/tpe-playground/
+
+Vite's base path is `/tpe-playground/`. No backend, external fonts, or API credentials are required.
+
+Keep secrets and personal data out of the source and examples. Environment variables exposed to frontend code (such as `VITE_*`) can be read in browser assets and cannot store secrets. If a credential is exposed, revoke or rotate it first; removing it from Git does not invalidate it.
+
+See [CI and Pages protection](../docs/ci-security.md) for workflow permissions,
+required PR checks, repository settings, and publication verification.
+
+## References
+
+The site's References section links to the papers behind the current single-objective TPE explorer:
+
+- James S. Bergstra, Rémi Bardenet, Yoshua Bengio, and Balázs Kégl. [Algorithms for Hyper-Parameter Optimization](https://proceedings.neurips.cc/paper/2011/hash/86e8f7ab32cfd12577bc2619bc635690-Abstract.html). NIPS, 2011. Original TPE paper.
+- Shuhei Watanabe. [Tree-Structured Parzen Estimator: Understanding Its Algorithm Components and Their Roles for Better Empirical Performance](https://arxiv.org/abs/2304.11127). arXiv:2304.11127, 2023. Review and empirical study of TPE algorithm components.
+
+## Structure
+
+- [src/App.tsx](../src/App.tsx): interactive plots, proposals, playback, and prior controls
+- [src/model/](../src/model/): shared numerical engine, model snapshots, proposal traces and field evaluation
+- [src/tpe.ts](../src/tpe.ts) and [src/tpe2d.ts](../src/tpe2d.ts): page adapters for the common engine
+- [Shared model contract](../docs/tpe-model.md): data ownership, group semantics, provenance and extension boundaries
+- [src/tpe.test.ts](../src/tpe.test.ts): numerical and proposal-loop tests
+- [src/main.tsx](../src/main.tsx): React entry point
+- [src/style.css](../src/style.css): responsive styles
+- [src/App.test.tsx](../src/App.test.tsx): smoke test
+- [.github/workflows/deploy.yml](../.github/workflows/deploy.yml): validation and deployment
+
+Model settings above the plot adjust the good fraction γ (5–50%) and Gaussian bandwidth. Choose Constant (the default), Scott, or Silverman beside the bandwidth slider. Moving Width switches to Constant and applies the selected width to both KDEs. Automatic rules fit ℓ and g separately as observations change; the slider follows ℓ, which generates candidates, and its width is displayed. Before two observations, automatic widths are unavailable; the slider retains the manual value until a KDE can be fitted.
+
+Scott uses `s n^(-1/5)`. Silverman uses the robust rule `0.9 min(s, IQR/1.34) n^(-1/5)` ([R documentation](https://www.stat.ethz.ch/R-manual/R-devel/library/stats/html/bandwidth.html)). Here `s` is the sample standard deviation, `n` is the group's observation count, and quartiles use linear interpolation (type 7). Both rules use unweighted observation locations and exclude the prior; observation weights affect the mixture proportions only. Automatic widths use [Optuna-style magic clipping](https://github.com/optuna/optuna/blob/master/optuna/samplers/_tpe/parzen_estimator.py): `maximum = range`, `minimum = range / min(100, 1 + n + priorKernelCount)`, where `priorKernelCount` is 1 when the prior is enabled and 0 otherwise. Clipping is applied independently in each group. A singleton has no estimable standard deviation; its raw width is zero, so it uses the same lower bound as coincident observations or a zero IQR. There is no separate spread fallback or temporal smoothing. For seed 50 with γ = 0.1 and the prior enabled, the good group's width changes from 3.333 to 2.5 when its count increases from one to two. These are clipped Scott/Silverman rules rather than unrestricted rule-of-thumb estimates. Constant widths are applied directly without automatic clipping. The prior retains its existing width. Constant keeps the density axis fixed during playback; automatic rules update the axis using the current kernel widths. Play 3D uses an adjustable constant bandwidth.
+
+Changing settings or resetting defaults preserves evaluated observations and affects future proposals; densities, acquisition, and candidate sampling use the selected settings.
+
+Searches run for 200 evaluations. In Play 2D, Resample cycles through ten seeds per objective. Changing objectives uses the same position in the new objective’s seed list.
+
+Each Play 2D objective is shifted by a constant so its minimum is 1. The comparison selector shows either the relative best-so-far error or average regret (cumulative objective gaps divided by evaluation count), on a logarithmic axis.
+
+The 3D explorer switches between multivariate joint kernels and univariate independent axes. Switching keeps observations and historical proposal settings; future proposals use the new mode.
+
+Play 3D includes Multimodal, Quadratic, and Rosenbrock objectives; changing the objective or generating a new seed restarts the search. Good fraction, bandwidth, weights, prior weight, startup trials, and candidate count preserve observations and change future proposals. Objective contours overlay a faint translucent surface. Linear height preserves relative function heights; optional Log1p height expands the valley bottom without changing optimization. Rosenbrock contours are computed directly from its level-curve equation to resolve the narrow valley. The diamond marks the optimum, numerically estimated for Multimodal. Performance compares against reproducible random search using absolute best-so-far gaps and average regret, supporting objectives with zero minima.

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Play 2D browser benchmark</title></head>
+  <body>
+    <aside style="position:fixed;bottom:0;right:0;z-index:100;background:white;color:black;padding:8px;max-width:360px">
+      <button id="run">Run browser benchmark</button>
+      <output id="status">Ready</output>
+      <a id="download" hidden download="foreground-results.json">Download results</a>
+      <textarea aria-label="Benchmark results" id="results" readonly style="width:100%;height:60px"></textarea>
+    </aside>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script type="module">
+      import { benchmark2D } from './browser2d.js';
+      const button = document.querySelector('#run');
+      const status = document.querySelector('#status');
+      const results = document.querySelector('#results');
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        results.value = '';
+        const download = document.querySelector('#download');
+        if (download.href) URL.revokeObjectURL(download.href);
+        download.hidden = true;
+        const runs = [];
+        try {
+          for (const scenario of ['idle', 'rotate', 'play', 'play-rotate', 'bandwidth', 'seek']) {
+            status.textContent = `Running ${scenario}`;
+            const diagnostic = new URLSearchParams(location.search).has('mutations');
+            runs.push(await benchmark2D(scenario, diagnostic ? 10 : 120, diagnostic, diagnostic ? 0 : 10000));
+            results.value = JSON.stringify(runs);
+          }
+          status.textContent = 'Complete';
+          download.href = URL.createObjectURL(new Blob([JSON.stringify(runs, null, 2)], { type: 'application/json' }));
+          download.hidden = false;
+        } catch (error) {
+          status.textContent = `Failed: ${error.message}`;
+        } finally {
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

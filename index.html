@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#21252b" />
+    <script>
+      (() => {
+        let theme;
+        try { theme = localStorage.getItem("tpe-theme"); } catch {}
+        if (theme !== "dark" && theme !== "light") {
+          theme = window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        }
+        document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#21252b" : "#f2f3f5";
+      })();
+    </script>
+    <meta
+      name="description"
+      content="An interactive laboratory for the Tree-structured Parzen Estimator. Explore how density models guide optimization."
+    />
+    <title>TPE Playground</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
