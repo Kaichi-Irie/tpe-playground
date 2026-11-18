@@ -42,8 +42,7 @@ it("renders the density explorer with playback controls and an empty initial his
   expect(html).toContain("Initial random exploration");
   expect(html).toContain("Next x =");
   expect(html).toContain("TPE proposals start after 10 evaluated trials.");
-  expect(html).not.toContain("View source");
-  expect(html).not.toContain("https://github.com/Kaichi-Irie/tpe-playground");
+  expect(html).toContain('<a href="https://github.com/Kaichi-Irie/tpe-playground">View the playground’s source code on GitHub</a>');
 });
 
 it("renders a synchronized comparison with no results before evaluation", () => {
