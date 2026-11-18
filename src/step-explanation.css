@@ -551,6 +551,26 @@
 .journey .journey-heading { grid-template-columns: minmax(0, 1fr); padding-top: 0; }
 .journey-started .journey-heading-main { padding-inline: 0; }
 
+.lab-sound-prompt {
+  align-self: center;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px 16px;
+  margin: 8px 8px 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13px;
+}
+.lab-sound-prompt p { margin: 0; }
+.lab-sound-prompt-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.lab-sound-prompt .lab-enable-sound { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+.lab-sound-prompt-error { flex-basis: 100%; text-align: center; }
+
 /* Audio shares the app header; errors overlay the page. */
 .lab-header-actions { display: flex; align-items: center; gap: 4px; }
 .app-header .lab-sound-controls { position: relative; flex-wrap: nowrap; gap: 4px; padding: 0; }

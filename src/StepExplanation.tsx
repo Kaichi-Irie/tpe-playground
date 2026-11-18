@@ -84,6 +84,9 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     };
   }, [audio]);
   const sectionRef = useRef<HTMLElement>(null);
+  const soundPromptRef = useRef<HTMLDivElement>(null);
+  const [soundState, setSoundState] = useState<"off" | "pending" | "on" | "error">("off");
+  const [soundPromptDismissed, setSoundPromptDismissed] = useState(false);
   const [intro, setIntro] = useState(true);
   const [rounds, setRounds] = useState(0);
   useEffect(() => {
@@ -227,6 +230,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   }
   function confirmSplit(height = data.partition.threshold) {
     setFocused(null);
+    setSoundPromptDismissed(true);
     setStage(2);
     audio.play("split", height);
   }
@@ -279,6 +283,25 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     setHistory([...example.trials]);
     setChosen([]); setAutoShown(0); setInitialComplete(true); setPlaced([]); setAllKernels(false); dispatchSampling({ type: "reset" });
     setFocused(null); setInspected(null);
+  }
+  const showSoundPrompt = !intro && stage === 1 && rounds === 0 && !soundPromptDismissed;
+  function dismissSoundPrompt() {
+    if (soundPromptRef.current?.contains(document.activeElement)) {
+      sectionRef.current?.focus({ preventScroll: true });
+    }
+    setSoundPromptDismissed(true);
+  }
+  async function toggleSound() {
+    if (soundState === "pending") return;
+    if (soundState === "on") {
+      audio.disable();
+      setSoundState("off");
+      return;
+    }
+    setSoundState("pending");
+    const enabled = await audio.enable();
+    if (enabled) dismissSoundPrompt();
+    setSoundState(enabled ? "on" : "error");
   }
   function change(patch: Partial<ExplanationSettings>) {
     if (intro || controlDisabled) return;
@@ -384,6 +407,20 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); move(event.key === "ArrowRight" ? 1 : -1); }
   }}>
+    {showSoundPrompt && <div className="lab-sound-prompt" ref={soundPromptRef}>
+      <p>Hear sound effects as you interact.</p>
+      <div className="lab-sound-prompt-actions">
+        <button type="button" className="journey-action lab-enable-sound" aria-disabled={soundState === "pending"} onClick={() => void toggleSound()}>
+          {soundState === "pending" ? "Turning sound on…" : "Turn sound on"}
+        </button>
+        <button type="button" className="journey-action" aria-disabled={soundState === "pending"} onClick={() => {
+          if (soundState === "pending") return;
+          setSoundState("off");
+          dismissSoundPrompt();
+        }}>Continue muted</button>
+      </div>
+      {soundState === "error" && <p className="lab-sound-prompt-error" role="alert">Sound unavailable. Try again.</p>}
+    </div>}
     <div className="journey-heading"><div className="journey-heading-main">
     {/* Both split headings share one grid cell, sized to the taller content.
         Revealing the split never resizes or reprojects the canvas. */}
@@ -406,7 +443,8 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         "  D ← D ∪ {(x_next, f(x_next))}",
       ].map((line, index) => <li key={line} aria-current={index === (stage <= 1 ? 0 : stage === 2 ? 2 : stage <= 5 ? 3 : stage === 6 ? 4 : stage === 7 ? 5 : 6) ? "step" : undefined}>{line}</li>)}</ol>
       </aside>
-    </div><LabSoundControls audio={audio} /></>, algorithmContainer) : null}
+    </div><LabSoundControls enabled={soundState === "on"} pending={soundState === "pending"}
+      error={soundState === "error" && !showSoundPrompt} onToggle={() => void toggleSound()} /></>, algorithmContainer) : null}
     <div className="journey-plot" style={{ minHeight: minimumPlotHeight }}>
     <svg ref={canvas.ref} onPointerMove={(event) => {
       if (intro || stage !== 1 || initialComplete) return;

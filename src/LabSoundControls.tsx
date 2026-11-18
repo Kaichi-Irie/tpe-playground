@@ -1,20 +1,12 @@
-import { useState } from "react";
-import type { LabAudio } from "./labAudio";
-
-export default function LabSoundControls({ audio }: { audio: LabAudio }) {
-  const [enabled, setEnabled] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState(false);
-  async function toggle() {
-    if (pending) return;
-    if (enabled) { audio.disable(); setEnabled(false); return; }
-    setPending(true);
-    const ready = await audio.enable();
-    setEnabled(ready); setError(!ready); setPending(false);
-  }
+export default function LabSoundControls({ enabled, pending, error, onToggle }: {
+  enabled: boolean;
+  pending: boolean;
+  error: boolean;
+  onToggle: () => void;
+}) {
   return <div className="lab-sound-controls">
     <button type="button" className="lab-sound-toggle" role="switch" aria-label="Sound effects" aria-checked={enabled} aria-busy={pending} aria-disabled={pending}
-      title={enabled ? "Sound is on · click to mute" : "Sound is off · click to enable"} onClick={() => void toggle()}>
+      title={enabled ? "Sound is on · click to mute" : "Sound is off · click to enable"} onClick={onToggle}>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M11 5 6 9H3v6h3l5 4Z" />
         {enabled ? <><path d="M15 8a6 6 0 0 1 0 8" /><path d="M18 5a10 10 0 0 1 0 14" /></> : <path d="m16 9 6 6m0-6-6 6" />}
