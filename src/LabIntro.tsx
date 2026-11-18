@@ -39,9 +39,10 @@ export default function LabIntro({ trials, nextX, objectivePreset, onExplore }: 
   const revealObjective = observed === trials.length;
   const plot = usePlotSize();
   const width = Math.max(240, plot.width), height = Math.max(140, plot.height);
-  const left = 30, right = width - 20, bottom = height - 28;
+  const left = 30, right = width - 20, top = 26, bottom = height - 28;
   const sx = (x: number) => left + (x + 5) / 10 * (right - left);
-  const sy = (y: number) => bottom - y / 8 * (bottom - 58);
+  const sy = (y: number) => bottom - y / 8 * (bottom - top - 8);
+  const proposalX = sx(nextX);
   return <section className="lab-intro" aria-label="TPE experiment preview">
     <div className="lab-intro-heading"><h2>Find the x that minimizes y.</h2><p>Try x. Observe y = f(x). Let TPE choose where to try next.</p></div>
     <div className="lab-intro-workbench">
@@ -56,14 +57,22 @@ export default function LabIntro({ trials, nextX, objectivePreset, onExplore }: 
       <div className="lab-intro-plot">
         <div className="lab-plot-caption"><span>Lower y is better ↓</span><span>{observed} observations</span></div>
         <div className="lab-curve-caption">{revealObjective ? "Dashed curve: true y = f(x), revealed for illustration" : "The function is hidden. Each trial reveals one value."}</div>
+        <div className="lab-plot-explore" aria-live="polite">
+          {ready && <>
+            <span id="lab-explore-question">Why here?</span>
+            <button ref={exploreRef} className="journey-action journey-primary" aria-describedby="lab-explore-question" onClick={onExplore}>Explore →</button>
+          </>}
+        </div>
         <svg ref={plot.ref} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${observed} observations${ready ? `; next proposed x ${nextX.toFixed(2)}, not yet evaluated` : ""}`}>
-          <g className="lab-axes"><line x1={left} y1="50" x2={left} y2={bottom} /><line x1={left} y1={bottom} x2={right} y2={bottom} />{[-5, 0, 5].map((x) => <text key={x} x={sx(x)} y={height - 7} textAnchor="middle">{x}</text>)}{[0, 4, 8].map((y) => <text key={y} x="20" y={sy(y) + 5} textAnchor="end">{y}</text>)}<text x={width - 9} y={height - 7}>x</text><text x="12" y="45">y</text></g>
+          <g className="lab-axes"><line x1={left} y1={top} x2={left} y2={bottom} /><line x1={left} y1={bottom} x2={right} y2={bottom} />{[-5, 0, 5].map((x) => <text key={x} x={sx(x)} y={height - 7} textAnchor="middle">{x}</text>)}{[0, 4, 8].map((y) => <text key={y} x="20" y={sy(y) + 5} textAnchor="end">{y}</text>)}<text x={width - 9} y={height - 7}>x</text><text x="12" y={top - 5}>y</text></g>
           {revealObjective && <path className="lab-objective-curve" d={objectiveValues.map((y, index) => `${index ? "L" : "M"}${sx(explanationGrid[index])},${sy(y)}`).join(" ")} />}
           {trials.slice(0, observed).map((trial, index) => <g key={trial.id} className={index === observed - 1 ? "lab-point lab-point-current" : "lab-point"}><circle cx={sx(trial.x)} cy={sy(trial.y)} r={index === observed - 1 ? 5 : 3.5} /><text x={sx(trial.x)} y={sy(trial.y) + (index === observed - 1 ? 19 : -10)} textAnchor="middle">{trial.id}</text></g>)}
-          {ready && <g className="lab-next"><line x1={sx(nextX)} x2={sx(nextX)} y1="62" y2={bottom} /><circle cx={sx(nextX)} cy={bottom} r="6" /><text x={Math.max(70, Math.min(width - 70, sx(nextX)))} y="27" textAnchor="middle">Why here?</text><text className="lab-next-value" x={Math.max(70, Math.min(width - 70, sx(nextX)))} y="49" textAnchor="middle">next x = {nextX.toFixed(2)}</text></g>}
+          {ready && <g className="lab-next">
+            <line x1={proposalX} x2={proposalX} y1={top} y2={bottom} />
+            <text x={Math.max(70, Math.min(width - 70, proposalX))} y={top - 9} textAnchor="middle">next x = {nextX.toFixed(2)}</text>
+          </g>}
         </svg>
       </div>
     </div>
-    <div className="lab-intro-entry" aria-live="polite">{ready && <button ref={exploreRef} className="journey-action journey-primary" onClick={onExplore}>Why this point? →</button>}</div>
   </section>;
 }

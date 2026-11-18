@@ -410,31 +410,28 @@
 
 .lab-intro-plot { min-height: 0; padding: 22px 16px 14px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .lab-plot-caption { display: flex; justify-content: space-between; gap: 12px; padding: 0 12px; font-size: 12px; color: var(--muted); }
-.lab-intro-plot svg { width: 100%; display: block; margin-top: 18px; flex: 1; height: 0; min-height: 0; }
+.lab-intro-plot svg { width: 100%; display: block; margin-top: 4px; flex: 1; height: 0; min-height: 0; }
+.lab-plot-explore { display: flex; flex: 0 0 auto; min-height: 44px; margin-top: 6px; align-items: center; justify-content: center; gap: 12px; color: var(--proposal-color); font-size: clamp(18px, 3vw, 24px); font-weight: 700; }
 .lab-axes line { stroke: var(--border); }
 .lab-axes text { fill: var(--muted); font-size: 15px; }
 .lab-point circle { fill: var(--muted); }
 .lab-point text { fill: var(--muted); font-size: 13px; }
 .lab-point-current circle { fill: var(--text); }
-.lab-next line { stroke: var(--accent); stroke-dasharray: 5 6; }
-.lab-next circle { fill: var(--background); stroke: var(--accent); stroke-width: 2; }
-.lab-next text { fill: var(--accent); font-size: 28px; font-weight: 700; }
-.lab-intro-entry { text-align: center; flex-shrink: 0; }
+.lab-next line { stroke: var(--proposal-color); stroke-dasharray: 5 6; }
+.lab-next text { fill: var(--proposal-color); font: 600 13px ui-monospace, SFMono-Regular, Consolas, monospace; }
 .lab-intro button:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 @media (max-width: 700px) {
-  .lab-intro { height: calc(100dvh - 48px); padding: 8px 10px 12px; gap: 10px; }
-  .lab-intro-workbench { grid-template-columns: 1fr; grid-template-rows: 180px minmax(0, 1fr); }
+  .lab-intro { height: calc(100dvh - 48px); min-height: 620px; padding: 8px 10px 12px; gap: 10px; }
+  .lab-intro-workbench { grid-template-columns: 1fr; grid-template-rows: 180px minmax(280px, 1fr); }
   .lab-terminal { border-right: 0; border-bottom: 1px solid var(--border); padding: 10px 14px; justify-content: start; font-size: 12px; line-height: 1.6; }
   .lab-command { margin: 6px 0; font-size: 14px; min-height: 22px; }
   .lab-log > div.lab-log-older { display: none; }
   .lab-proposal-log { margin-top: 6px; }
   .lab-intro-plot { min-height: 0; padding: 12px 8px 4px; }
-  .lab-intro-plot svg { flex: 1; min-height: 0; height: 0; margin-top: 8px; }
   .lab-plot-caption { padding: 0 4px; font-size: 11px; }
   .lab-axes text, .lab-point text { font-size: 12px; }
-  .lab-next text { font-size: 24px; }
 }
-.lab-intro .journey-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 650; padding: 12px 24px; }
+.lab-plot-explore .journey-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 650; padding: 6px 14px; }
 
 .lab-prompt, .lab-executable { color: var(--good); }
 .lab-filename, .lab-log-x { color: var(--accent); }
@@ -463,9 +460,6 @@
 .lab-proposal-log { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 0 6px; font-size: 11px; white-space: nowrap; }
 .lab-intro { --proposal-color: #996000; }
 [data-theme="dark"] .lab-intro { --proposal-color: #e8b66a; }
-.lab-next line, .lab-next circle { stroke: var(--proposal-color); }
-.lab-next text { fill: var(--proposal-color); }
-.lab-next .lab-next-value { font: 600 13px ui-monospace, SFMono-Regular, Consolas, monospace; }
 
 .lab-sound-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 0; font-size: 11px; }
 .lab-sound-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 6px 9px; font: inherit; font-weight: 650; letter-spacing: 0.04em; color: inherit; background: transparent; border: 1px solid #80808055; border-radius: 8px; cursor: pointer; }
@@ -495,7 +489,6 @@
 .lab-terminal-actions button { display: inline-flex; align-items: center; gap: 6px; }
 .lab-terminal-actions svg { flex-shrink: 0; fill: currentColor; }
 .lab-terminal-title .lab-skip { border-color: transparent; font-size: 11px; }
-.lab-intro-entry { min-height: 44px; }
 @keyframes journey-tap-pulse { from { transform: scale(.7); opacity: .9; } to { transform: scale(1.4); opacity: 0; } }
 @media (max-width: 800px) { .journey { min-height: calc(100dvh - 48px); } }
 @media (prefers-reduced-motion: reduce) { .journey-tap-marker .journey-tap-ring { animation: none; } }
@@ -544,12 +537,6 @@
 @media (max-width: 800px) {
   .journey .journey-heading .journey-math { font-size: 18px; }
 }
-@media (max-width: 700px) {
-  .lab-intro { height: calc(100dvh - 48px); min-height: 620px; }
-  .lab-intro-workbench { grid-template-rows: auto minmax(280px, 1fr); min-height: 0; }
-  .lab-proposal-log { flex-wrap: nowrap; white-space: nowrap; }
-}
-
 /* Constrain the math grid itself, so intrinsic KaTeX widths cannot widen the page. */
 .journey .journey-heading .journey-formula { grid-template-columns: minmax(0, 1fr); }
 .journey .journey-heading .journey-math { width: 100%; min-width: 0; }
