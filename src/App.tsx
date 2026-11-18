@@ -211,7 +211,8 @@ export default function App() {
           <li><strong>Model.</strong> Fit densities ℓ(x) and g(x) to the two groups using kernel density estimation (KDE).</li>
           <li><strong>Sample.</strong> Draw candidates from ℓ(x), evaluate the one with the highest ℓ(x)/g(x), and repeat.</li>
         </ol>
-        <p>Explore the steps in <a href="#play">Play 2D</a> or <a href="#play-2d">Play 3D</a>. For bandwidths, weights, and other design choices, see <a href="https://arxiv.org/abs/2304.11127">Watanabe’s TPE tutorial</a>. This playground uses a simplified educational implementation.</p>
+        <p>Explore the steps in <a href="#play">Play 2D</a> or <a href="#play-2d">Play 3D</a>. For bandwidths, weights, and other design choices, see <a href="https://arxiv.org/abs/2304.11127">Watanabe’s TPE tutorial</a>.</p>
+        <p>TPE Playground uses a simplified educational implementation. <a href="https://github.com/Kaichi-Irie/tpe-playground">View the playground’s source code on GitHub</a>.</p>
         <section className="algorithm-comparison" aria-labelledby="comparison-heading">
           <h3 id="comparison-heading">TPE and other optimizers</h3>
           <div className="algorithm-table-scroll" role="region" aria-label="Optimization algorithm comparison" tabIndex={0}>
