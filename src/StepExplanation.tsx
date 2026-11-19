@@ -27,6 +27,8 @@ const badMath = String.raw`\htmlClass{journey-bad}{g}`;
 const alphaMath = String.raw`\htmlClass{journey-prior}{\alpha}`;
 const h = String.raw`\htmlClass{journey-accent}{h}`;
 const compactLabQuery = "(max-width: 800px)";
+const acquisitionFormula = String.raw`${alphaMath}(x)=\frac{${goodMath}(x)}{${badMath}(x)}`;
+const nextFormula = String.raw`x_{\mathrm{next}}=\underset{z_j}{\arg\max}\;${alphaMath}(z_j)`;
 const normalKernel = String.raw`k_i(x;${h})=\mathcal N(x\mid x_i,${h}^2)`;
 const kernelScale = String.raw`\frac{1}{${h}\sqrt{2\pi}}`;
 export const kernelFormula = String.raw`${normalKernel}=${kernelScale}\exp\!\left(-\frac{(x-x_i)^2}{2${h}^2}\right)`;
@@ -252,11 +254,9 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     String.raw`\htmlClass{journey-good}{\mathrm{Good}:\ y_i\leq y^*}\quad\htmlClass{journey-bad}{\mathrm{Bad}:\ y_i>y^*}`,
     "",
     compactLab ? kernelFormulaCompact : kernelFormula,
-    compactLab
-      ? String.raw`\begin{aligned}p(x\mid\mathcal D_{\mathrm{Bad}})&\approx ${badMath}(x)=${densityExpansion("Bad")}\\[6pt]p(x\mid\mathcal D_{\mathrm{Good}})&\approx ${goodMath}(x)=${densityExpansion("Good")}\end{aligned}`
-      : String.raw`\begin{aligned}p(x\mid\mathcal D_{\mathrm{Bad}})&\approx ${badMath}(x)\\${badMath}(x)&=${densityExpansion("Bad")}\\[6pt]p(x\mid\mathcal D_{\mathrm{Good}})&\approx ${goodMath}(x)\\${goodMath}(x)&=${densityExpansion("Good")}\end{aligned}`,
+    String.raw`\begin{aligned}p(x\mid\mathcal D_{\mathrm{Bad}})&\approx ${badMath}(x)=${densityExpansion("Bad")}\\[6pt]p(x\mid\mathcal D_{\mathrm{Good}})&\approx ${goodMath}(x)=${densityExpansion("Good")}\end{aligned}`,
     String.raw`z_1,\ldots,z_M\sim ${goodMath}(x)`,
-    String.raw`\begin{gathered}${alphaMath}(x)=\frac{${goodMath}(x)}{${badMath}(x)}\\[6pt]x_{\mathrm{next}}=\underset{z_j}{\arg\max}\;${alphaMath}(z_j)\end{gathered}`,
+    compactLab ? String.raw`\begin{gathered}${acquisitionFormula}\\[6pt]${nextFormula}\end{gathered}` : String.raw`${acquisitionFormula},\qquad ${nextFormula}`,
     p < 7.95 ? String.raw`y_{\mathrm{next}}=f(x_{\mathrm{next}})` : String.raw`(x_{\mathrm{next}},y_{\mathrm{next}})=(${nextTrial.x.toFixed(1)},${nextTrial.y.toFixed(1)})`,
   ];
 
