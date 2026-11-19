@@ -6,6 +6,8 @@ it("renders the density explorer with playback controls and an empty initial his
   const html = renderToStaticMarkup(<App />);
   expect(html).toContain("What is TPE?");
   expect(html).toContain('href="#lab"');
+  expect(html).toContain('href="#play-2d" aria-current="page">Play 2D');
+  expect(html).toContain('href="#play-3d">Play 3D');
   expect(html).not.toContain('href="#explain"');
   expect(html).toContain("Minimize f(x)");
   expect(html).not.toContain("TPE density explorer");
@@ -71,6 +73,7 @@ it("renders About as a named article with five parallel section headings", () =>
   const article = html.match(/<article\b[^>]*class="about-page"[^>]*>[\s\S]*?<\/article>/)?.[0] ?? "";
 
   expect(article).toMatch(/^<article\b[^>]* aria-label="About"/);
+  expect(article).toContain('<a href="#play-2d">Play 2D</a> or <a href="#play-3d">Play 3D</a>');
   expect(article).not.toMatch(/<h3\b/);
   expect(Array.from(article.matchAll(/<h2\b[^>]*>(.*?)<\/h2>/g), ([, heading]) => heading)).toEqual([
     "What is TPE?",

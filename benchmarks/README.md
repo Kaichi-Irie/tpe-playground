@@ -1,4 +1,4 @@
-# Play 2D performance (#22)
+# Play 3D performance (#22)
 
 ## Reproduce
 
@@ -17,7 +17,7 @@ For a production browser comparison:
 npm run bench:browser
 ```
 
-Open `http://127.0.0.1:4173/tpe-playground/benchmarks/runner.html?profile2d#play-2d`
+Open `http://127.0.0.1:4173/tpe-playground/benchmarks/runner.html?profile2d#play-3d`
 in a visible foreground tab. Wait for the explorer to load, then press **Run browser
 benchmark**. The suite runs idle, keyboard rotation, timed Play, Play + rotation,
 bandwidth changes (about 10 seconds each), then 0→200 seek. Download the results;
@@ -27,7 +27,7 @@ optionally put them in ignored `benchmarks/results/` and summarize with:
 node benchmarks/summarize.mjs benchmarks/results/foreground-results.json
 ```
 
-Use `?profile2d&mutations#play-2d` for a separate 10-input diagnostic. It counts DOM
+Use `?profile2d&mutations#play-3d` for a separate 10-input diagnostic. It counts DOM
 mutations and hashes exact scene geometry/attributes/painter order. Play uses one
 Next trial per frame in this diagnostic so faster renderers still end at trial 110.
 It is not a timing comparison. Normal timed runs use the real one-second timer.

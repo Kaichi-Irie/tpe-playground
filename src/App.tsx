@@ -3,7 +3,7 @@ import { usePlotSize } from "./usePlotSize";
 import { PlaybackControls } from "./PlaybackControls";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { weightOptions } from "./searchSettings";
-import { consumeShare, readRoute, readSharedSearch, type Route, type SharedSearch } from "./shareSearch";
+import { consumeShare, playHashes, readRoute, readSharedSearch, type Route, type SharedSearch } from "./shareSearch";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { trialLimit, buildView1D, prior, searchDefaults, defaults, domain, proposeTrial, proposal1DFromTrace, type Trial } from "./tpe";
 
@@ -248,7 +248,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
           <li><strong>Model.</strong> Fit densities ℓ(x) and g(x) to the two groups using kernel density estimation (KDE).</li>
           <li><strong>Sample.</strong> Draw candidates from ℓ(x), evaluate the one with the highest ℓ(x)/g(x), and repeat.</li>
         </ol>
-        <p>Explore the steps in <a href="#play">Play 2D</a> or <a href="#play-2d">Play 3D</a>. For bandwidths, weights, and other design choices, see <a href="https://arxiv.org/abs/2304.11127">Watanabe’s TPE tutorial</a>.</p>
+        <p>Explore the steps in <a href={playHashes["1d"]}>Play 2D</a> or <a href={playHashes["2d"]}>Play 3D</a>. For bandwidths, weights, and other design choices, see <a href="https://arxiv.org/abs/2304.11127">Watanabe’s TPE tutorial</a>.</p>
         <p>TPE Playground uses a simplified educational implementation. <a href="https://github.com/Kaichi-Irie/tpe-playground">View the playground’s source code on GitHub</a>.</p>
         <section className="algorithm-comparison" aria-labelledby="comparison-heading">
           <h2 id="comparison-heading">TPE and other optimizers</h2>

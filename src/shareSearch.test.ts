@@ -20,11 +20,26 @@ function roundTrip1D(search: SharedSearch<ObjectivePreset>) {
 
 describe("share links", () => {
   it.each([
-    ["", "1d"], ["#play", "1d"], ["#play-2d", "2d"], ["#about", "about"],
+    ["", "1d"], ["#play", "1d"], ["#play-2d", "1d"], ["#play-3d", "2d"], ["#about", "about"],
     ["#lab?seed=3", "lab"], ["#about?v=1", "about"], ["#invalid?v=1&seed=3", "1d"],
-    ["#play?seed=3", "1d"], ["#play-2d?v=2&seed=3", "2d"],
+    ["#play?seed=3", "1d"], ["#play?v=2&seed=3", "1d"],
+    ["#play-2d?v=3&seed=3", "1d"], ["#play-3d?v=3&seed=3", "2d"],
   ])("opens %s as %s without a settings payload", (hash, page) => {
     expect(readRoute(hash)).toEqual({ page, share: null });
+  });
+
+  it.each([
+    ["#play?v=1&seed=3", "1d"], ["#play-2d?v=1&seed=3", "2d"],
+    ["#play-2d?v=2&seed=3", "1d"], ["#play-3d?v=2&seed=3", "2d"],
+  ])("opens shared settings from %s in %s", (hash, page) => {
+    const route = readRoute(hash);
+    expect(route.page).toBe(page);
+    expect(route.share?.get("seed")).toBe("3");
+  });
+
+  it("writes the 2D route for new 2D share links", () => {
+    const url = new URL(createShareUrl(pageUrl, { page: "1d", preset: defaults1D.preset }, defaults1D.seed, defaults1D.settings));
+    expect(url.hash).toMatch(/^#play-2d\?v=2&/);
   });
 
   it("preserves the base path and writes the 3D route and density mode without tracking parameters", () => {
@@ -32,6 +47,7 @@ describe("share links", () => {
     const route = readRoute(url.hash);
     expect(url.pathname).toBe("/tpe-playground/");
     expect(url.search).toBe("");
+    expect(url.hash).toMatch(/^#play-3d\?v=2&/);
     expect(route.page).toBe("2d");
     expect(route.share?.get("mode")).toBe("univariate");
     expect(route.share?.get("seed")).toBe("99");
