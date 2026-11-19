@@ -3,8 +3,8 @@ import { expect, it } from "vitest";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { defaultModelSettings2D, settings2D } from "./tpe2d";
 
-it("keeps dialog actions in the footer and the seed in Experiment", () => {
-  const html = renderToStaticMarkup(
+function renderPanel(status?: string) {
+  return renderToStaticMarkup(
     <ModelSettingsPanel
       experiment={{ page: "2d", preset: "quadratic", mode: "multivariate" }}
       settings={defaultModelSettings2D}
@@ -15,8 +15,26 @@ it("keeps dialog actions in the footer and the seed in Experiment", () => {
       trialLimit={settings2D.count}
       widths={[]}
       domainWidth={10}
+      status={status}
     />,
   );
+}
+
+it("renders playback status between Settings and the live controls when provided", () => {
+  const html = renderPanel("Random start");
+  const settingsButton = html.indexOf(">Settings</button>");
+  const status = html.indexOf('class="model-status"');
+  const liveControls = html.indexOf('class="config live-model-controls');
+
+  expect(settingsButton).toBeGreaterThanOrEqual(0);
+  expect(status).toBeGreaterThan(settingsButton);
+  expect(liveControls).toBeGreaterThan(status);
+  expect(html.slice(status, liveControls)).toContain("Random start");
+  expect(renderPanel()).not.toContain('class="model-status"');
+});
+
+it("keeps dialog actions in the footer and the seed in Experiment", () => {
+  const html = renderPanel();
 
   const heading = html.match(/class="settings-dialog-heading">([\s\S]*?)<\/div>/)?.[1];
   expect(heading).toMatch(/^<h2[^>]*>Settings<\/h2><button[^>]*aria-label="Close settings"[^>]*>×<\/button>$/);
