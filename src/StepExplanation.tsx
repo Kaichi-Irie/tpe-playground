@@ -419,6 +419,8 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     const radius = mix(5.5, 3.5 + Math.sqrt(kernel.mixtureWeight) * 9, clamp(p - 4) * (1 - evaluation));
     const visibleRadius = kernelPicking ? Math.max(radius, 9 * screenScale) : radius;
     const guideLabelX = Math.max((left - x) / ui + 8, Math.min(28, (right - x) / ui - 112));
+    // IDs sit right of the point unless that would overflow the plot edge.
+    const indexSide = x + 30 * ui > W ? -1 : 1;
     const guided = kernelPicking && !allKernels && placed.length < 3 && history.find((entry) => !placed.includes(entry.id))?.id === trial.id;
     return <g key={trial.id} data-observation={trial.id} aria-hidden={observed === 0} style={{ ...pointStyle(x, y - base, color, observed === 0 ? 0 : !guided && focused !== null && focused !== trial.id ? 0.3 : 1), transition: "color 350ms ease, opacity 200ms ease", pointerEvents: observed === 0 ? "none" : undefined }}>
       <g className="journey-observation-control" tabIndex={observed === 0 ? -1 : 0} role="button" aria-label={`Observation at x ${trial.x.toFixed(1)}${p >= 1 ? `, f(x) ${trial.y.toFixed(1)}` : ""}`} onMouseEnter={() => setFocused(trial.id)} onMouseLeave={() => setFocused(null)} onFocus={() => setFocused(trial.id)} onBlur={() => setFocused(null)} onClick={(event) => kernelPicking && event.detail !== 0 ? pickKernel(event.clientX, event.clientY) : placeKernel(trial.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); placeKernel(trial.id); } }}>
@@ -426,7 +428,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         <circle r={visibleRadius} className="journey-observation" />
         <title>{p < 1 ? `x = ${trial.x.toFixed(1)}` : `x = ${trial.x.toFixed(1)}, f(x) = ${trial.y.toFixed(1)}`}</title>
       </g>
-      <text className="journey-point-index" x={kernelPicking ? visibleRadius + 5 * ui : 10 * ui} y={kernelPicking ? -visibleRadius - 4 * ui : -9 * ui}>{trial.id}</text>
+      <text className="journey-point-index" x={(kernelPicking ? visibleRadius + 5 * ui : 10 * ui) * indexSide} y={kernelPicking ? -visibleRadius - 4 * ui : -9 * ui} textAnchor={indexSide < 0 ? "end" : undefined}>{trial.id}</text>
       {guided && <g className="journey-tap-marker journey-kernel-guide" transform={`scale(${ui})`} aria-hidden="true">
         <circle className="journey-tap-ring" r="22" /><circle r="15" />
         <path d={`M14-14L${guideLabelX + 8}-40`} />
@@ -553,7 +555,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
                 <line x1={sx(x)} x2={sx(x)} y1="0" y2="4" />
                 <text x={sx(x)} y="23" textAnchor="middle">{x}</text>
               </g>)}
-              {kind === "bad" && <text className="journey-axis-title" x={W - 4 * screenScale} y="4" textAnchor="end">x</text>}
+              {kind === "bad" && <text className="journey-axis-title" x={W - 4 * screenScale} y={-8 * ui} textAnchor="end">x</text>}
               <text x={left} y={mix(-H * 0.29, (kind === "good" ? lane + 50 : 50) - laneBase, scoring)} className={`journey-${kind}`} opacity={project}>{p < 4.5 ? (kind === "good" ? "Good" : "Bad") : kind === "good" ? "ℓ(x)" : "g(x)"}</text>
             </g>
             <g className={`journey-${kind}`} opacity={densityVisibility} aria-hidden={stage < 4 || stage === 8}>
@@ -616,7 +618,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         <text className="journey-acquisition-title" x={left} y={stage === 6 ? sampleBase - 40 : lane * 2 + 50}>{stage === 6 ? `Candidates zⱼ · M = ${settings.candidates}` : ratioPlot.logarithmic ? "Acquisition α(x) · log scale" : "Acquisition α(x)"}</text>
         </g>
         {[-5,-4,-3,-2,-1,0,1,2,3,4,5].map((x) => <g key={x}><line x1={sx(x)} x2={sx(x)} y1={sampleBase} y2={sampleBase + 6} /><text x={sx(x)} y={sampleBase + 23} textAnchor="middle">{x}</text></g>)}
-        <text x={W - 4 * screenScale} y={sampleBase + 5} textAnchor="end">x</text>
+        <text x={W - 4 * screenScale} y={sampleBase - 8 * ui} textAnchor="end">x</text>
       </g>
       <g aria-hidden={stage < 6 || stage === 8} style={{ pointerEvents: stage === 6 || stage === 7 ? "auto" : "none" }}>
         {orderedCandidates.map(({ candidate, index: i }) => {
