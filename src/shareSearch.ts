@@ -29,10 +29,14 @@ export function readRoute(hash: string): Route {
   return { page: path === "#lab" ? "lab" : path === "#about" ? "about" : "1d", share: null };
 }
 
-// Consume a shared configuration once per opening. Ordinary tab navigation can
-// then use history without resetting the running 1D experiment.
-export function consumeShare(page: Page) {
-  if (page === "1d" || page === "2d") window.history.replaceState(window.history.state, "", playHashes[page]);
+export function readBrowserRoute(): Route {
+  const { hash } = window.location;
+  const route = readRoute(hash);
+  // Replace the current entry when consuming a share or opening the old bookmark.
+  if ((route.page === "1d" || route.page === "2d") && (route.share || hash === "#play")) {
+    window.history.replaceState(window.history.state, "", playHashes[route.page]);
+  }
+  return route;
 }
 
 export function createShareUrl(documentUrl: string, experiment: ShareExperiment, seed: number, settings: ModelSettings) {
