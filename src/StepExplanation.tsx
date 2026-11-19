@@ -13,7 +13,7 @@ import { LabAudio } from "./labAudio";
 import LabSoundControls from "./LabSoundControls";
 import { labLayout } from "./labLayout";
 import { usePlotSize } from "./usePlotSize";
-import { loadSeenHints, nextHint, saveSeenHints, type LabHintId } from "./labHints";
+import { clearSeenHints, loadSeenHints, nextHint, saveSeenHints, type LabHintId } from "./labHints";
 import LabHintBubble, { labHintElementId } from "./LabHintBubble";
 
 const stages = ["Unknown objective", "Observe", "Split", "Model inputs", "Kernels", "Density", "Sample", "Choose", "Evaluate"];
@@ -244,8 +244,8 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   function noteControlUsed(id: LabHintId) {
     if (activeHint === id && !usedHints.has(id)) setUsedHints((current) => new Set([...current, id]));
   }
-  function showHintsAgain() {
-    saveSeenHints(new Set());
+  function resetHints() {
+    clearSeenHints();
     setSeenHints(new Set());
     setUsedHints(new Set());
   }
@@ -268,17 +268,17 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     if (point.x < left || point.x > right || point.y < 35 || point.y > bottom) return;
     applySplit((bottom - point.y) / (bottom - 35) * 8);
   }
-  function confirmSplit(height = data.partition.threshold) {
+  function confirmSplit(goodCount = data.partition.good.length) {
     setFocused(null);
     setSoundPromptDismissed(true);
     setStage(2);
-    audio.play("split", height);
+    audio.play("split", goodCount);
   }
   function applySplit(value: number) {
-    const { gamma, threshold } = splitAtThreshold(history, value);
+    const { gamma } = splitAtThreshold(history, value);
     setSettings((current) => ({ ...current, gamma }));
     // The tap target persists in Split, so keyboard focus stays on the grid.
-    confirmSplit(threshold);
+    confirmSplit(splitTrials(history, gamma).good.length);
   }
   function inspectSplitPoint(clientX: number, clientY: number) {
     const matrix = canvas.ref.current?.getScreenCTM();
@@ -312,7 +312,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   function placeKernel(id: number) {
     setFocused(id);
     if (intro || animating || (stage !== 4 && stage !== 5)) return;
-    audio.play("kernel");
+    audio.play("kernel", history.find((trial) => trial.id === id)?.x);
     if (stage === 4 && !allKernels && !placed.includes(id)) {
       setPlaced((current) => [...current, id]);
     }
@@ -347,7 +347,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     if (intro || controlDisabled) return;
     setSettings((current) => ({ ...current, ...patch }));
     if (patch.bandwidth !== undefined && patch.bandwidth !== settings.bandwidth && (allKernels || placed.length > 0)) audio.play("bandwidth", patch.bandwidth);
-    if (patch.gamma !== undefined && patch.gamma !== settings.gamma) audio.adjustSplit(splitTrials(history, patch.gamma).threshold);
+    if (patch.gamma !== undefined && patch.gamma !== settings.gamma) audio.adjustSplit(splitTrials(history, patch.gamma).good.length, splitTrials(history, settings.gamma).good.length);
     if (patch.priorWeight !== undefined && patch.priorWeight !== settings.priorWeight) audio.play("alpha", patch.priorWeight);
     setInspected(null);
     if (patch.seed !== undefined) dispatchSampling({ type: "reset", revealed: stage === 7 ? settings.candidates : 0 });
@@ -399,6 +399,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   function restart() {
     audio.stop();
     preserveLessonFocus(true);
+    resetHints();
     setIntro(true); setRounds(0); setChosen([]); setAutoShown(0); setInitialComplete(false); setPlaced([]); setAllKernels(false); dispatchSampling({ type: "reset" });
     setHistory([...example.trials]); setSettings(explanationDefaults);
     setFocused(null); setInspected(null); jump(0); setStage(0); setReplay((v) => v + 1);
@@ -485,7 +486,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         "  D ← D ∪ {(x_next, f(x_next))}",
       ].map((line, index) => <li key={line} aria-current={index === (stage <= 1 ? 0 : stage === 2 ? 2 : stage <= 5 ? 3 : stage === 6 ? 4 : stage === 7 ? 5 : 6) ? "step" : undefined}>{line}</li>)}</ol>
       </aside>
-    </div><button type="button" className="algorithm-trigger lab-hints-trigger" onClick={showHintsAgain} aria-label="Show control hints again" title="Show control hints again">
+    </div><button type="button" className="algorithm-trigger lab-hints-trigger" onClick={resetHints} aria-label="Show control hints again" title="Show control hints again">
       <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M6 12.5h4M6.5 14.5h3M5.2 10.2A4.5 4.5 0 1 1 10.8 10.2c-.5.4-.8 1-.8 1.6V12H6v-.2c0-.6-.3-1.2-.8-1.6Z" /></svg><span>Hints</span>
     </button><LabSoundControls enabled={soundState === "on"} pending={soundState === "pending"}
       error={soundState === "error" && !showSoundPrompt} onToggle={() => void toggleSound()} /></>, algorithmContainer) : null}

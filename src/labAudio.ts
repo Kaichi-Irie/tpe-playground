@@ -1,32 +1,37 @@
 import { AlphaVoice } from "./alphaSynth";
 import { renderDice } from "./diceSounds";
-import { bandwidthFrequency, splitFrequency, kernelRotation, renderSound, type LabSound } from "./labSoundDesign";
+import { bandwidthFrequency, kernelNote, renderBandwidth, renderKernel, renderSplit, type LabSound, type SplitDirection } from "./labSoundDesign";
 
+// Values per sound: split = good count, kernel = observation x,
+// bandwidth = h, alpha = prior weight.
 export class LabAudio {
   private context: AudioContext | undefined;
   private output: GainNode | undefined;
   private voices = new Map<AudioBufferSourceNode, GainNode>();
   private enabled = false;
-  private lastSplitKey: string | undefined;
+  private lastSplitCount: number | undefined;
   private splitTimer: ReturnType<typeof setTimeout> | undefined;
   private lastSplitTime = -Infinity;
   private lastSplitInputTime = -Infinity;
-  private fadingVoices = new Set<AudioBufferSourceNode>();
 
-  adjustSplit(height: number, variant = this.variants.split) {
+  // A γ slider step from one good count to another: one ratchet click whose
+  // pitch shows the direction. The caller passes where the divider was, so the
+  // first click after enabling sound is directional too.
+  adjustSplit(goodCount: number, previousCount: number) {
+    // An edit that leaves the count unchanged moves nothing; keep any pending step.
+    if (goodCount === previousCount) return;
     clearTimeout(this.splitTimer);
     this.splitTimer = undefined;
     const context = this.context;
     if (!this.enabled || !context || context.state !== "running" || document.hidden) return;
-    const key = `${variant}:${splitFrequency(height, variant).toFixed(4)}`;
     const continuing = context.currentTime - this.lastSplitInputTime < 0.35;
     this.lastSplitInputTime = context.currentTime;
-    if (key === this.lastSplitKey && continuing) return;
+    if (goodCount === this.lastSplitCount && continuing) return;
+    const direction = Math.sign(goodCount - previousCount) as SplitDirection;
     const play = () => {
       this.splitTimer = undefined;
       if (!this.enabled || context.state !== "running" || document.hidden) return;
-      this.play("split", height, variant, true);
-      this.lastSplitKey = key;
+      this.playSplit(goodCount, direction);
       this.lastSplitTime = context.currentTime;
     };
     // Coalesce fast reversals, retaining the final slider position.
@@ -34,7 +39,6 @@ export class LabAudio {
     if (delay > 0) this.splitTimer = setTimeout(play, delay * 1000);
     else play();
   }
-  private variants = { kernel: 2, sample: 6, bandwidth: 2, split: 0, alpha: 0 };
   private alphaVoice: AlphaVoice | undefined;
   private alphaHeld = false;
   private alphaTimer: ReturnType<typeof setTimeout> | undefined;
@@ -49,24 +53,21 @@ export class LabAudio {
     this.releaseAlpha();
   }
 
-  auditionAlpha(value: number, variant: number) {
+  auditionAlpha(value: number) {
     this.endAlphaGesture();
-    this.play("alpha", value, variant);
+    this.play("alpha", value);
     clearTimeout(this.alphaTimer);
     if (this.alphaVoice) this.alphaTimer = setTimeout(() => this.releaseAlpha(), 1600);
   }
 
-  private releaseAlpha() {
+  private releaseAlpha(cut = false) {
     clearTimeout(this.alphaTimer);
     this.alphaTimer = undefined;
-    this.alphaVoice?.release();
+    this.alphaVoice?.release(cut);
     this.alphaVoice = undefined;
   }
 
-  private kernelStep = 0;
   private buffers = new Map<string, AudioBuffer>();
-
-  select(sound: LabSound, variant: number) { this.variants[sound] = variant; }
   private generation = 0;
   private lastPlayed = -Infinity;
   private lastBandwidthKey: string | undefined;
@@ -100,11 +101,11 @@ export class LabAudio {
   stop() {
     clearTimeout(this.splitTimer);
     this.splitTimer = undefined;
-    this.lastSplitKey = undefined;
+    this.lastSplitCount = undefined;
     this.lastSplitTime = -Infinity;
     this.lastSplitInputTime = -Infinity;
-    this.fadingVoices.clear();
-    this.endAlphaGesture();
+    this.alphaHeld = false;
+    this.releaseAlpha(true);
     for (const [voice, gain] of this.voices) {
       const now = this.context?.currentTime ?? 0;
       gain.gain.setTargetAtTime(0, now, 0.005);
@@ -132,45 +133,62 @@ export class LabAudio {
     this.stop();
   }
 
-  play(sound: LabSound, value?: number, previewVariant?: number, legato = false) {
+  // A confirming split tap (value = good count) strikes a neutral click.
+  play(sound: LabSound, value?: number) {
     const context = this.context;
     if (!this.enabled || !context || !this.output || context.state !== "running" || document.hidden) return;
     if (sound === "alpha") {
       clearTimeout(this.splitTimer);
       this.splitTimer = undefined;
-      const variant = previewVariant ?? this.variants.alpha;
-      if (!this.alphaVoice || this.alphaVoice.variant !== variant) {
-        this.releaseAlpha();
-        this.alphaVoice = new AlphaVoice(context, this.output, variant);
-      }
+      this.alphaVoice ??= new AlphaVoice(context, this.output);
       this.alphaVoice.update(value ?? 4);
       clearTimeout(this.alphaTimer);
       // Pointer/key gestures sustain until release. AT and button edits settle
-      // after inactivity; a new edit extends the same voice, never restarts it.
+      // after inactivity; a new edit extends the same chord, never restarts it.
       if (!this.alphaHeld) this.alphaTimer = setTimeout(() => this.releaseAlpha(), 450);
       return;
     }
+    if (sound === "split") {
+      clearTimeout(this.splitTimer);
+      this.splitTimer = undefined;
+      this.playSplit(value ?? 1, 0);
+      return;
+    }
     const now = context.currentTime;
-    if (now - this.lastPlayed < (sound === "bandwidth" ? 0.12 : sound === "split" ? 0 : 0.075)) return;
-    const rotation = sound === "kernel" && previewVariant === undefined ? kernelRotation[this.kernelStep++ % kernelRotation.length] : undefined;
-    const variant = previewVariant ?? rotation?.variant ?? this.variants[sound];
-    const key = `${sound}:${variant}:${sound === "bandwidth" ? bandwidthFrequency(value ?? 0.55).toFixed(4) : sound === "split" && value !== undefined ? splitFrequency(value, variant).toFixed(4) : ""}`;
-    if (sound === "bandwidth" && key === this.lastBandwidthKey) return;
-    if (legato) {
-      this.endAlphaGesture();
-      // Preserve a short piano tail while the new note gently enters.
-      for (const [source, previousGain] of this.voices) {
-        if (this.fadingVoices.has(source)) continue;
-        previousGain.gain.setTargetAtTime(0, now, 0.085);
-        source.stop(now + 0.4);
-        this.fadingVoices.add(source);
-      }
-    } else this.stop();
+    if (now - this.lastPlayed < (sound === "bandwidth" ? 0.12 : 0.075)) return;
+    let key: string;
+    let render: () => Float32Array;
+    if (sound === "bandwidth") {
+      const h = value ?? 0.55;
+      key = `bandwidth:${bandwidthFrequency(h).toFixed(4)}`;
+      if (key === this.lastBandwidthKey) return;
+      render = () => renderBandwidth(h, context.sampleRate);
+    } else if (sound === "kernel") {
+      const midi = kernelNote(value ?? 0);
+      key = `kernel:${midi}`;
+      render = () => renderKernel(midi, context.sampleRate);
+    } else {
+      key = "sample";
+      render = () => renderDice(context.sampleRate);
+    }
+    this.stop();
     this.lastPlayed = now;
     if (sound === "bandwidth") this.lastBandwidthKey = key;
+    this.playBuffer(key, render, sound === "sample" ? 0.8 : 1);
+  }
+
+  // Clicks are short, so they never cut other sounds or each other.
+  private playSplit(goodCount: number, direction: SplitDirection) {
+    const context = this.context!;
+    this.lastSplitCount = goodCount;
+    this.playBuffer(`split:${direction}`, () => renderSplit(direction, context.sampleRate), 0.5);
+  }
+
+  private playBuffer(key: string, render: () => Float32Array, level: number) {
+    const context = this.context!;
     let buffer = this.buffers.get(key);
     if (!buffer) {
-      const samples = sound === "sample" ? renderDice(variant, context.sampleRate) : renderSound(sound, variant, context.sampleRate, value);
+      const samples = render();
       buffer = context.createBuffer(1, samples.length, context.sampleRate);
       buffer.getChannelData(0).set(samples);
       if (this.buffers.size > 160) this.buffers.clear();
@@ -178,14 +196,12 @@ export class LabAudio {
     }
     const voice = context.createBufferSource();
     voice.buffer = buffer;
-    voice.playbackRate.value = rotation?.rate ?? 1;
     const gain = context.createGain();
-    gain.gain.setValueAtTime(legato ? 0 : sound === "sample" ? 0.8 : 1, now);
-    if (legato) gain.gain.setTargetAtTime(0.85, now, 0.035);
+    gain.gain.setValueAtTime(level, context.currentTime);
     voice.connect(gain);
-    gain.connect(this.output);
+    gain.connect(this.output!);
     this.voices.set(voice, gain);
-    voice.onended = () => { voice.disconnect(); gain.disconnect(); this.voices.delete(voice); this.fadingVoices.delete(voice); };
+    voice.onended = () => { voice.disconnect(); gain.disconnect(); this.voices.delete(voice); };
     voice.start();
   }
 

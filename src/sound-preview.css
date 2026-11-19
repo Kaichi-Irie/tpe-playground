@@ -6,21 +6,12 @@ h1 { font-size: 32px; margin: 8px 0; }
 p { line-height: 1.6; }
 header > p:first-child { letter-spacing: .15em; font-size: 12px; }
 section { padding: 20px 0; border-bottom: 1px solid #80808060; }
-.candidates { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 24px; }
 button { color: inherit; background: transparent; border: 1px solid #80808080; border-radius: 10px; padding: 14px; font: inherit; cursor: pointer; }
-.candidates button { text-align: left; }
-.candidates button[aria-pressed="true"] { background: light-dark(#d9e8de, #294a38); border-color: currentColor; }
-button span { display: block; font-size: 13px; margin-top: 8px; line-height: 1.5; }
 button:focus-visible, input:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
 label { display: block; }
 output { float: right; font-variant-numeric: tabular-nums; }
 input[type="range"] { display: block; width: 100%; margin: 20px 0; }
 .lab-sound-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.lab-sound-controls button span { display: inline; }
-.lab-sound-volume:not([hidden]) { display: flex; gap: 12px; align-items: center; }
-.lab-sound-volume input { width: 150px; }
 footer { padding-top: 20px; }
 a { color: inherit; }
-.alpha-audition-control { position: sticky; top: 0; z-index: 1; padding: 16px; margin-bottom: 20px; border: 1px solid #80808060; border-radius: 12px; background: light-dark(#f4f5ef, #17231d); }
-.alpha-audition-control > strong { display: block; margin-bottom: 12px; }
-.sound-family { text-transform: uppercase; letter-spacing: .08em; opacity: .65; font-size: 11px; }
+.kernel-pads { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; margin-bottom: 12px; }

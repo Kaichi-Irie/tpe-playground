@@ -1,5 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { hintsForStage, loadSeenHints, nextHint, saveSeenHints, type LabHintId } from "./labHints";
+import { clearSeenHints, hintsForStage, loadSeenHints, nextHint, saveSeenHints, type LabHintId } from "./labHints";
+
+const storageKey = "tpe-lab-hints-seen";
+
+function stubStorage(name: "localStorage" | "sessionStorage") {
+  const store = new Map<string, string>();
+  vi.stubGlobal(name, {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => { store.set(key, value); },
+    removeItem: (key: string) => { store.delete(key); },
+  });
+  return store;
+}
+
+function blockedStorage(): never {
+  throw new Error("blocked");
+}
 
 describe("lab hints", () => {
   afterEach(() => { vi.unstubAllGlobals(); });
@@ -27,25 +43,56 @@ describe("lab hints", () => {
   });
 
   it("remembers seen hints and ignores unknown or corrupt storage", () => {
-    const store = new Map<string, string>();
-    vi.stubGlobal("localStorage", {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => { store.set(key, value); },
-      removeItem: (key: string) => { store.delete(key); },
-    });
+    const store = stubStorage("sessionStorage");
     saveSeenHints(new Set<LabHintId>(["gamma", "prior"]));
     expect([...loadSeenHints()]).toEqual(["gamma", "prior"]);
-    store.set("tpe-lab-hints-seen", JSON.stringify(["gamma", "unknown", 3]));
+    store.set(storageKey, JSON.stringify(["gamma", "unknown", 3]));
     expect([...loadSeenHints()]).toEqual(["gamma"]);
-    store.set("tpe-lab-hints-seen", "{not json");
+    store.set(storageKey, "{not json");
     expect(loadSeenHints().size).toBe(0);
     saveSeenHints(new Set());
-    expect(store.has("tpe-lab-hints-seen")).toBe(false);
+    expect(store.has(storageKey)).toBe(false);
+  });
+
+  it("removes the legacy local entry without restoring it", () => {
+    const local = stubStorage("localStorage");
+    const session = stubStorage("sessionStorage");
+    local.set(storageKey, JSON.stringify(["gamma"]));
+
+    expect(loadSeenHints().size).toBe(0);
+    expect(local.has(storageKey)).toBe(false);
+    expect(session.has(storageKey)).toBe(false);
+    saveSeenHints(new Set(["prior"]));
+    expect(local.has(storageKey)).toBe(false);
+  });
+
+  it("clears the seen hints stored for this tab", () => {
+    const store = stubStorage("sessionStorage");
+    saveSeenHints(new Set(["gamma"]));
+    expect(loadSeenHints()).toEqual(new Set(["gamma"]));
+
+    clearSeenHints();
+
+    expect(store.has(storageKey)).toBe(false);
+    expect(loadSeenHints().size).toBe(0);
+  });
+
+  it("loads tab storage when legacy cleanup is blocked", () => {
+    vi.stubGlobal("localStorage", { removeItem: blockedStorage });
+    const store = stubStorage("sessionStorage");
+    store.set(storageKey, JSON.stringify(["gamma"]));
+
+    expect(loadSeenHints()).toEqual(new Set(["gamma"]));
   });
 
   it("works without storage", () => {
-    vi.stubGlobal("localStorage", { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); }, removeItem: () => { throw new Error("blocked"); } });
+    vi.stubGlobal("sessionStorage", {
+      getItem: blockedStorage,
+      setItem: blockedStorage,
+      removeItem: blockedStorage,
+    });
     expect(loadSeenHints().size).toBe(0);
     expect(() => saveSeenHints(new Set<LabHintId>(["gamma"]))).not.toThrow();
+    expect(() => clearSeenHints()).not.toThrow();
   });
 });
