@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearSeenHints, guidePlacement, hintsForStage, loadSeenHints, nextHint, nextLabGuide, saveSeenHints, type LabHintId, type LabTaskGuideId } from "./labHints";
+import { clearSeenHints, completedTaskGuides, guidePlacement, hintsForStage, labHintIds, loadSeenHints, nextHint, nextLabGuide, saveSeenHints, taskGuideIds, type GuideContext, type LabHintId, type LabTaskGuideId } from "./labHints";
 
 const storageKey = "tpe-lab-hints-seen";
 
@@ -103,14 +103,27 @@ describe("Lab guide priority and milestones", () => {
     (region, placement) => expect(guidePlacement(region)).toBe(placement),
   );
 
-  const initial = {
+  const initial: GuideContext = {
     stage: 1, taskPending: true, paused: false, initialComplete: false, splitConfirmed: false,
     chosenCount: 0, placedCount: 0, drawnCount: 0, candidateCount: 3,
   };
 
-  function guide(patch: Partial<typeof initial>, dismissed: LabTaskGuideId[] = [], seen: LabHintId[] = []) {
-    return nextLabGuide({ ...initial, ...patch }, new Set(seen), new Set(dismissed));
+  function guide(patch: Partial<GuideContext>, doneTasks: LabTaskGuideId[] = [], seen: LabHintId[] = []) {
+    return nextLabGuide({ ...initial, ...patch }, new Set(seen), new Set(doneTasks));
   }
+
+  it.each<[Partial<GuideContext>, LabTaskGuideId[]]>([
+    [{ initialComplete: true }, ["observe"]],
+    [{ splitConfirmed: true }, ["split"]],
+    [{ stage: 4, placedCount: 3 }, ["kernels"]],
+    [{ stage: 4, placedCount: 2 }, []],
+    [{ stage: 6, drawnCount: 3 }, ["sample"]],
+    [{ stage: 6, drawnCount: 4 }, ["sample"]],
+    [{ stage: 6, drawnCount: 2 }, []],
+    [{ stage: 7, drawnCount: 3 }, []],
+  ])("recognizes completed tasks for %j", (patch, completed) => {
+    expect(completedTaskGuides({ ...initial, ...patch })).toEqual(completed);
+  });
 
   it("guides observation and then splitting, without resurfacing after a confirmed split", () => {
     expect(guide({ chosenCount: 2 })).toEqual({ kind: "task", id: "observe" });
@@ -132,6 +145,19 @@ describe("Lab guide priority and milestones", () => {
     expect(guide({ stage: 6, drawnCount: 1 })).toEqual({ kind: "task", id: "sample" });
     expect(guide({ stage: 6, drawnCount: 2 }, ["sample"])).toBeNull();
     expect(guide({ stage: 6, drawnCount: 3 })).toBeNull();
+  });
+
+  it("does not reopen a completed Sample guide after the candidate count grows", () => {
+    const patch = { stage: 6, drawnCount: 3, candidateCount: 10 };
+    expect(guide(patch, ["sample"])).toBeNull();
+    expect(guide(patch)).toEqual({ kind: "task", id: "sample" });
+  });
+
+  it.each([1, 2, 4, 5, 6, 7])("suppresses all guides in stage %i after the round ends", (stage) => {
+    for (const taskPending of [true, false]) {
+      expect(guide({ stage, taskPending }, taskGuideIds, labHintIds)).toBeNull();
+      expect(guide({ stage, taskPending, initialComplete: true }, taskGuideIds, labHintIds)).toBeNull();
+    }
   });
 
   it("suspends task and control cues while keeping their dismissal and sequence", () => {
