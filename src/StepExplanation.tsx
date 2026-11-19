@@ -133,7 +133,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   const [seenHints, setSeenHints] = useState<ReadonlySet<LabHintId>>(() => new Set());
   const [usedHints, setUsedHints] = useState<ReadonlySet<LabHintId>>(() => new Set());
   const [dismissedTasks, setDismissedTasks] = useState<ReadonlySet<LabTaskGuideId>>(() => new Set());
-  const [compactLab, setCompactLab] = useState(false);
+  const [compactLab, setCompactLab] = useState(() => typeof window !== "undefined" && window.matchMedia(compactLabQuery).matches);
   useEffect(() => {
     const query = window.matchMedia(compactLabQuery);
     const update = () => setCompactLab(query.matches);
@@ -513,12 +513,13 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   const guideBubble = guideMessage && placement && <LabHintBubble message={guideMessage} phase={hintPhase} placement={placement} onDismiss={dismissGuide} />;
 
   return <>{intro && <LabIntro trials={example.trials} nextX={nextTrial.x} objectivePreset={example.objectivePreset} onExplore={startLab} />}<section hidden={intro} ref={sectionRef} data-stage={stage} data-guide-region={guideRegion} data-hint={actionHint ?? undefined} className={`journey ${intro ? "journey-intro" : "journey-started"}  ${!intro && stage === 1 && !initialComplete ? "journey-picking" : ""}`} aria-label="Interactive TPE walkthrough" tabIndex={0} onKeyDown={(event) => {
+    if (event.target instanceof HTMLSelectElement) return;
     if (event.key === "Escape" && guide && !event.defaultPrevented) {
       event.preventDefault();
       dismissGuide(true);
       return;
     }
-    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+    if (event.target instanceof HTMLInputElement) return;
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); move(event.key === "ArrowRight" ? 1 : -1); }
   }}>
     <span className="sr-only" role="status">{visible ? announcedGuide : ""}</span>
@@ -764,12 +765,12 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         {activeTask === "split" && <circle className="journey-guide-ring" cx={sx(0)} cy={sy(data.partition.threshold)} r={16 * screenScale} aria-hidden="true" />}
       </g>}
     </svg>
-    {placement === "top" && guideBubble}
     </div>
+    {placement === "top" && guideBubble}
     {!intro && <div className="journey-task" aria-live="polite">
       {stage === 1 && !initialComplete && <><strong>Pick 3 points on the highlighted x-axis · {chosen.length} / 3</strong>{chosen.length === 3 && <span>Adding 7 spread-out inputs · {autoShown} / 7</span>}</>}
       {(stage === 1 || stage === 2) && initialComplete && <span>
-        {history.length} observations{stage === 1 && " · Tap a height on the grid to split."}
+        {history.length} observations{stage === 1 && activeTask !== "split" && " · Tap a height on the grid to split."}
       </span>}
       {stage === 4 && <strong>{allKernels ? "Kernels ready · tune h below" : placed.length >= 3 ? "Adding the remaining kernels…" : `Tap 3 points · ${placed.length} / 3`}</strong>}
       {stage === 6 && <>

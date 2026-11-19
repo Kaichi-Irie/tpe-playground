@@ -653,7 +653,8 @@
   z-index: 4;
   background: rgb(0 0 0 / .55);
 }
-.journey[data-guide-region="plot"] .journey-plot,
+.journey[data-guide-region] .journey-plot,
+.journey[data-guide-region] :is(.journey-navigation, .journey-controls, .journey-task):has(:focus-visible),
 .journey[data-guide-region="task"] .journey-task {
   position: relative;
   z-index: 5;
