@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { createShareUrl, readRoute, readSharedSearch, type SharedSearch } from "./shareSearch";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createShareUrl, readBrowserRoute, readRoute, readSharedSearch, type SharedSearch } from "./shareSearch";
 import { bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrialCounts, weightOptions } from "./searchSettings";
 import { objectivePresets, type ObjectivePreset } from "./objectives";
 import { defaults, prior, runSearch, searchDefaults, trialLimit } from "./tpe";
@@ -17,6 +17,31 @@ function roundTrip1D(search: SharedSearch<ObjectivePreset>) {
   const url = createShareUrl(pageUrl, { page: "1d", preset: search.preset }, search.seed, search.settings);
   return readSharedSearch(readRoute(new URL(url).hash).share, defaults1D, objectivePresets, trialLimit, 10);
 }
+
+describe("browser route", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each([
+    ["#play", "#play-2d", null],
+    ["#play?v=1&seed=3", "#play-2d", "3"],
+    ["#play-2d?v=1&seed=3", "#play-3d", "3"],
+    ["#play-2d", null, null],
+    ["", null, null],
+  ])("handles the address bar and settings for %s", (hash, canonicalHash, seed) => {
+    const state = { navigation: 1 };
+    const replaceState = vi.fn();
+    vi.stubGlobal("window", { location: { hash }, history: { state, replaceState } });
+
+    const route = readBrowserRoute();
+    expect(route.page).toBe(canonicalHash === "#play-3d" ? "2d" : "1d");
+    expect(route.share?.get("seed") ?? null).toBe(seed);
+    if (canonicalHash) {
+      expect(replaceState).toHaveBeenCalledExactlyOnceWith(state, "", canonicalHash);
+    } else {
+      expect(replaceState).not.toHaveBeenCalled();
+    }
+  });
+});
 
 describe("share links", () => {
   it.each([
