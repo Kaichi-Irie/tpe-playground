@@ -3,7 +3,7 @@ import { usePlotSize } from "./usePlotSize";
 import { PlaybackControls } from "./PlaybackControls";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { weightOptions } from "./searchSettings";
-import { consumeShare, playHashes, readRoute, readSharedSearch, type Route, type SharedSearch } from "./shareSearch";
+import { playHashes, readBrowserRoute, readSharedSearch, type Route, type SharedSearch } from "./shareSearch";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { trialLimit, buildView1D, prior, searchDefaults, defaults, domain, proposeTrial, proposal1DFromTrace, type Trial } from "./tpe";
 
@@ -74,16 +74,13 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
   const [algorithmContainer, setAlgorithmContainer] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
     const onHashChange = () => {
-      const next = readRoute(window.location.hash);
+      const next = readBrowserRoute();
       setPlaying(false);
-      if (next.share) {
-        consumeShare(next.page);
-        if (next.page === "1d") {
-          searchGeneration.current += 1;
-          setSearch(readSharedSearch(next.share, defaultSearch, objectivePresets, trialLimit, domainWidth));
-          setPlayback(emptyPlayback());
-          setSelected(null);
-        }
+      if (next.share && next.page === "1d") {
+        searchGeneration.current += 1;
+        setSearch(readSharedSearch(next.share, defaultSearch, objectivePresets, trialLimit, domainWidth));
+        setPlayback(emptyPlayback());
+        setSelected(null);
       }
       setRoute((current) =>
         current.page === next.page && !next.share
