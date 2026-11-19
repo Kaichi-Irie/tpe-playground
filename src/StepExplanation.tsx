@@ -266,17 +266,17 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     if (point.x < left || point.x > right || point.y < 35 || point.y > bottom) return;
     applySplit((bottom - point.y) / (bottom - 35) * 8);
   }
-  function confirmSplit(height = data.partition.threshold) {
+  function confirmSplit(goodCount = data.partition.good.length) {
     setFocused(null);
     setSoundPromptDismissed(true);
     setStage(2);
-    audio.play("split", height);
+    audio.play("split", goodCount);
   }
   function applySplit(value: number) {
-    const { gamma, threshold } = splitAtThreshold(history, value);
+    const { gamma } = splitAtThreshold(history, value);
     setSettings((current) => ({ ...current, gamma }));
     // The tap target persists in Split, so keyboard focus stays on the grid.
-    confirmSplit(threshold);
+    confirmSplit(splitTrials(history, gamma).good.length);
   }
   function inspectSplitPoint(clientX: number, clientY: number) {
     const matrix = canvas.ref.current?.getScreenCTM();
@@ -310,7 +310,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   function placeKernel(id: number) {
     setFocused(id);
     if (intro || animating || (stage !== 4 && stage !== 5)) return;
-    audio.play("kernel");
+    audio.play("kernel", history.find((trial) => trial.id === id)?.x);
     if (stage === 4 && !allKernels && !placed.includes(id)) {
       setPlaced((current) => [...current, id]);
     }
@@ -345,7 +345,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     if (intro || controlDisabled) return;
     setSettings((current) => ({ ...current, ...patch }));
     if (patch.bandwidth !== undefined && patch.bandwidth !== settings.bandwidth && (allKernels || placed.length > 0)) audio.play("bandwidth", patch.bandwidth);
-    if (patch.gamma !== undefined && patch.gamma !== settings.gamma) audio.adjustSplit(splitTrials(history, patch.gamma).threshold);
+    if (patch.gamma !== undefined && patch.gamma !== settings.gamma) audio.adjustSplit(splitTrials(history, patch.gamma).good.length, splitTrials(history, settings.gamma).good.length);
     if (patch.priorWeight !== undefined && patch.priorWeight !== settings.priorWeight) audio.play("alpha", patch.priorWeight);
     setInspected(null);
     if (patch.seed !== undefined) dispatchSampling({ type: "reset", revealed: stage === 7 ? settings.candidates : 0 });
