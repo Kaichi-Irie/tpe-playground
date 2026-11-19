@@ -873,7 +873,12 @@ header { height: 64px; padding: 10px 0; border: 0; }
 .settings-dialog .settings-form .help-content { position: static; width: auto; max-width: 100%; margin-top: 6px; box-shadow: none; }
 .settings-dialog .settings-form .help { position: relative; }
 .settings-dialog .settings-form .settings-reset,
-.settings-dialog .settings-form .resample { min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); }
+.settings-dialog .settings-form .resample,
+.share-search button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); }
+.share-search button { justify-self: start; }
+.share-search p, .share-search [role="status"] { margin: 0; color: var(--muted); font-size: 13px; }
+.share-search [role="status"]:empty { margin-top: -6px; }
+.share-search input { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--control); color: var(--text); font-size: 16px; }
 .visual-workspace .live-model-controls { flex: 0 0 auto; margin-left: auto; }
 @media (max-width: 700px) {
   .visual-workspace { height: max(560px, calc(100dvh - 48px)); min-height: 560px; }

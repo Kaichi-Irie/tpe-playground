@@ -1,10 +1,11 @@
 import { TopBar } from "./TopBar";
 import { usePlotSize } from "./usePlotSize";
 import { PlaybackControls } from "./PlaybackControls";
-import { ModelSettingsPanel, weightOptions } from "./ModelSettingsPanel";
-import type { BandwidthRule } from "./model/bandwidth";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { trialLimit, buildView1D, prior, searchDefaults, defaults, domain, proposeTrial, proposal1DFromTrace, type WeightStrategy, type Trial } from "./tpe";
+import { ModelSettingsPanel } from "./ModelSettingsPanel";
+import { weightOptions } from "./searchSettings";
+import { consumeShare, readRoute, readSharedSearch, type Route, type SharedSearch } from "./shareSearch";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { trialLimit, buildView1D, prior, searchDefaults, defaults, domain, proposeTrial, proposal1DFromTrace, type Trial } from "./tpe";
 
 import { getObjective, objectivePresets, type ObjectivePreset } from "./objectives";
 
@@ -28,12 +29,14 @@ function initialTheme(): boolean {
   return window.matchMedia ? !window.matchMedia("(prefers-color-scheme: light)").matches : true;
 }
 
-function pageFromHash(): "1d" | "2d" | "about" | "lab" {
-  const hash = typeof window === "undefined" ? "" : window.location.hash;
-  return hash === "#lab" ? "lab" : hash === "#about" ? "about" : hash === "#play-2d" ? "2d" : "1d";
-}
+const domainWidth = domain[1] - domain[0];
+const defaultSearch: SharedSearch<ObjectivePreset> = {
+  seed: 50,
+  preset: "multimodal",
+  settings: { ...defaults, priorWeight: prior.weight, ...searchDefaults },
+};
 
-export default function App() {
+export default function App({ initialRoute = { page: "1d", share: null } }: { initialRoute?: Route } = {}) {
   const { ref: chartRef, width, height } = usePlotSize();
   const W = Math.max(240, width), H = Math.max(200, height);
   const compactChart = W < 600;
@@ -43,32 +46,48 @@ export default function App() {
   const sy = (y: number) => box.bottom - y / 8 * (box.bottom - box.top);
   const path = (ys: number[], scale: (y: number) => number) => ys.map((y, i) => `${i ? "L" : "M"}${sx(grid[i]).toFixed(2)},${scale(y).toFixed(2)}`).join(" ");
   const area = (line: string) => `${line} L${box.right},${box.bottom} L${box.left},${box.bottom} Z`;
-  const [objectivePreset, setObjectivePreset] = useState<ObjectivePreset>("multimodal");
+  const [route, setRoute] = useState(() => ({ ...initialRoute, visit: 0 }));
+  const { page } = route;
+  const [search, setSearch] = useState(() => readSharedSearch(
+    route.page === "1d" ? route.share : null, defaultSearch, objectivePresets, trialLimit, domainWidth,
+  ));
+  const { seed, preset: objectivePreset, settings } = search;
+  const { priorWeight, startupTrials, candidates, gamma, weights, bandwidthRule, bandwidth } = settings;
   const objectiveDefinition = getObjective(objectivePreset);
   const objectiveValues = useMemo(() => grid.map(objectiveDefinition.evaluate), [objectiveDefinition]);
-  const [priorWeight, setPriorWeight] = useState(prior.weight);
-  const [startupTrials, setStartupTrials] = useState(searchDefaults.startupTrials);
-  const [candidates, setCandidates] = useState(searchDefaults.candidates);
-  const [seed, setSeed] = useState(50);
   const [playback, setPlayback] = useState(emptyPlayback);
   const { step } = playback;
-  const [page, setPage] = useState(pageFromHash);
+  const [playing, setPlaying] = useState(false);
+  const [selected, setSelected] = useState<Trial | null>(null);
+  const searchGeneration = useRef(0);
   // Keep the Lab mounted after the first visit so its stage, progress, and settings survive tab switches.
   const [labVisited, setLabVisited] = useState(page === "lab");
   useEffect(() => { if (page === "lab") setLabVisited(true); }, [page]);
   const [algorithmContainer, setAlgorithmContainer] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
-    const onHashChange = () => { setPage(pageFromHash()); setPlaying(false); };
+    const onHashChange = () => {
+      const next = readRoute(window.location.hash);
+      setPlaying(false);
+      if (next.share) {
+        consumeShare(next.page);
+        if (next.page === "1d") {
+          searchGeneration.current += 1;
+          setSearch(readSharedSearch(next.share, defaultSearch, objectivePresets, trialLimit, domainWidth));
+          setPlayback(emptyPlayback());
+          setSelected(null);
+        }
+      }
+      setRoute((current) =>
+        current.page === next.page && !next.share
+          ? current
+          : { ...next, visit: current.visit + 1 },
+      );
+    };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
-  const [playing, setPlaying] = useState(false);
   const [dark, setDark] = useState(initialTheme);
-  const [gamma, setGamma] = useState(defaults.gamma);
-  const [weights, setWeights] = useState<WeightStrategy>(defaults.weights);
   const weightOption = weightOptions.find((option) => option.value === weights)!;
-  const [bandwidthRule, setBandwidthRule] = useState<BandwidthRule>(defaults.bandwidthRule);
-  const [bandwidth, setBandwidth] = useState(defaults.bandwidth);
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#21252b" : "#f2f3f5");
@@ -76,7 +95,9 @@ export default function App() {
   useEffect(() => {
     if (!playing) return;
     if (step >= trialLimit) { setPlaying(false); return; }
+    const generation = searchGeneration.current;
     const timer = window.setTimeout(() => {
+      if (generation !== searchGeneration.current) return;
       setPlayback((current) => movePlayback(current, current.step + 1, seed, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }));
       setSelected(null);
     }, 1000);
@@ -91,7 +112,6 @@ export default function App() {
     setPlaying(false);
     setPlayback(keepObservations);
   }
-  const [selected, setSelected] = useState<Trial | null>(null);
   const [visible, setVisible] = useState({ objective: true, good: true, bad: true, observations: true, acquisition: false });
   const trials = useMemo(() => playback.trials.slice(0, step), [playback.trials, step]);
   const model = useMemo(() => buildView1D(trials, grid, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }), [trials, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
@@ -121,7 +141,7 @@ export default function App() {
       }} actionSlot={<div className="lab-header-actions" ref={setAlgorithmContainer} />} />
       {(labVisited || page === "lab") && <div hidden={page !== "lab"} className="lab-page"><Suspense fallback={<p>Loading explanation…</p>}><StepExplanation visible={page === "lab"} algorithmContainer={page === "lab" ? algorithmContainer : null} /></Suspense></div>}
       <div hidden={page === "about" || page === "lab"} className="play-page">
-      {page === "2d" ? <Suspense fallback={<p>Loading 3D explorer…</p>}><Explorer2D /></Suspense> : null}
+      {page === "2d" ? <Suspense fallback={<p>Loading 3D explorer…</p>}><Explorer2D key={route.visit} sharedSettings={route.share} /></Suspense> : null}
       <div hidden={page !== "1d"} className="visual-workspace explorer-1d">
       <section className="canvas-plot" aria-labelledby="plot-heading">
       <div className="canvas-controls">
@@ -175,16 +195,17 @@ export default function App() {
         </div>
         <div className="stats"><span className="good-text"><strong>{model.good.length}</strong> good</span><span className="bad-text"><strong>{model.bad.length}</strong> bad</span><span>Objective: <strong>Minimize f(x)</strong><Help label="objective function">{objectiveDefinition.formula}, for −5 ≤ x ≤ 5. Lower values are better.</Help></span></div>
       </div>
-      <ModelSettingsPanel settings={{ gamma, bandwidth, bandwidthRule, weights, priorWeight, startupTrials, candidates }}
-        defaultSettings={{ ...defaults, priorWeight: prior.weight, ...searchDefaults }}
-        onChange={(next) => { setGamma(next.gamma); setBandwidth(next.bandwidth); setBandwidthRule(next.bandwidthRule ?? "constant"); setWeights(next.weights); setPriorWeight(next.priorWeight); setStartupTrials(next.startupTrials); setCandidates(next.candidates); editModel(); }}
-        seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); setPlayback(emptyPlayback()); setPlaying(false); setSelected(null); }}
-        trialLimit={trialLimit} widths={goodWidth === undefined ? [] : [{ label: "x", value: goodWidth }]} domainWidth={domain[1] - domain[0]} >
+      <ModelSettingsPanel key={page === "1d" ? route.visit : "hidden"}
+        experiment={{ page: "1d", preset: objectivePreset }} settings={settings}
+        defaultSettings={defaultSearch.settings}
+        onChange={(next) => { setSearch({ ...search, settings: { ...next, bandwidthRule: next.bandwidthRule ?? "constant" } }); editModel(); }}
+        seed={seed} onNewSeed={() => { setSearch({ ...search, seed: Math.floor(Math.random() * 100) }); setPlayback(emptyPlayback()); setPlaying(false); setSelected(null); }}
+        trialLimit={trialLimit} widths={goodWidth === undefined ? [] : [{ label: "x", value: goodWidth }]} domainWidth={domainWidth} >
       <section className="search-toolbar" aria-label="Search controls">
         <div className="plot-header">
           <div className="objective-picker parameter">
             <h2><label htmlFor="objective-preset">Objective</label></h2>
-            <select id="objective-preset" value={objectivePreset} onChange={(event) => { setObjectivePreset(event.target.value as ObjectivePreset); setPlayback(emptyPlayback()); setPlaying(false); setSelected(null); }}>{(Object.keys(objectivePresets) as ObjectivePreset[]).map((preset) => <option key={preset} value={preset}>{objectivePresets[preset].label}</option>)}</select>
+            <select id="objective-preset" value={objectivePreset} onChange={(event) => { setSearch({ ...search, preset: event.target.value as ObjectivePreset }); setPlayback(emptyPlayback()); setPlaying(false); setSelected(null); }}>{(Object.keys(objectivePresets) as ObjectivePreset[]).map((preset) => <option key={preset} value={preset}>{objectivePresets[preset].label}</option>)}</select>
             <span className="preset-details"><Help label={`${objectiveDefinition.label} preset`} trigger="Preset details"><strong>{objectiveDefinition.label}</strong><br />{objectiveDefinition.description}<br />{objectiveDefinition.formula}<br />Changing the preset restarts the search.</Help></span>
           </div>
         </div>
