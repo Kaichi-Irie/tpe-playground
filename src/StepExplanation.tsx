@@ -1,6 +1,6 @@
 import { alphaGestureHandlers } from "./alphaGesture";
 import { createPortal } from "react-dom";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useId, useMemo, useReducer, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { acquisitionPlot, completeInitialInputs, buildExplanation, explanationDefaults, explanationGrid, fixedExample, kernelContribution, evaluateExplanation, splitAtThreshold, fractionForCount, type ExplanationExample, type ExplanationSettings } from "./explanation";
@@ -15,6 +15,7 @@ import { labLayout } from "./labLayout";
 import { usePlotSize } from "./usePlotSize";
 import { clearSeenHints, labHints, loadSeenHints, nextLabGuide, saveSeenHints, taskGuides, type LabHintId, type LabTaskGuideId } from "./labHints";
 import LabHintBubble, { labHintElementId } from "./LabHintBubble";
+import { Help } from "./Help";
 
 const stages = ["Unknown objective", "Observe", "Split", "Model inputs", "Kernels", "Density", "Sample", "Choose", "Evaluate"];
 const journeyStops = [0, 1, 2, 4, 5, 6, 7, 8];
@@ -33,7 +34,7 @@ export function JourneyMath({ tex }: { tex: string }) {
     // Only authored class annotations are needed; no links or external resources.
     trust: (context) => context.command === "\\htmlClass",
   }), [tex]);
-  return <div className="journey-math" dangerouslySetInnerHTML={{ __html: html }} />;
+  return <span className="journey-math" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 // Keep the canvas mounted. All geometry follows one reversible playhead.
@@ -65,13 +66,26 @@ function usePlayhead(target: number, replay: number, preview: boolean) {
   return { position, jump };
 }
 
-function Range({ name, symbol, value, min, max, step, onChange, audio, hinted }: {
+function LabInfo({ id, disabled, children }: { id: LabHintId; disabled: boolean; children?: ReactNode }) {
+  const { label, meaning } = labHints[id];
+  return <Help className="journey-info" label={label} disabled={disabled}>{meaning}{children}</Help>;
+}
+
+export function LabTutorialButton({ onReplay }: { onReplay: () => void }) {
+  return <button type="button" className="algorithm-trigger lab-hints-trigger" onClick={onReplay} aria-label="Replay the Lab tutorial" title="Replay the Lab tutorial">
+    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M6 12.5h4M6.5 14.5h3M5.2 10.2A4.5 4.5 0 1 1 10.8 10.2c-.5.4-.8 1-.8 1.6V12H6v-.2c0-.6-.3-1.2-.8-1.6Z" /></svg><span>Tutorial</span>
+  </button>;
+}
+
+export function Range({ name, symbol, value, min, max, step, onChange, audio, hinted, hint, infoDisabled }: {
   name: string; symbol: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; audio?: LabAudio;
-  hinted?: boolean;
+  hinted?: boolean; hint: LabHintId; infoDisabled: boolean;
 }) {
-  return <label className={`journey-range ${symbol === "γ" ? "journey-gamma-control" : symbol === "h" ? "journey-h-control" : ""}`}><span>{name} <i>{symbol}</i></span>
-    <input {...(audio ? alphaGestureHandlers(audio) : {})} aria-label={name} data-guide-target={hinted || undefined} aria-describedby={hinted ? labHintElementId : undefined} type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
-    <output>{Number(value.toFixed(2))}</output></label>;
+  const inputId = useId();
+  return <div className={`journey-range ${symbol === "γ" ? "journey-gamma-control" : symbol === "h" ? "journey-h-control" : ""}`}>
+    <span><label htmlFor={inputId}>{name} <i>{symbol}</i></label><LabInfo id={hint} disabled={infoDisabled} /></span>
+    <input {...(audio ? alphaGestureHandlers(audio) : {})} id={inputId} data-guide-target={hinted || undefined} aria-describedby={hinted ? labHintElementId : undefined} type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    <output>{Number(value.toFixed(2))}</output></div>;
 }
 
 export default function StepExplanation({ example = fixedExample, algorithmContainer, visible = true }: { example?: ExplanationExample; algorithmContainer?: HTMLElement | null; visible?: boolean }) {
@@ -132,7 +146,6 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   const [guideSlotStage, setGuideSlotStage] = useState<number | null>(null);
   const [announcedGuide, setAnnouncedGuide] = useState("");
   const [algorithmOpen, setAlgorithmOpen] = useState(false);
-  const [weightDetailsOpen, setWeightDetailsOpen] = useState(false);
   useEffect(() => { if (!visible) setAlgorithmOpen(false); }, [visible]);
   useEffect(() => { setSeenHints(loadSeenHints()); }, []);
   const { position: p, jump } = usePlayhead(stage, replay, intro);
@@ -240,7 +253,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     drawnCount: visibleDrawn, candidateCount: settings.candidates,
     paused: !visible || intro,
   }, seenHints, dismissedTasks);
-  const guide = animating || showSoundPrompt || algorithmOpen || weightDetailsOpen ? null : eligibleGuide;
+  const guide = animating || showSoundPrompt || algorithmOpen ? null : eligibleGuide;
   const activeHint = guide?.kind === "control" ? guide.id : null;
   const activeTask = guide?.kind === "task" ? guide.id : null;
   const hint = activeHint ? labHints[activeHint] : null;
@@ -248,6 +261,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   const guideMessage = activeTask === "sample" && visibleDrawn > 0
     ? "Select the die to roll again, or choose Roll the rest."
     : activeTask ? taskGuides[activeTask].action : hint?.[hintPhase];
+  const infoDisabled = Boolean(guideMessage);
   const guideAnnouncement = activeTask ? taskGuides[activeTask].announcement
     : hint ? hintPhase === "meaning" ? hint.meaning : `Hint available for ${hint.label}.` : "";
   const actionHint = hintPhase === "action" ? activeHint : null;
@@ -436,7 +450,6 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
       }
     }
     preserveLessonFocus();
-    setWeightDetailsOpen(false);
     setInspected(null);
     if (stage === 8 && direction === 1) {
       setHistory((current) => [...current, nextTrial]);
@@ -458,7 +471,6 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     preserveLessonFocus(true);
     resetHints();
     setSplitConfirmed(false);
-    setWeightDetailsOpen(false);
     setIntro(true); setRounds(0); setChosen([]); setAutoShown(0); setInitialComplete(false); setPlaced([]); setAllKernels(false); dispatchSampling({ type: "reset" });
     setHistory([...example.trials]); setSettings(explanationDefaults);
     setFocused(null); setInspected(null); jump(0); setStage(0); setReplay((v) => v + 1);
@@ -540,9 +552,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         "  D ← D ∪ {(x_next, f(x_next))}",
       ].map((line, index) => <li key={line} aria-current={index === (stage <= 1 ? 0 : stage === 2 ? 2 : stage <= 5 ? 3 : stage === 6 ? 4 : stage === 7 ? 5 : 6) ? "step" : undefined}>{line}</li>)}</ol>
       </aside>
-    </div><button type="button" className="algorithm-trigger lab-hints-trigger" onClick={resetHints} aria-label="Show Lab hints again" title="Show Lab hints again">
-      <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M6 12.5h4M6.5 14.5h3M5.2 10.2A4.5 4.5 0 1 1 10.8 10.2c-.5.4-.8 1-.8 1.6V12H6v-.2c0-.6-.3-1.2-.8-1.6Z" /></svg><span>Hints</span>
-    </button><LabSoundControls enabled={soundState === "on"} pending={soundState === "pending"}
+    </div><LabTutorialButton onReplay={resetHints} /><LabSoundControls enabled={soundState === "on"} pending={soundState === "pending"}
       error={soundState === "error" && !showSoundPrompt} onToggle={() => void toggleSound()} /></>, algorithmContainer) : null}
     <div className="journey-plot" style={{ minHeight: minimumPlotHeight }}>
     <svg ref={canvas.ref} onPointerMove={(event) => {
@@ -772,12 +782,12 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     </div>}
     <div className="journey-controls">
       <fieldset disabled={stage === 8} aria-disabled={controlDisabled}>
-        {(stage === 2 || stage === 3 || stage === 4) && <Range hinted={activeHint === "gamma"} name="Good fraction" symbol="γ" value={settings.gamma} min={1 / history.length} max={(history.length - 1) / history.length} step={1 / history.length} onChange={(gamma) => { noteControlUsed("gamma"); change({ gamma: fractionForCount(Math.round(gamma * history.length), history.length) }); }} />}
-        {stage === 4 && <Range hinted={activeHint === "bandwidth"} name="Bandwidth" symbol="h" value={settings.bandwidth} min={0.2} max={1.5} step={0.05} onChange={(bandwidth) => { noteControlUsed("bandwidth"); change({ bandwidth }); }} />}
-        {stage === 5 && <><Range audio={audio} hinted={activeHint === "prior"} name="Prior" symbol="α" value={settings.priorWeight} min={0} max={10} step={0.25} onChange={(priorWeight) => { noteControlUsed("prior"); change({ priorWeight }); }} />
+        {(stage === 2 || stage === 3 || stage === 4) && <Range hint="gamma" infoDisabled={infoDisabled} hinted={activeHint === "gamma"} name="Good fraction" symbol="γ" value={settings.gamma} min={1 / history.length} max={(history.length - 1) / history.length} step={1 / history.length} onChange={(gamma) => { noteControlUsed("gamma"); change({ gamma: fractionForCount(Math.round(gamma * history.length), history.length) }); }} />}
+        {stage === 4 && <Range hint="bandwidth" infoDisabled={infoDisabled} hinted={activeHint === "bandwidth"} name="Bandwidth" symbol="h" value={settings.bandwidth} min={0.2} max={1.5} step={0.05} onChange={(bandwidth) => { noteControlUsed("bandwidth"); change({ bandwidth }); }} />}
+        {stage === 5 && <><Range audio={audio} hint="prior" infoDisabled={infoDisabled} hinted={activeHint === "prior"} name="Prior" symbol="α" value={settings.priorWeight} min={0} max={10} step={0.25} onChange={(priorWeight) => { noteControlUsed("prior"); change({ priorWeight }); }} />
           <label className="journey-weight">Weighting <select aria-label="Weighting" data-guide-target={activeHint === "weights" || undefined} aria-describedby={activeHint === "weights" ? labHintElementId : undefined} value={settings.weights} onChange={(e) => { noteControlUsed("weights"); change({ weights: e.target.value as ExplanationSettings["weights"] }); }}><option value="uniform">Uniform</option><option value="recency">Recency</option><option value="ei">Improvement</option></select></label>
-          <details className="journey-weight-details" onToggle={(event) => setWeightDetailsOpen(event.currentTarget.open)}><summary aria-label="Weight formula" title="Weight formula">ⓘ</summary><div><span className="journey-weight-note">{weightDescription}</span><JourneyMath tex={weightMath} /></div></details></>}
-        {(stage === 6 || stage === 7) && <><Range hinted={activeHint === "candidates"} name="Candidates" symbol="M" value={settings.candidates} min={1} max={40} step={1} onChange={(candidates) => { noteControlUsed("candidates"); change({ candidates }); }} /><button className="journey-icon" aria-label="Resample candidates" title="Resample candidates" onClick={() => { if (controlDisabled) return; change({ seed: settings.seed + 1 }); }}>↻</button></>}
+          <LabInfo id="weights" disabled={infoDisabled}><span className="journey-weight-note">{weightDescription}</span><JourneyMath tex={weightMath} /></LabInfo></>}
+        {(stage === 6 || stage === 7) && <><Range hint="candidates" infoDisabled={infoDisabled} hinted={activeHint === "candidates"} name="Candidates" symbol="M" value={settings.candidates} min={1} max={40} step={1} onChange={(candidates) => { noteControlUsed("candidates"); change({ candidates }); }} /><button className="journey-icon" aria-label="Resample candidates" title="Resample candidates" onClick={() => { if (controlDisabled) return; change({ seed: settings.seed + 1 }); }}>↻</button></>}
       </fieldset>
     </div>
     <nav className="journey-navigation" aria-label="Walkthrough navigation">
