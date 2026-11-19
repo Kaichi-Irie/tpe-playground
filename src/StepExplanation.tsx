@@ -13,7 +13,7 @@ import { LabAudio } from "./labAudio";
 import LabSoundControls from "./LabSoundControls";
 import { labLayout } from "./labLayout";
 import { usePlotSize } from "./usePlotSize";
-import { clearSeenHints, labHints, loadSeenHints, nextLabGuide, saveSeenHints, taskGuides, type LabHintId, type LabTaskGuideId } from "./labHints";
+import { clearSeenHints, guidePlacement, labHints, loadSeenHints, nextLabGuide, saveSeenHints, taskGuides, type LabHintId, type LabTaskGuideId } from "./labHints";
 import LabHintBubble, { labHintElementId } from "./LabHintBubble";
 
 const stages = ["Unknown objective", "Observe", "Split", "Model inputs", "Kernels", "Density", "Sample", "Choose", "Evaluate"];
@@ -25,7 +25,11 @@ const goodMath = String.raw`\htmlClass{journey-good}{\ell}`;
 const badMath = String.raw`\htmlClass{journey-bad}{g}`;
 const alphaMath = String.raw`\htmlClass{journey-prior}{\alpha}`;
 const h = String.raw`\htmlClass{journey-accent}{h}`;
-export const kernelFormula = String.raw`\begin{gathered}k_i(x;${h})=\mathcal N(x\mid x_i,${h}^2)\\[4pt]=\frac{1}{${h}\sqrt{2\pi}}\exp\!\left(-\frac{(x-x_i)^2}{2${h}^2}\right)\end{gathered}`;
+const compactLabQuery = "(max-width: 800px)";
+const normalKernel = String.raw`k_i(x;${h})=\mathcal N(x\mid x_i,${h}^2)`;
+const kernelScale = String.raw`\frac{1}{${h}\sqrt{2\pi}}`;
+export const kernelFormula = String.raw`${normalKernel}=${kernelScale}\exp\!\left(-\frac{(x-x_i)^2}{2${h}^2}\right)`;
+export const kernelFormulaCompact = String.raw`\begin{gathered}${normalKernel}\\=${kernelScale}\,e^{-(x-x_i)^2/(2${h}^2)}\end{gathered}`;
 
 export function JourneyMath({ tex }: { tex: string }) {
   const html = useMemo(() => katex.renderToString(tex, {
@@ -129,7 +133,14 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   const [seenHints, setSeenHints] = useState<ReadonlySet<LabHintId>>(() => new Set());
   const [usedHints, setUsedHints] = useState<ReadonlySet<LabHintId>>(() => new Set());
   const [dismissedTasks, setDismissedTasks] = useState<ReadonlySet<LabTaskGuideId>>(() => new Set());
-  const [guideSlotStage, setGuideSlotStage] = useState<number | null>(null);
+  const [compactLab, setCompactLab] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia(compactLabQuery);
+    const update = () => setCompactLab(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
   const [announcedGuide, setAnnouncedGuide] = useState("");
   const [algorithmOpen, setAlgorithmOpen] = useState(false);
   const [weightDetailsOpen, setWeightDetailsOpen] = useState(false);
@@ -209,7 +220,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     rounds > 0 ? "New observation added. Split the data again." : initialComplete ? "Tap the grid to split Good and Bad." : "Pick a point x. Observe its value.",
     "Split data into Good and Bad.",
     "Model where Good and Bad inputs occur.",
-    "Tap a point. Add a probability density.",
+    "Spread each point into a smooth density.",
     "Sum weighted kernels into densities.",
     "Roll the dice. Find your next move.",
     "Which candidate wins?",
@@ -226,8 +237,10 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     querying ? String.raw`x_{${querying.id}}=${querying.x.toFixed(1)},\qquad y_{${querying.id}}=f(x_{${querying.id}})${queryProgress > 0.65 ? `=${querying.y.toFixed(1)}` : ""}` : rounds > 0 ? String.raw`\mathcal D\leftarrow\mathcal D\cup\{(x_{\mathrm{next}},y_{\mathrm{next}})\}` : String.raw`y_i=f(x_i),\quad i=1,\ldots,${!intro && !initialComplete ? chosen.length + autoShown : history.length}`,
     String.raw`\htmlClass{journey-good}{\mathrm{Good}:\ y_i\leq y^*}\quad\htmlClass{journey-bad}{\mathrm{Bad}:\ y_i>y^*}`,
     "",
-    kernelFormula,
-    String.raw`\begin{aligned}p(x\mid\mathcal D_{\mathrm{Bad}})&\approx ${badMath}(x)\\${badMath}(x)&=${densityExpansion("Bad")}\\[6pt]p(x\mid\mathcal D_{\mathrm{Good}})&\approx ${goodMath}(x)\\${goodMath}(x)&=${densityExpansion("Good")}\end{aligned}`,
+    compactLab ? kernelFormulaCompact : kernelFormula,
+    compactLab
+      ? String.raw`\begin{aligned}p(x\mid\mathcal D_{\mathrm{Bad}})&\approx ${badMath}(x)=${densityExpansion("Bad")}\\[6pt]p(x\mid\mathcal D_{\mathrm{Good}})&\approx ${goodMath}(x)=${densityExpansion("Good")}\end{aligned}`
+      : String.raw`\begin{aligned}p(x\mid\mathcal D_{\mathrm{Bad}})&\approx ${badMath}(x)\\${badMath}(x)&=${densityExpansion("Bad")}\\[6pt]p(x\mid\mathcal D_{\mathrm{Good}})&\approx ${goodMath}(x)\\${goodMath}(x)&=${densityExpansion("Good")}\end{aligned}`,
     String.raw`z_1,\ldots,z_M\sim ${goodMath}(x)`,
     String.raw`\begin{gathered}${alphaMath}(x)=\frac{${goodMath}(x)}{${badMath}(x)}\\[6pt]x_{\mathrm{next}}=\underset{z_j}{\arg\max}\;${alphaMath}(z_j)\end{gathered}`,
     p < 7.95 ? String.raw`y_{\mathrm{next}}=f(x_{\mathrm{next}})` : String.raw`(x_{\mathrm{next}},y_{\mathrm{next}})=(${nextTrial.x.toFixed(1)},${nextTrial.y.toFixed(1)})`,
@@ -251,11 +264,9 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   const guideAnnouncement = activeTask ? taskGuides[activeTask].announcement
     : hint ? hintPhase === "meaning" ? hint.meaning : `Hint available for ${hint.label}.` : "";
   const actionHint = hintPhase === "action" ? activeHint : null;
-  const guideRegion = activeTask ? activeTask === "sample" ? "task" : "plot" : actionHint ? "control" : undefined;
+  const guideRegion = activeTask ? activeTask === "sample" ? "task" : "plot" : activeHint ? "control" : undefined;
+  const placement = guideRegion && guidePlacement(guideRegion);
   const guidedTrial = activeTask === "kernels" ? history.find((trial) => !placed.includes(trial.id))?.id : undefined;
-  // Keep the row steady once a cue appears, and reclaim it when the learner leaves that step.
-  const reservedGuideStage = guide || guideSlotStage === stage ? stage : null;
-  if (guideSlotStage !== reservedGuideStage) setGuideSlotStage(reservedGuideStage);
 
   const hasEligibleGuide = eligibleGuide !== null;
   useEffect(() => {
@@ -264,7 +275,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   }, [guideAnnouncement, hasEligibleGuide]);
 
   useEffect(() => {
-    if (!actionHint || !window.matchMedia("(max-width: 800px)").matches) return;
+    if (!actionHint || !window.matchMedia(compactLabQuery).matches) return;
     const target = sectionRef.current?.querySelector("[data-guide-target]");
     // On short screens, bring the full control into view without interrupting keyboard focus.
     if (target && target.getBoundingClientRect().bottom + 8 > window.innerHeight) {
@@ -499,7 +510,14 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     </g>;
   }
 
+  const guideBubble = guideMessage && placement && <LabHintBubble message={guideMessage} phase={hintPhase} placement={placement} onDismiss={dismissGuide} />;
+
   return <>{intro && <LabIntro trials={example.trials} nextX={nextTrial.x} objectivePreset={example.objectivePreset} onExplore={startLab} />}<section hidden={intro} ref={sectionRef} data-stage={stage} data-guide-region={guideRegion} data-hint={actionHint ?? undefined} className={`journey ${intro ? "journey-intro" : "journey-started"}  ${!intro && stage === 1 && !initialComplete ? "journey-picking" : ""}`} aria-label="Interactive TPE walkthrough" tabIndex={0} onKeyDown={(event) => {
+    if (event.key === "Escape" && guide && !event.defaultPrevented) {
+      event.preventDefault();
+      dismissGuide(true);
+      return;
+    }
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); move(event.key === "ArrowRight" ? 1 : -1); }
   }}>
@@ -577,7 +595,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         <g opacity={1 - project} aria-hidden={project === 1}>
           <line x1={left} x2={left} y1="30" y2={bottom} />
           {[0,1,2,3,4,5,6,7,8].map((y) => <g key={y}><line x1={left - 4} x2={left} y1={sy(y)} y2={sy(y)} /><text x={left - 10} y={sy(y) + 4} textAnchor="end">{y}</text></g>)}
-          <text className="journey-axis-title" x={left} y="24">y</text>
+          <text className="journey-axis-title" x={left} y={Math.max(24, 20 * ui)}>y</text>
         </g>
       </g>
       <g opacity={truthVisibility} aria-hidden={truthVisibility === 0}>
@@ -746,14 +764,12 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         {activeTask === "split" && <circle className="journey-guide-ring" cx={sx(0)} cy={sy(data.partition.threshold)} r={16 * screenScale} aria-hidden="true" />}
       </g>}
     </svg>
+    {placement === "top" && guideBubble}
     </div>
-    {reservedGuideStage !== null && <div className="lab-guide-slot">
-      {guideMessage && <LabHintBubble message={guideMessage} phase={hintPhase} onDismiss={dismissGuide} />}
-    </div>}
     {!intro && <div className="journey-task" aria-live="polite">
       {stage === 1 && !initialComplete && <><strong>Pick 3 points on the highlighted x-axis · {chosen.length} / 3</strong>{chosen.length === 3 && <span>Adding 7 spread-out inputs · {autoShown} / 7</span>}</>}
       {(stage === 1 || stage === 2) && initialComplete && <span>
-        {history.length} observations{stage === 1 && activeTask !== "split" && " · Tap a height on the grid to split."}
+        {history.length} observations{stage === 1 && " · Tap a height on the grid to split."}
       </span>}
       {stage === 4 && <strong>{allKernels ? "Kernels ready · tune h below" : placed.length >= 3 ? "Adding the remaining kernels…" : `Tap 3 points · ${placed.length} / 3`}</strong>}
       {stage === 6 && <>
@@ -772,7 +788,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     </div>}
     <div className="journey-controls">
       <fieldset disabled={stage === 8} aria-disabled={controlDisabled}>
-        {(stage === 2 || stage === 3 || stage === 4) && <Range hinted={activeHint === "gamma"} name="Good fraction" symbol="γ" value={settings.gamma} min={1 / history.length} max={(history.length - 1) / history.length} step={1 / history.length} onChange={(gamma) => { noteControlUsed("gamma"); change({ gamma: fractionForCount(Math.round(gamma * history.length), history.length) }); }} />}
+        {(stage === 2 || stage === 3) && <Range hinted={activeHint === "gamma"} name="Good fraction" symbol="γ" value={settings.gamma} min={1 / history.length} max={(history.length - 1) / history.length} step={1 / history.length} onChange={(gamma) => { noteControlUsed("gamma"); change({ gamma: fractionForCount(Math.round(gamma * history.length), history.length) }); }} />}
         {stage === 4 && <Range hinted={activeHint === "bandwidth"} name="Bandwidth" symbol="h" value={settings.bandwidth} min={0.2} max={1.5} step={0.05} onChange={(bandwidth) => { noteControlUsed("bandwidth"); change({ bandwidth }); }} />}
         {stage === 5 && <><Range audio={audio} hinted={activeHint === "prior"} name="Prior" symbol="α" value={settings.priorWeight} min={0} max={10} step={0.25} onChange={(priorWeight) => { noteControlUsed("prior"); change({ priorWeight }); }} />
           <label className="journey-weight">Weighting <select aria-label="Weighting" data-guide-target={activeHint === "weights" || undefined} aria-describedby={activeHint === "weights" ? labHintElementId : undefined} value={settings.weights} onChange={(e) => { noteControlUsed("weights"); change({ weights: e.target.value as ExplanationSettings["weights"] }); }}><option value="uniform">Uniform</option><option value="recency">Recency</option><option value="ei">Improvement</option></select></label>
@@ -787,5 +803,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
       <span aria-live="polite">{stages[stage]}</span>
       <button className="journey-arrow" aria-label={stage === 8 ? "Continue with new observation" : "Next step"} title={stage === 8 ? "Continue with new observation" : "Next step"} aria-disabled={intro || (stage === 1 || (rounds === 0 && (animating || taskPending)))} onClick={() => move(1)}>→</button>
     </nav>
+    {guideBubble && <div className="lab-guide-scrim" aria-hidden="true" onClick={() => dismissGuide(false)} />}
+    {placement === "bottom" && guideBubble}
   </section></>;
 }

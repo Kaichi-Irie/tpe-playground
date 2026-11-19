@@ -2,14 +2,13 @@ import tippyGuide from "./assets/tippy-guide.webp";
 
 export const labHintElementId = "lab-guide-text";
 
-export default function LabHintBubble({ message, phase, onDismiss }: {
+export default function LabHintBubble({ message, phase, placement, onDismiss }: {
   message: string;
   phase: "action" | "meaning";
+  placement: "top" | "bottom";
   onDismiss: (keyboard: boolean) => void;
 }) {
-  return <div className="lab-guide" onKeyDown={(event) => {
-    if (event.key === "Escape" && !event.defaultPrevented) onDismiss(true);
-  }}>
+  return <div className="lab-guide" data-placement={placement}>
     <img className="lab-guide-tippy" src={tippyGuide} width="288" height="245" alt="" />
     <div className={`lab-hint lab-hint-${phase}`}>
       <p id={labHintElementId}>{message}</p>

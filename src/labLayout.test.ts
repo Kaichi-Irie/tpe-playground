@@ -1,7 +1,9 @@
 import { expect, it } from "vitest";
 import { labLayout } from "./labLayout";
 
-it.each([[1939, 300], [1440, 420], [900, 440], [390, 320], [844, 180]])(
+const phonePlotFloor = labLayout(375, 0).minimumPlotHeight;
+
+it.each([[1939, 300], [1440, 420], [900, 440], [390, 320], [844, 180], [375, phonePlotFloor]])(
   "reserves room for all three scoring lanes at %i × %i",
   (width, height) => {
     const layout = labLayout(width, height);
