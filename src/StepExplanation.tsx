@@ -13,6 +13,8 @@ import { LabAudio } from "./labAudio";
 import LabSoundControls from "./LabSoundControls";
 import { labLayout } from "./labLayout";
 import { usePlotSize } from "./usePlotSize";
+import { loadSeenHints, nextHint, saveSeenHints, type LabHintId } from "./labHints";
+import LabHintBubble, { labHintElementId } from "./LabHintBubble";
 
 const stages = ["Unknown objective", "Observe", "Split", "Model inputs", "Kernels", "Density", "Sample", "Choose", "Evaluate"];
 const journeyStops = [0, 1, 2, 4, 5, 6, 7, 8];
@@ -63,11 +65,12 @@ function usePlayhead(target: number, replay: number, preview: boolean) {
   return { position, jump };
 }
 
-function Range({ name, symbol, value, min, max, step, onChange, audio }: {
+function Range({ name, symbol, value, min, max, step, onChange, audio, hint, hinted }: {
   name: string; symbol: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; audio?: LabAudio;
+  hint?: LabHintId; hinted?: boolean;
 }) {
-  return <label className={`journey-range ${symbol === "γ" ? "journey-gamma-control" : symbol === "h" ? "journey-h-control" : ""}`}><span>{name} <i>{symbol}</i></span>
-    <input {...(audio ? alphaGestureHandlers(audio) : {})} aria-label={name} type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+  return <label data-hint-anchor={hint} className={`journey-range ${symbol === "γ" ? "journey-gamma-control" : symbol === "h" ? "journey-h-control" : ""}`}><span>{name} <i>{symbol}</i></span>
+    <input {...(audio ? alphaGestureHandlers(audio) : {})} aria-label={name} aria-describedby={hinted ? labHintElementId : undefined} type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
     <output>{Number(value.toFixed(2))}</output></label>;
 }
 
@@ -116,6 +119,11 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     return () => window.clearTimeout(timer);
   }, [intro, chosen.length, initialComplete, autoShown]);
   const [replay, setReplay] = useState(0);
+  // Coach hints: point at a control, then explain it once the learner uses it.
+  const [seenHints, setSeenHints] = useState<ReadonlySet<LabHintId>>(() => new Set());
+  const [usedHints, setUsedHints] = useState<ReadonlySet<LabHintId>>(() => new Set());
+  const controlsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { setSeenHints(loadSeenHints()); }, []);
   const { position: p, jump } = usePlayhead(stage, replay, intro);
   const [history, setHistory] = useState(() => [...example.trials]);
   const [settings, setSettings] = useState(explanationDefaults);
@@ -213,6 +221,31 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   ];
 
   const taskPending = !intro && ((stage === 1 && !initialComplete) || (stage === 4 && !allKernels) || (stage === 6 && drawn < settings.candidates));
+  const activeHint = intro || animating ? null : nextHint({ stage, taskPending }, seenHints);
+  const hintPhase = activeHint && usedHints.has(activeHint) ? "meaning" : "action";
+  function markHintsSeen(ids: Iterable<LabHintId>) {
+    const next = new Set([...seenHints, ...ids]);
+    if (next.size === seenHints.size) return;
+    saveSeenHints(next);
+    setSeenHints(next);
+  }
+  function dismissHint(id: LabHintId) {
+    markHintsSeen([id]);
+    // The dismiss button unmounts; keep keyboard focus on the control it described.
+    controlsRef.current?.querySelector<HTMLElement>(`[data-hint-anchor="${id}"] :is(input, select)`)?.focus();
+  }
+  function noteControlUsed(id: LabHintId) {
+    if (activeHint === id && !usedHints.has(id)) setUsedHints((current) => new Set([...current, id]));
+  }
+  function showHintsAgain() {
+    saveSeenHints(new Set());
+    setSeenHints(new Set());
+    setUsedHints(new Set());
+  }
+  // An explained hint is done once the learner leaves its stage.
+  useEffect(() => {
+    if (usedHints.size) markHintsSeen(usedHints);
+  }, [stage]);
   function pickAt(clientX: number, clientY: number) {
     const matrix = canvas.ref.current?.getScreenCTM();
     if (!matrix) return;
@@ -403,7 +436,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     </g>;
   }
 
-  return <>{intro && <LabIntro trials={example.trials} nextX={nextTrial.x} objectivePreset={example.objectivePreset} onExplore={startLab} />}<section hidden={intro} ref={sectionRef} data-stage={stage} className={`journey ${intro ? "journey-intro" : "journey-started"}  ${!intro && stage === 1 && !initialComplete ? "journey-picking" : ""}`} aria-label="Interactive TPE walkthrough" tabIndex={0} onKeyDown={(event) => {
+  return <>{intro && <LabIntro trials={example.trials} nextX={nextTrial.x} objectivePreset={example.objectivePreset} onExplore={startLab} />}<section hidden={intro} ref={sectionRef} data-stage={stage} data-hint={activeHint && hintPhase === "action" ? activeHint : undefined} className={`journey ${intro ? "journey-intro" : "journey-started"}  ${!intro && stage === 1 && !initialComplete ? "journey-picking" : ""}`} aria-label="Interactive TPE walkthrough" tabIndex={0} onKeyDown={(event) => {
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); move(event.key === "ArrowRight" ? 1 : -1); }
   }}>
@@ -443,7 +476,9 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         "  D ← D ∪ {(x_next, f(x_next))}",
       ].map((line, index) => <li key={line} aria-current={index === (stage <= 1 ? 0 : stage === 2 ? 2 : stage <= 5 ? 3 : stage === 6 ? 4 : stage === 7 ? 5 : 6) ? "step" : undefined}>{line}</li>)}</ol>
       </aside>
-    </div><LabSoundControls enabled={soundState === "on"} pending={soundState === "pending"}
+    </div><button type="button" className="algorithm-trigger lab-hints-trigger" onClick={showHintsAgain} aria-label="Show control hints again" title="Show control hints again">
+      <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M6 12.5h4M6.5 14.5h3M5.2 10.2A4.5 4.5 0 1 1 10.8 10.2c-.5.4-.8 1-.8 1.6V12H6v-.2c0-.6-.3-1.2-.8-1.6Z" /></svg><span>Hints</span>
+    </button><LabSoundControls enabled={soundState === "on"} pending={soundState === "pending"}
       error={soundState === "error" && !showSoundPrompt} onToggle={() => void toggleSound()} /></>, algorithmContainer) : null}
     <div className="journey-plot" style={{ minHeight: minimumPlotHeight }}>
     <svg ref={canvas.ref} onPointerMove={(event) => {
@@ -668,14 +703,15 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
       </>}
 
     </div>}
-    <div className="journey-controls">
+    <div className="journey-controls" ref={controlsRef}>
+      {activeHint && <LabHintBubble key={activeHint} id={activeHint} phase={hintPhase} container={controlsRef} onDismiss={() => dismissHint(activeHint)} />}
       <fieldset disabled={stage === 8} aria-disabled={controlDisabled}>
-        {(stage === 2 || stage === 3 || stage === 4) && <Range name="Good fraction" symbol="γ" value={settings.gamma} min={1 / history.length} max={(history.length - 1) / history.length} step={1 / history.length} onChange={(gamma) => change({ gamma: fractionForCount(Math.round(gamma * history.length), history.length) })} />}
-        {stage === 4 && <Range name="Bandwidth" symbol="h" value={settings.bandwidth} min={0.2} max={1.5} step={0.05} onChange={(bandwidth) => change({ bandwidth })} />}
-        {stage === 5 && <><Range audio={audio} name="Prior" symbol="α" value={settings.priorWeight} min={0} max={10} step={0.25} onChange={(priorWeight) => change({ priorWeight })} />
-          <label className="journey-weight">Weighting <select aria-label="Weighting" value={settings.weights} onChange={(e) => change({ weights: e.target.value as ExplanationSettings["weights"] })}><option value="uniform">Uniform</option><option value="recency">Recency</option><option value="ei">Improvement</option></select></label>
+        {(stage === 2 || stage === 3 || stage === 4) && <Range hint="gamma" hinted={activeHint === "gamma"} name="Good fraction" symbol="γ" value={settings.gamma} min={1 / history.length} max={(history.length - 1) / history.length} step={1 / history.length} onChange={(gamma) => { noteControlUsed("gamma"); change({ gamma: fractionForCount(Math.round(gamma * history.length), history.length) }); }} />}
+        {stage === 4 && <Range hint="bandwidth" hinted={activeHint === "bandwidth"} name="Bandwidth" symbol="h" value={settings.bandwidth} min={0.2} max={1.5} step={0.05} onChange={(bandwidth) => { noteControlUsed("bandwidth"); change({ bandwidth }); }} />}
+        {stage === 5 && <><Range audio={audio} hint="prior" hinted={activeHint === "prior"} name="Prior" symbol="α" value={settings.priorWeight} min={0} max={10} step={0.25} onChange={(priorWeight) => { noteControlUsed("prior"); change({ priorWeight }); }} />
+          <label className="journey-weight" data-hint-anchor="weights">Weighting <select aria-label="Weighting" aria-describedby={activeHint === "weights" ? labHintElementId : undefined} value={settings.weights} onChange={(e) => { noteControlUsed("weights"); change({ weights: e.target.value as ExplanationSettings["weights"] }); }}><option value="uniform">Uniform</option><option value="recency">Recency</option><option value="ei">Improvement</option></select></label>
           <details className="journey-weight-details"><summary aria-label="Weight formula" title="Weight formula">ⓘ</summary><div><span className="journey-weight-note">{weightDescription}</span><JourneyMath tex={weightMath} /></div></details></>}
-        {(stage === 6 || stage === 7) && <><Range name="Candidates" symbol="M" value={settings.candidates} min={1} max={40} step={1} onChange={(candidates) => change({ candidates })} /><button className="journey-icon" aria-label="Resample candidates" title="Resample candidates" onClick={() => { if (controlDisabled) return; change({ seed: settings.seed + 1 }); }}>↻</button></>}
+        {(stage === 6 || stage === 7) && <><Range hint="candidates" hinted={activeHint === "candidates"} name="Candidates" symbol="M" value={settings.candidates} min={1} max={40} step={1} onChange={(candidates) => { noteControlUsed("candidates"); change({ candidates }); }} /><button className="journey-icon" aria-label="Resample candidates" title="Resample candidates" onClick={() => { if (controlDisabled) return; change({ seed: settings.seed + 1 }); }}>↻</button></>}
       </fieldset>
     </div>
     <nav className="journey-navigation" aria-label="Walkthrough navigation">
