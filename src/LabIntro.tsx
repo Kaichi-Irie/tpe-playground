@@ -39,7 +39,9 @@ export default function LabIntro({ trials, nextX, objectivePreset, onExplore }: 
   const revealObjective = observed === trials.length;
   const plot = usePlotSize();
   const width = Math.max(240, plot.width), height = Math.max(140, plot.height);
-  const left = 30, right = width - 20, top = 26, bottom = height - 28;
+  // Margins and label offsets grow with the fluid chart text size.
+  const u = plot.typeScale;
+  const left = 30 * u, right = width - 20 * u, top = 26 * u, bottom = height - 28 * u;
   const sx = (x: number) => left + (x + 5) / 10 * (right - left);
   const sy = (y: number) => bottom - y / 8 * (bottom - top - 8);
   const proposalX = sx(nextX);
@@ -64,12 +66,12 @@ export default function LabIntro({ trials, nextX, objectivePreset, onExplore }: 
           </>}
         </div>
         <svg ref={plot.ref} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${observed} observations${ready ? `; next proposed x ${nextX.toFixed(2)}, not yet evaluated` : ""}`}>
-          <g className="lab-axes"><line x1={left} y1={top} x2={left} y2={bottom} /><line x1={left} y1={bottom} x2={right} y2={bottom} />{[-5, 0, 5].map((x) => <text key={x} x={sx(x)} y={height - 7} textAnchor="middle">{x}</text>)}{[0, 4, 8].map((y) => <text key={y} x="20" y={sy(y) + 5} textAnchor="end">{y}</text>)}<text x={width - 9} y={height - 7}>x</text><text x="12" y={top - 5}>y</text></g>
+          <g className="lab-axes"><line x1={left} y1={top} x2={left} y2={bottom} /><line x1={left} y1={bottom} x2={right} y2={bottom} />{[-5, 0, 5].map((x) => <text key={x} x={sx(x)} y={height - 7 * u} textAnchor="middle">{x}</text>)}{[0, 4, 8].map((y) => <text key={y} x={20 * u} y={sy(y) + 5 * u} textAnchor="end">{y}</text>)}<text x={width - 9 * u} y={height - 7 * u}>x</text><text x={left + 6 * u} y={top + 4 * u}>y</text></g>
           {revealObjective && <path className="lab-objective-curve" d={objectiveValues.map((y, index) => `${index ? "L" : "M"}${sx(explanationGrid[index])},${sy(y)}`).join(" ")} />}
-          {trials.slice(0, observed).map((trial, index) => <g key={trial.id} className={index === observed - 1 ? "lab-point lab-point-current" : "lab-point"}><circle cx={sx(trial.x)} cy={sy(trial.y)} r={index === observed - 1 ? 5 : 3.5} /><text x={sx(trial.x)} y={sy(trial.y) + (index === observed - 1 ? 19 : -10)} textAnchor="middle">{trial.id}</text></g>)}
+          {trials.slice(0, observed).map((trial, index) => <g key={trial.id} className={index === observed - 1 ? "lab-point lab-point-current" : "lab-point"}><circle cx={sx(trial.x)} cy={sy(trial.y)} r={index === observed - 1 ? 5 : 3.5} /><text x={sx(trial.x)} y={sy(trial.y) + (index === observed - 1 ? 19 : -10) * u} textAnchor="middle">{trial.id}</text></g>)}
           {ready && <g className="lab-next">
             <line x1={proposalX} x2={proposalX} y1={top} y2={bottom} />
-            <text x={Math.max(70, Math.min(width - 70, proposalX))} y={top - 9} textAnchor="middle">next x = {nextX.toFixed(2)}</text>
+            <text x={Math.max(70 * u, Math.min(width - 70 * u, proposalX))} y={top - 9 * u} textAnchor="middle">next x = {nextX.toFixed(2)}</text>
           </g>}
         </svg>
       </div>

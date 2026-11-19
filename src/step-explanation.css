@@ -1,21 +1,21 @@
 .journey { height: calc(100dvh - 122px); min-height: 550px; display: flex; flex-direction: column; position: relative; }
 .journey-formula { flex: 0 0 98px; display: grid; place-items: center; min-width: 0; padding: 8px; }
-.journey-math { max-width: 100%; font-size: 17px; color: var(--text); }
+.journey-math { max-width: 100%; font-size: var(--type-lg); color: var(--text); }
 .journey-math .katex-display { margin: 0; overflow-x: auto; overflow-y: hidden; padding: 6px 4px; }
 .journey-good { color: var(--good); }
 .journey-bad { color: var(--bad); }
 .journey-prior { color: var(--acquisition); }
 .journey-accent { color: var(--accent); }
 .journey-canvas { display: block; width: 100%; flex: 1 1 0; height: 0; min-height: 260px; overflow: hidden; }
-.journey-canvas text { font-size: 13px; }
+.journey-canvas text { font-size: calc(13 * var(--chart-px)); }
 .journey-canvas text.journey-good { fill: var(--good); }
 .journey-canvas text.journey-bad { fill: var(--bad); }
 .journey-axis line { stroke: var(--border); stroke-width: 1; }
 .journey-axis text { fill: var(--muted); }
 .journey-threshold { stroke: var(--threshold); stroke-width: 1.2; stroke-dasharray: 5 5; }
-.journey-canvas .journey-small-label { font-size: 12px; }
+.journey-canvas .journey-small-label { font-size: calc(12 * var(--chart-px)); }
 .journey-blackbox rect { fill: var(--surface-muted); stroke: var(--muted); stroke-width: 1; }
-.journey-blackbox text { fill: var(--text); font-family: KaTeX_Main, serif; font-size: 20px; }
+.journey-blackbox text { fill: var(--text); font-family: KaTeX_Main, serif; font-size: calc(20 * var(--chart-px)); }
 .journey-observation { fill: currentColor; stroke: var(--background); stroke-width: 2; cursor: pointer; }
 .journey-observation:focus-visible, .journey-candidate:focus-visible { outline: none; stroke: var(--accent); stroke-width: 3; }
 .journey-canvas .kernel { fill: none; stroke: currentColor; stroke-width: 1.5; }
@@ -31,17 +31,17 @@
 .journey-controls { flex: 0 0 100px; padding: 4px 20px 0; }
 .journey-controls fieldset { min-width: 0; display: flex; align-items: center; justify-content: center; gap: 32px; flex-wrap: wrap; border: 0; padding: 0; margin: 0; min-height: 44px; }
 .journey-controls fieldset:disabled { opacity: .45; }
-.journey-range { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--muted); }
+.journey-range { display: flex; align-items: center; gap: 16px; font-size: var(--type-sm); color: var(--muted); }
 .journey-range > span { white-space: nowrap; }
-.journey-range i { font-family: KaTeX_Math, serif; font-size: 17px; color: var(--accent); margin-left: 6px; }
+.journey-range i { font-family: KaTeX_Math, serif; font-size: var(--type-lg); color: var(--accent); margin-left: 6px; }
 .journey-range input { width: clamp(100px, 20vw, 240px); height: 32px; accent-color: var(--accent); cursor: pointer; }
 .journey-range output { min-width: 30px; font-variant-numeric: tabular-nums; color: var(--text); }
-.journey-weight { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); }
-.journey-weight select { min-height: 36px; background: transparent; border: 0; border-bottom: 1px solid var(--border); color: var(--text); font-size: 12px; }
+.journey-weight { display: flex; align-items: center; gap: 12px; font-size: var(--type-sm); color: var(--muted); }
+.journey-weight select { min-height: 36px; background: transparent; border: 0; border-bottom: 1px solid var(--border); color: var(--text); font-size: var(--type-sm); }
 .journey-detail { height: 48px; display: grid; place-items: center; }
-.journey-detail .journey-math { font-size: 13px; }
+.journey-detail .journey-math { font-size: var(--type-xs); }
 .journey-navigation { flex: 0 0 64px; display: flex; align-items: center; justify-content: center; gap: 20px; position: relative; }
-.journey-navigation > span { min-width: 150px; text-align: center; font-size: 12px; color: var(--muted); }
+.journey-navigation > span { min-width: 150px; text-align: center; font-size: var(--type-sm); color: var(--muted); }
 .journey-arrow, .journey-icon { border: 0; border-radius: 50%; width: 44px; height: 44px; color: var(--text); background: transparent; font-size: 23px; padding: 0; }
 .journey-arrow { border: 1px solid var(--border); }
 .journey button:disabled { opacity: .25; cursor: default; }
@@ -49,12 +49,10 @@
 @media (max-width: 700px) {
   .journey { height: calc(100dvh - 48px); min-height: 560px; }
   .journey-formula { flex-basis: 90px; padding-inline: 10px; }
-  .journey-math { font-size: 13px; }
   .journey-controls { flex-basis: 122px; padding: 4px 12px 0; }
   .journey-controls fieldset { gap: 4px 16px; }
   .journey-range { gap: 10px; }
   .journey-range input { width: 140px; }
-  .journey-detail .journey-math { font-size: 11px; }
   .journey-navigation { gap: 12px; padding-left: 30px; }
   .journey-navigation > span { min-width: 120px; }
 }
@@ -63,15 +61,13 @@
 }
 
 @media (max-width: 700px) {
-  .journey-canvas text { font-size: 23px; }
-  .journey-canvas .journey-small-label { font-size: 21px; }
   .journey-observation { stroke-width: 3px; }
   .journey-candidate { r: 8px; }
   .journey-candidate.winner { r: 11px; }
 }
 
 .journey-kernel-link { stroke: currentColor; stroke-width: 1; stroke-dasharray: 3 4; }
-.journey-canvas .journey-kernel-label { fill: currentColor; font-family: KaTeX_Main, serif; font-size: 14px; stroke: var(--background); stroke-width: 4; paint-order: stroke; }
+.journey-canvas .journey-kernel-label { fill: currentColor; font-family: KaTeX_Main, serif; font-size: calc(14 * var(--chart-px)); stroke: var(--background); stroke-width: 4; paint-order: stroke; }
 .journey-query-result text { fill: var(--text); font-family: KaTeX_Main, serif; }
 .journey-query-result line { stroke: var(--muted); stroke-dasharray: 3 4; opacity: .6; }
 .journey-score-axis path { fill: none; stroke: var(--acquisition); stroke-width: 2; opacity: .65; }
@@ -80,38 +76,34 @@
 .journey-winner-halo path { fill: var(--acquisition); stroke: var(--background); stroke-width: 2; }
 
 .journey-accent, .journey-range i { color: var(--text); }
-.journey-canvas .journey-axis-title { font-size: 23px; fill: var(--text); font-family: KaTeX_Main, serif; }
-.journey-canvas .journey-point-index { font-size: 11px; fill: currentColor; pointer-events: none; paint-order: stroke; stroke: var(--background); stroke-width: 3px; }
-.journey-canvas .journey-group-good { fill: var(--good); font-size: 20px; }
-.journey-canvas .journey-group-bad { fill: var(--bad); font-size: 20px; }
+.journey-canvas .journey-axis-title { font-size: calc(20 * var(--chart-px)); fill: var(--text); font-family: KaTeX_Main, serif; }
+.journey-canvas .journey-point-index { font-size: calc(11 * var(--chart-px)); fill: currentColor; pointer-events: none; paint-order: stroke; stroke: var(--background); stroke-width: 3px; }
+.journey-canvas .journey-group-good { fill: var(--good); font-size: calc(22 * var(--chart-px)); }
+.journey-canvas .journey-group-bad { fill: var(--bad); font-size: calc(22 * var(--chart-px)); }
 .journey-formula-pair { flex-basis: 154px; }
-.journey-formula-pair .journey-math { font-size: 15px; }
+.journey-formula-pair .journey-math { font-size: var(--type-md); }
 .journey-next-input { color: var(--acquisition); pointer-events: none; }
 .journey-next-input circle { fill: currentColor; }
-.journey-next-input text { fill: currentColor; font-size: 20px; font-family: KaTeX_Main, serif; paint-order: stroke; stroke: var(--background); stroke-width: 4px; }
+.journey-next-input text { fill: currentColor; font-size: calc(20 * var(--chart-px)); font-family: KaTeX_Main, serif; paint-order: stroke; stroke: var(--background); stroke-width: 4px; }
 .journey-next-input line { stroke: currentColor; stroke-dasharray: 4 4; }
-.journey-reset, .journey-replay { position: absolute; border: 0; background: transparent; color: var(--muted); font-size: 12px; padding: 10px; }
+.journey-reset, .journey-replay { position: absolute; border: 0; background: transparent; color: var(--muted); font-size: var(--type-sm); padding: 10px; }
 .journey-reset { left: 0; }
 .journey-replay { right: 0; }
 @media (max-width: 700px) {
-  .journey-formula-pair .journey-math { font-size: 12px; }
   .journey-navigation { margin-top: 34px; }
   .journey-reset, .journey-replay { top: -32px; }
-  .journey-canvas .journey-point-index { font-size: 17px; }
 }
 .journey-next-input .journey-persistent-axis { stroke: var(--border); stroke-dasharray: none; }
-.journey-message { margin: 8px 12px 0; text-align: center; font-size: 15px; color: var(--text); }
+.journey-message { margin: 8px 12px 0; text-align: center; font-size: var(--type-md); color: var(--text); }
 .journey-truth { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 6; opacity: .5; }
-.journey-truth-label { fill: var(--muted); font-size: 12px !important; }
-.journey-threshold-label { fill: var(--text); font-family: KaTeX_Main, serif; font-size: 18px; }
+.journey-truth-label { fill: var(--muted); font-size: calc(12 * var(--chart-px)) !important; }
+.journey-canvas .journey-threshold-label { fill: var(--text); font-family: KaTeX_Main, serif; font-size: calc(20 * var(--chart-px)); }
 .journey-bandwidth line, .journey-bandwidth path { stroke: var(--text); stroke-width: 1.5; fill: none; }
-.journey-bandwidth text { fill: var(--text); font: italic 18px KaTeX_Main, serif; }
-.journey-weight-note { font-size: 11px; color: var(--muted); }
+.journey-bandwidth text { fill: var(--text); font: italic calc(16 * var(--chart-px)) KaTeX_Main, serif; }
+.journey-weight-note { font-size: var(--type-xs); color: var(--muted); }
 .journey-detail:has(.journey-weight-note) { height: 62px; }
 .journey-controls:has(.journey-weight-note) { flex-basis: 116px; }
 @media (max-width: 700px) {
-  .journey-message { font-size: 13px; }
-  .journey-formula-pair .journey-math { font-size: 11px; }
   .journey-controls:has(.journey-weight-note) { flex-basis: 140px; }
 }
 .journey { --journey-h: #7541b8; --journey-gamma: #007b72; }
@@ -131,17 +123,17 @@
 .journey-heading-main { min-width: 0; }
 .journey-heading .journey-formula { min-height: 98px; }
 .journey-heading .journey-formula-pair { min-height: 154px; }
-.journey-algorithm { padding: 14px 8px; font-size: 11px; color: var(--muted); }
-.journey-algorithm > span { font-size: 12px; }
-.journey-algorithm ol { list-style: none; padding: 0; margin: 6px 0 0; font: 10px/1.8 ui-monospace, monospace; }
+.journey-algorithm { padding: 14px 8px; font-size: var(--type-xs); color: var(--muted); }
+.journey-algorithm > span { font-size: var(--type-sm); }
+.journey-algorithm ol { list-style: none; padding: 0; margin: 6px 0 0; font: var(--type-xs)/1.8 ui-monospace, monospace; }
 .journey-algorithm li { white-space: pre; padding: 2px 5px; border-left: 2px solid transparent; }
 .journey-algorithm li[aria-current] { color: var(--text); background: var(--surface-muted); border-color: var(--acquisition); }
-.journey-axis text { font-size: 17px; fill: var(--text); }
+.journey-axis text { font-size: calc(17 * var(--chart-px)); fill: var(--text); }
 .journey-grid line { stroke: var(--border); stroke-width: 1; }
 .journey-draw-source circle { fill: var(--good); }
 .journey-draw-source line { stroke: var(--good); stroke-dasharray: 3 4; }
-.journey-draw-source text, .journey-candidate-label { fill: var(--acquisition); font: italic 15px KaTeX_Main, serif; }
-.journey-query-result text { font-size: 19px; }
+.journey-draw-source text, .journey-canvas .journey-candidate-label { fill: var(--acquisition); font: italic calc(15 * var(--chart-px)) KaTeX_Main, serif; }
+.journey-query-result text { font-size: calc(19 * var(--chart-px)); }
 @media (max-width: 800px) {
   .journey-heading { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .journey-algorithm { padding: 0 12px 8px; }
@@ -149,14 +141,12 @@
   .journey-algorithm ol { margin: 0; display: flex; overflow-x: auto; gap: 10px; }
   .journey-algorithm li { display: none; }
   .journey-algorithm li[aria-current] { display: block; }
-  .journey-axis text { font-size: 23px; }
 }
 /* Preserve readable plot coordinates instead of shrinking the SVG to the remaining viewport. */
 .journey { height: auto; min-height: calc(100dvh - 122px); }
 .journey-canvas { flex: 1 0 420px; height: clamp(420px, 48vw, 560px); min-height: 420px; }
 @media (max-width: 700px) {
   .journey-canvas { flex-basis: 280px; height: 300px; min-height: 280px; }
-  .journey-axis text { font-size: 26px; }
 }
 
 .journey button[aria-disabled="true"] { opacity: .25; cursor: default; }
@@ -171,15 +161,15 @@
 .journey-intro .journey-heading-main { align-self: end; }
 .journey-intro .journey-controls, .journey-intro .journey-navigation { display: none; }
 .journey-welcome { text-align: center; padding: 28px 16px 10px; }
-.journey-welcome h2 { font-size: clamp(28px, 4vw, 44px); margin: 10px 0; }
-.journey-welcome p { color: var(--muted); }
-.journey-eyebrow { font: 11px ui-monospace, monospace; letter-spacing: .14em; }
-.journey-action { border: 1px solid var(--border); border-radius: 9px; background: var(--surface-muted); color: var(--text); padding: 12px 18px; cursor: pointer; font: inherit; font-size: 13px; min-height: 44px; }
+.journey-welcome h2 { font-size: var(--type-2xl); margin: 10px 0; }
+.journey-welcome p { color: var(--muted); font-size: var(--type-sm); }
+.journey-eyebrow { font: var(--type-xs) ui-monospace, monospace; letter-spacing: .14em; }
+.journey-action { border: 1px solid var(--border); border-radius: 9px; background: var(--surface-muted); color: var(--text); padding: 12px 18px; cursor: pointer; font: inherit; font-size: var(--type-md); min-height: 44px; }
 .journey-action:hover:not(:disabled) { border-color: var(--acquisition); }
 .journey-action:focus-visible { outline: 2px solid var(--acquisition); outline-offset: 3px; }
 .journey-task { text-align: center; display: grid; justify-items: center; gap: 10px; padding: 18px; border-top: 1px solid var(--border); }
 .journey-task:empty { display: none; }
-.journey-task > span { color: var(--muted); font-size: 13px; }
+.journey-task > span { color: var(--muted); font-size: var(--type-md); }
 .journey-task-actions { display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; }
 .journey-candidate-label { stroke: var(--background); stroke-width: 4px; paint-order: stroke; }
 .journey-started .journey-draw-source { animation: journey-reveal 550ms ease both; }
@@ -216,17 +206,17 @@
 .journey .journey-heading { min-height: 154px; flex: 0 0 auto; align-items: center; }
 .journey .journey-heading .journey-formula,
 .journey .journey-heading .journey-formula-pair { min-height: 0; padding: 6px; }
-.journey .journey-message { font-size: clamp(22px, 2.5vw, 32px); font-weight: 700; line-height: 1.2; margin: 8px 8px 12px; }
-.journey .journey-math { font-size: 15px; }
+.journey .journey-message { font-size: var(--type-xl); font-weight: 700; line-height: 1.2; margin: 8px 8px 12px; }
+.journey .journey-math { font-size: var(--type-md); }
 .journey .journey-canvas { flex: 1 1 0; min-height: 0; height: 0; width: 100%; }
 .journey .journey-task { flex: 0 0 auto; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 16px; padding: 6px 10px; }
 .journey .journey-task:empty { display: none; }
-.journey .journey-task strong { font-size: 13px; }
+.journey .journey-task strong { font-size: var(--type-md); }
 .journey .journey-controls { flex: 0 0 auto; padding: 0 10px; }
 .journey .journey-controls fieldset { gap: 8px 24px; min-height: 40px; }
 .journey .journey-detail { height: auto; min-height: 0; }
 .journey .journey-detail:empty { display: none; }
-.journey .journey-detail .journey-math { font-size: 11px; }
+.journey .journey-detail .journey-math { font-size: var(--type-xs); }
 .journey .journey-navigation { flex: 0 0 50px; margin: 0; padding: 0; }
 .journey .journey-reset, .journey .journey-replay { top: auto; }
 .journey .journey-action { padding: 8px 14px; }
@@ -234,45 +224,40 @@
 .journey .journey-die small { font-size: 10px; line-height: 1; }
 .journey .journey-die strong { font-size: 25px; line-height: 1.3; font-variant-numeric: tabular-nums; }
 .journey-intro .journey-welcome { padding: 10px; flex-shrink: 0; }
-.journey-intro .journey-welcome h2 { font-size: 28px; margin: 4px; }
+.journey-intro .journey-welcome h2 { font-size: var(--type-2xl); margin: 4px; }
 .journey-intro .journey-welcome .journey-eyebrow { display: none; }
 .journey-intro .journey-heading { min-height: 190px; }
 .journey-intro .journey-algorithm { transform: translate(-40px, 0) scale(1.15); }
 @media (max-width: 800px) {
   .journey { height: calc(100dvh - 48px); }
   .journey .journey-heading { min-height: 0; gap: 0; }
-  .journey .journey-message { font-size: 22px; margin: 8px 0; }
-  .journey .journey-math, .journey .journey-formula-pair .journey-math { font-size: 11px; }
+  .journey .journey-message { margin: 8px 0; }
   .journey .journey-algorithm { padding: 4px 8px; margin: 0 6px; }
-  .journey .journey-algorithm > span { font-size: 10px; margin: 0; }
-  .journey .journey-algorithm ol { font-size: 9px; }
+  .journey .journey-algorithm > span { margin: 0; }
   .journey-intro .journey-algorithm { transform: none; }
-  .journey-intro .journey-welcome h2 { font-size: 22px; }
-  .journey-intro .journey-welcome p { font-size: 11px; }
-  .journey .journey-range { gap: 6px; font-size: 11px; }
+  .journey .journey-range { gap: 6px; }
   .journey .journey-range input { width: clamp(64px, 18vw, 140px); }
   .journey .journey-controls fieldset { gap: 4px 12px; }
   .journey .journey-navigation { gap: 8px; }
   .journey .journey-navigation > span { min-width: 65px; }
-  .journey .journey-reset, .journey .journey-replay { font-size: 10px; padding: 4px; }
+  .journey .journey-reset, .journey .journey-replay { padding: 4px; }
   .journey .journey-task { gap: 6px 10px; padding: 4px; }
   .journey .journey-task-actions { gap: 6px; }
 }
 @media (max-height: 650px) and (min-width: 801px) {
   .journey .journey-heading { min-height: 110px; }
-  .journey .journey-algorithm ol { font-size: 9px; line-height: 1.4; }
+  .journey .journey-algorithm ol { line-height: 1.4; }
   .journey .journey-algorithm { padding: 6px; }
-  .journey .journey-message { font-size: 23px; }
 }
 
-.journey .journey-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-size: 17px; font-weight: 700; padding: 12px 28px; box-shadow: 0 4px 16px var(--shadow); }
+.journey .journey-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-size: var(--type-lg); font-weight: 700; padding: 12px 28px; box-shadow: 0 4px 16px var(--shadow); }
 .journey .journey-primary:hover { background: var(--focus); }
 .journey-code-first .journey-welcome,
 .journey-code-first .journey-heading-main,
 .journey-code-first .journey-canvas { display: none; }
 .journey.journey-code-first .journey-heading { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; }
 .journey.journey-code-first .journey-algorithm { transform: none; width: min(760px, 100%); padding: clamp(16px, 4vw, 48px); margin: 0; }
-.journey-code-first .journey-algorithm > span { font-size: clamp(22px, 3vw, 36px); }
+.journey-code-first .journey-algorithm > span { font-size: var(--type-xl); }
 .journey-code-first .journey-algorithm ol { display: block; font-size: clamp(11px, 1.7vw, 21px); line-height: 2; margin: 20px 0 28px; }
 .journey-code-first .journey-algorithm li { display: block; }
 .journey-picking .journey-canvas { cursor: crosshair; }
@@ -288,8 +273,8 @@
 /* Decorative execution cue: exploring is the only entry action. */
 .journey-auto-run { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .journey .journey-run-cue { display: inline-block; cursor: default; animation: journey-auto-press 2400ms ease both; }
-.journey-run-caption { font-size: 12px; color: var(--muted); }
-.journey-algorithm > span small { font-size: 10px; font-weight: 400; color: var(--muted); }
+.journey-run-caption { font-size: var(--type-sm); color: var(--muted); }
+.journey-algorithm > span small { font-size: var(--type-2xs); font-weight: 400; color: var(--muted); }
 @keyframes journey-auto-press {
   0%, 65% { transform: translateY(0); box-shadow: 0 4px 0 var(--border); }
   75%, 88% { transform: translateY(4px) scale(.98); box-shadow: 0 0 0 var(--border); filter: brightness(1.2); }
@@ -303,9 +288,8 @@
 .journey-draw-source, .journey-candidate-label, .journey-query-result,
 .journey-inspection-probe, .journey-bandwidth, .journey-kernel-link,
 .journey-kernel-label, .journey-canvas .kernel, .density-line, .density-fill { pointer-events: none; }
-.journey-canvas .journey-acquisition-title { font-size: 20px; font-weight: 600; }
+.journey-canvas .journey-acquisition-title { font-size: calc(20 * var(--chart-px)); font-weight: 600; }
 @media (max-width: 700px) {
-  .journey-canvas .journey-acquisition-title { font-size: 26px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .journey .journey-run-cue { animation: none; }
@@ -331,7 +315,7 @@
 .journey .journey-die:disabled { opacity: 1; cursor: default; }
 .journey .journey-die:focus-visible, .journey-algorithm-toggle:focus-visible { outline: 2px solid var(--acquisition); outline-offset: 3px; }
 .journey .journey-die:hover:enabled { background: var(--background); transform: rotate(-4deg); }
-.journey .journey-first-roll { min-height: 64px; padding: 16px 32px; font-size: 20px; }
+.journey .journey-first-roll { min-height: 64px; padding: 16px 32px; font-size: var(--type-lg); }
 .journey-formula-active { color: var(--acquisition); }
 @keyframes journey-dice-tumble {
   0% { transform: translateY(-10px) rotate(-22deg) scale(.8); }
@@ -359,7 +343,7 @@
   .journey .journey-canvas { height: 0; min-height: 0; }
   .journey .journey-controls { padding: 4px 16px; }
   .journey .journey-controls fieldset { gap: 2px 8px; }
-  .journey .journey-range { display: grid; grid-template-columns: 112px minmax(0, 1fr) 32px; gap: 8px; width: 100%; font-size: 12px; }
+  .journey .journey-range { display: grid; grid-template-columns: 112px minmax(0, 1fr) 32px; gap: 8px; width: 100%; }
   .journey .journey-range input { width: 100%; height: 44px; min-width: 0; margin: 0; }
   .journey .journey-controls fieldset:has(.journey-icon) .journey-range { width: calc(100% - 52px); grid-template-columns: 100px minmax(0, 1fr) 24px; }
   .journey .journey-navigation { min-height: 56px; }
@@ -368,7 +352,7 @@
 }
 
 .journey .journey-roll-status { display: grid; gap: 2px; text-align: left; }
-.journey-roll-status small { display: block; font-size: 11px; }
+.journey-roll-status small { display: block; font-size: var(--type-xs); }
 .journey-weight-details { position: relative; color: var(--muted); }
 .journey-weight-details summary { display: grid; place-items: center; width: 44px; height: 44px; cursor: pointer; list-style: none; }
 .journey-weight-details summary::-webkit-details-marker { display: none; }
@@ -378,11 +362,11 @@
 @media (max-width: 800px) {
   .journey-started .journey-algorithm-minimized { min-width: 36px; min-height: 36px; padding: 0; border: 0; background: transparent; }
   .journey-started .journey-algorithm-minimized ol { display: none; }
-.journey .journey-algorithm:not(.journey-algorithm-minimized) ol { font-size: 11px; line-height: 1.8; }
+.journey .journey-algorithm:not(.journey-algorithm-minimized) ol { font-size: var(--type-xs); line-height: 1.8; }
 .journey-algorithm:not(.journey-algorithm-minimized) li { white-space: pre-wrap; overflow-wrap: anywhere; }
   .journey-started .journey-algorithm:not(.journey-algorithm-minimized) > span { display: block; padding-right: 16px; }
   .journey .journey-heading { padding-bottom: 2px; }
-  .journey .journey-message { font-size: clamp(18px, 5vw, 22px); margin: 4px 0; }
+  .journey .journey-message { margin: 4px 0; }
   .journey .journey-controls:has(.journey-weight-details) fieldset { gap: 0 8px; }
   .journey .journey-controls fieldset { position: relative; }
   .journey-weight-details { position: static; }
@@ -397,11 +381,11 @@
 .journey[hidden] { display: none; }
 .lab-intro { max-width: 1140px; height: calc(100dvh - var(--app-header-height, 56px)); margin: 0 auto; padding: 20px 12px 16px; color: var(--text); display: flex; flex-direction: column; gap: 16px; }
 .lab-intro-workbench { display: grid; grid-template-columns: minmax(280px, .8fr) minmax(0, 1.4fr); flex: 1; min-height: 0; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: var(--surface); }
-.lab-terminal { padding: 18px; border-right: 1px solid var(--border); background: var(--background); font: 12px/1.8 ui-monospace, SFMono-Regular, Consolas, monospace; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
-.lab-terminal-title { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 11px; }
-.lab-terminal-title button { background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 5px 10px; cursor: pointer; }
+.lab-terminal { padding: 18px; border-right: 1px solid var(--border); background: var(--background); font: var(--type-md)/1.8 ui-monospace, SFMono-Regular, Consolas, monospace; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+.lab-terminal-title { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: var(--type-xs); }
+.lab-terminal-title button { background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 5px 10px; cursor: pointer; font-size: var(--type-xs); }
 .lab-terminal-title button:disabled { opacity: .4; cursor: default; }
-.lab-command { margin: 20px 0 14px; min-height: 24px; color: var(--text); font-size: 15px; }
+.lab-command { margin: 20px 0 14px; min-height: 24px; color: var(--text); font-size: var(--type-lg); }
 .lab-cursor { color: var(--accent); }
 .lab-cursor-rest { visibility: hidden; }
 .lab-log > div:not(.lab-proposal-log) { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -409,27 +393,26 @@
 .lab-proposal-log { color: var(--accent); margin-top: 10px; }
 
 .lab-intro-plot { min-height: 0; padding: 22px 16px 14px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-.lab-plot-caption { display: flex; justify-content: space-between; gap: 12px; padding: 0 12px; font-size: 12px; color: var(--muted); }
+.lab-plot-caption { display: flex; justify-content: space-between; gap: 12px; padding: 0 12px; font-size: var(--type-sm); color: var(--muted); }
 .lab-intro-plot svg { width: 100%; display: block; margin-top: 4px; flex: 1; height: 0; min-height: 0; }
-.lab-plot-explore { display: flex; flex: 0 0 auto; min-height: 44px; margin-top: 6px; align-items: center; justify-content: center; gap: 12px; color: var(--proposal-color); font-size: clamp(18px, 3vw, 24px); font-weight: 700; }
+.lab-plot-explore { display: flex; flex: 0 0 auto; min-height: 44px; margin-top: 6px; align-items: center; justify-content: center; gap: 12px; color: var(--proposal-color); font-size: var(--type-xl); font-weight: 700; }
 .lab-axes line { stroke: var(--border); }
-.lab-axes text { fill: var(--muted); font-size: 15px; }
+.lab-axes text { fill: var(--muted); font-size: calc(16 * var(--chart-px)); }
 .lab-point circle { fill: var(--muted); }
-.lab-point text { fill: var(--muted); font-size: 13px; }
+.lab-point text { fill: var(--muted); font-size: calc(15 * var(--chart-px)); }
 .lab-point-current circle { fill: var(--text); }
 .lab-next line { stroke: var(--proposal-color); stroke-dasharray: 5 6; }
-.lab-next text { fill: var(--proposal-color); font: 600 13px ui-monospace, SFMono-Regular, Consolas, monospace; }
+.lab-next text { fill: var(--proposal-color); font: 600 calc(20 * var(--chart-px)) ui-monospace, SFMono-Regular, Consolas, monospace; }
 .lab-intro button:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 @media (max-width: 700px) {
   .lab-intro { height: calc(100dvh - 48px); min-height: 620px; padding: 8px 10px 12px; gap: 10px; }
   .lab-intro-workbench { grid-template-columns: 1fr; grid-template-rows: 180px minmax(280px, 1fr); }
-  .lab-terminal { border-right: 0; border-bottom: 1px solid var(--border); padding: 10px 14px; justify-content: start; font-size: 12px; line-height: 1.6; }
-  .lab-command { margin: 6px 0; font-size: 14px; min-height: 22px; }
+  .lab-terminal { border-right: 0; border-bottom: 1px solid var(--border); padding: 10px 14px; justify-content: start; line-height: 1.6; }
+  .lab-command { margin: 6px 0; min-height: 22px; }
   .lab-log > div.lab-log-older { display: none; }
   .lab-proposal-log { margin-top: 6px; }
   .lab-intro-plot { min-height: 0; padding: 12px 8px 4px; }
-  .lab-plot-caption { padding: 0 4px; font-size: 11px; }
-  .lab-axes text, .lab-point text { font-size: 12px; }
+  .lab-plot-caption { padding: 0 4px; }
 }
 .lab-plot-explore .journey-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 650; padding: 6px 14px; }
 
@@ -439,7 +422,7 @@
 .lab-log b { font-weight: 500; }
 .lab-log-current b { font-weight: 750; }
 @media (max-height: 500px) and (min-width: 701px) {
-  .lab-terminal { font-size: 11px; line-height: 1.5; padding: 10px 14px; }
+  .lab-terminal { line-height: 1.5; padding: 10px 14px; }
   .lab-command { margin: 6px 0; }
   .lab-log > div.lab-log-older { display: none; }
   .lab-intro-plot svg { min-height: 0; height: 0; flex: 1; }
@@ -457,11 +440,12 @@
 .lab-log > div.lab-log-current, .lab-log-current b { color: #f2f2f2; }
 .lab-proposal-value { color: #e8b66a; white-space: nowrap; }
 .lab-proposal-source { color: #a9abb2; }
-.lab-proposal-log { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 0 6px; font-size: 11px; white-space: nowrap; }
+/* Source and value wrap as separate units, so narrow phones never clip the x value. */
+.lab-proposal-log { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; font-size: var(--type-lg); white-space: nowrap; }
 .lab-intro { --proposal-color: #996000; }
 [data-theme="dark"] .lab-intro { --proposal-color: #e8b66a; }
 
-.lab-sound-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 0; font-size: 11px; }
+.lab-sound-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 0; font-size: var(--type-xs); }
 .lab-sound-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 6px 9px; font: inherit; font-weight: 650; letter-spacing: 0.04em; color: inherit; background: transparent; border: 1px solid #80808055; border-radius: 8px; cursor: pointer; }
 .lab-sound-toggle { min-width: 75px; }
 .lab-sound-toggle[aria-checked="true"] { color: #27675c; background: #548b801c; border-color: #548b80; }
@@ -481,23 +465,23 @@
 .journey-tap-marker path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .journey-tap-marker rect { fill: var(--surface); stroke: currentColor; stroke-width: 1.5; }
 .journey-tap-marker .journey-tap-ring { fill: none; stroke: currentColor; stroke-width: 2; animation: journey-tap-pulse 1.8s ease-out infinite; transform-box: fill-box; transform-origin: center; }
-.journey-canvas .journey-tap-marker text { fill: currentColor; font-size: 13px; font-weight: 600; }
+.journey-canvas .journey-tap-marker text { fill: currentColor; font-size: calc(13 * var(--chart-px)); font-weight: 600; }
 .journey-split-target:focus-visible { outline: none; }
 .journey-split-focus { display: none; fill: none; stroke: var(--accent); stroke-width: 2; pointer-events: none; }
 .journey-split-target:focus-visible .journey-split-focus { display: block; }
 .lab-terminal-actions { display: flex; align-items: center; gap: 8px; }
 .lab-terminal-actions button { display: inline-flex; align-items: center; gap: 6px; }
 .lab-terminal-actions svg { flex-shrink: 0; fill: currentColor; }
-.lab-terminal-title .lab-skip { border-color: transparent; font-size: 11px; }
+.lab-terminal-title .lab-skip { border-color: transparent; font-size: var(--type-xs); }
 @keyframes journey-tap-pulse { from { transform: scale(.7); opacity: .9; } to { transform: scale(1.4); opacity: 0; } }
 @media (max-width: 800px) { .journey { min-height: calc(100dvh - 48px); } }
 @media (prefers-reduced-motion: reduce) { .journey-tap-marker .journey-tap-ring { animation: none; } }
 
 /* State the experiment's goal before the first observation. */
 .lab-intro-heading { flex-shrink: 0; text-align: center; }
-.lab-intro-heading h2 { margin: 0; font-size: clamp(20px, 2.4vw, 28px); line-height: 1.25; letter-spacing: -.5px; }
-.lab-intro-heading p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
-.lab-curve-caption { min-height: 30px; padding: 4px 12px 0; color: var(--muted); font-size: 11px; }
+.lab-intro-heading h2 { margin: 0; font-size: var(--type-2xl); line-height: 1.25; letter-spacing: -.5px; }
+.lab-intro-heading p { margin: 6px 0 0; color: var(--muted); font-size: var(--type-md); }
+.lab-curve-caption { min-height: 30px; padding: 4px 12px 0; color: var(--muted); font-size: var(--type-sm); }
 .lab-objective-curve { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 6; animation: lab-reveal-objective 800ms ease-out; }
 @keyframes lab-reveal-objective { from { opacity: 0; } to { opacity: 1; } }
 
@@ -509,33 +493,31 @@
 .journey-kernel-guide circle { fill: none; }
 
 /* A labeled code icon remains discoverable when the overview is collapsed. */
-.journey .journey-algorithm-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: auto; height: 44px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 12px; }
+.journey .journey-algorithm-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: auto; height: 44px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: var(--type-sm); }
 .journey-algorithm-toggle svg { fill: none; stroke: currentColor; stroke-width: 1.5; }
 .journey-started .journey-algorithm { z-index: 4; }
 .journey-started .journey-algorithm:not(.journey-algorithm-minimized) { width: min(300px, calc(100vw - 32px)); padding: 8px 12px 12px; background: var(--surface); box-shadow: 0 6px 24px var(--shadow); }
 .journey-started .journey-algorithm-minimized { width: auto; min-width: 124px; min-height: 46px; padding: 0; border: 0; background: transparent; }
 .journey-started .journey-algorithm-minimized ol { display: none; }
-.journey .journey-algorithm:not(.journey-algorithm-minimized) ol { font-size: 11px; line-height: 1.8; }
+.journey .journey-algorithm:not(.journey-algorithm-minimized) ol { font-size: var(--type-xs); line-height: 1.8; }
 .journey-algorithm:not(.journey-algorithm-minimized) li { white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 800px) {
   .journey .journey-heading { padding-top: 58px; }
-  .lab-intro-heading p { font-size: 12px; }
   .lab-curve-caption { padding-inline: 4px; }
 }
 @media (prefers-reduced-motion: reduce) { .lab-objective-curve { animation: none; } }
 
 /* Let the title share the close button's row instead of reserving an empty row. */
 .journey-algorithm-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; }
-.journey-algorithm-header > span { color: var(--text); font-size: 12px; font-weight: 600; }
+.journey-algorithm-header > span { color: var(--text); font-size: var(--type-sm); font-weight: 600; }
 .journey .journey-algorithm-toggle { position: static; flex-shrink: 0; }
 .journey-algorithm-minimized .journey-algorithm-header > span { display: none; }
 
-.lab-plot-caption > span:first-child { color: var(--text); font-size: 16px; font-weight: 650; }
+.lab-plot-caption > span:first-child { color: var(--text); font-size: var(--type-lg); font-weight: 650; }
 .lab-plot-caption { flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
-.journey .journey-heading .journey-math { font-size: 19px; }
-.journey-canvas .journey-next-label text { font-size: 24px; }
+.journey .journey-heading .journey-math { font-size: var(--type-math); }
+.journey-canvas .journey-next-label text { font-size: calc(24 * var(--chart-px)); }
 @media (max-width: 800px) {
-  .journey .journey-heading .journey-math { font-size: 18px; }
 }
 /* Constrain the math grid itself, so intrinsic KaTeX widths cannot widen the page. */
 .journey .journey-heading .journey-formula { grid-template-columns: minmax(0, 1fr); }
@@ -564,16 +546,16 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
-  font-size: 13px;
+  font-size: var(--type-md);
 }
-.lab-sound-prompt p { margin: 0; }
+.lab-sound-prompt p { margin: 0; font-size: inherit; }
 .lab-sound-prompt-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .lab-sound-prompt .lab-enable-sound { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
 .lab-sound-prompt-error { flex-basis: 100%; text-align: center; }
 
 /* Audio shares the app header; errors overlay the page. */
 .lab-header-actions { display: flex; align-items: center; gap: 4px; }
-.app-header .lab-sound-controls { position: relative; flex-wrap: nowrap; gap: 4px; padding: 0; }
+.app-header .lab-sound-controls { position: relative; flex-wrap: nowrap; gap: 4px; padding: 0; font-size: var(--type-sm); }
 .app-header .lab-sound-controls button { min-width: 44px; height: 44px; padding: 0 10px; border-color: transparent; }
 .app-header .lab-sound-controls > [role="alert"] { position: absolute; z-index: 10; right: 0; top: calc(100% + 6px); padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); box-shadow: 0 8px 24px var(--shadow); }
 .app-header .lab-sound-controls > [role="alert"] { width: 220px; }
@@ -589,26 +571,26 @@
 .lab-terminal { justify-content: start; }
 @media (max-width: 800px) {
   .journey .journey-heading { padding-inline: 6px; }
-  .journey .journey-message { font-size: clamp(16px, 4.3vw, 20px); margin: 4px 0; }
+  .journey .journey-message { margin: 4px 0; }
   .journey .journey-heading .journey-formula { padding: 2px; }
-  .journey [data-heading-stage="1"] .journey-math { font-size: clamp(13px, 3.65vw, 18px); }
-  .journey [data-heading-stage="2"] .journey-math { font-size: clamp(13px, 3.8vw, 18px); }
-  .journey [data-heading-stage="5"] .journey-math { font-size: clamp(13px, 3.65vw, 18px); }
+  .journey [data-heading-stage="1"] .journey-math { font-size: clamp(13px, 3.65vw, var(--type-math)); }
+  .journey [data-heading-stage="2"] .journey-math { font-size: clamp(13px, 3.8vw, var(--type-math)); }
+  .journey [data-heading-stage="5"] .journey-math { font-size: clamp(13px, 3.65vw, var(--type-math)); }
   .journey .journey-controls fieldset:empty { display: none; }
   .lab-curve-caption { min-height: 0; }
 }
 
 /* Coach hints: a bubble above the control, plus a pulse on what it changes. */
 .journey .journey-controls { position: relative; }
-.lab-hint { position: absolute; z-index: 5; left: var(--hint-left); width: max-content; max-width: min(300px, calc(100% - 16px)); display: flex; align-items: center; gap: 10px; padding: 9px 10px 9px 14px; border: 1.5px solid var(--accent); border-radius: 12px; background: var(--surface); color: var(--text); box-shadow: 0 8px 24px var(--shadow); font-size: 13px; line-height: 1.4; text-align: left; animation: lab-hint-in 260ms ease both; }
+.lab-hint { position: absolute; z-index: 5; left: var(--hint-left); width: max-content; max-width: min(24em, calc(100% - 16px)); display: flex; align-items: center; gap: 10px; padding: 9px 10px 9px 14px; border: 1.5px solid var(--accent); border-radius: 12px; background: var(--surface); color: var(--text); box-shadow: 0 8px 24px var(--shadow); font-size: var(--type-md); line-height: 1.4; text-align: left; animation: lab-hint-in 260ms ease both; }
 .lab-hint[data-placed="false"] { visibility: hidden; }
 .lab-hint::after { content: ""; position: absolute; top: 100%; left: var(--hint-arrow); width: 12px; height: 12px; margin: -6px 0 0 -6px; background: var(--surface); border: solid var(--accent); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
-.lab-hint p { margin: 0; flex: 1 1 auto; }
-.lab-hint-meaning { max-width: min(380px, calc(100% - 16px)); }
+.lab-hint p { margin: 0; flex: 1 1 auto; font-size: inherit; }
+.lab-hint-meaning { max-width: min(29em, calc(100% - 16px)); }
 .lab-hint-action p { font-weight: 650; }
 .lab-hint-try { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--accent); vertical-align: 1px; animation: lab-hint-dot 1.4s ease-in-out infinite; }
-.lab-hint-dismiss { flex: 0 0 auto; min-width: 32px; min-height: 32px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
-.lab-hint-action .lab-hint-dismiss { border-color: transparent; font-size: 18px; line-height: 1; padding: 4px 8px; }
+.lab-hint-dismiss { flex: 0 0 auto; min-width: 32px; min-height: 32px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: var(--type-xs); cursor: pointer; }
+.lab-hint-action .lab-hint-dismiss { border-color: transparent; font-size: var(--type-lg); line-height: 1; padding: 4px 8px; }
 .lab-hint-meaning .lab-hint-dismiss { color: var(--text); }
 .lab-hint-dismiss:hover { background: var(--surface-muted); color: var(--text); }
 .lab-hint-dismiss:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -628,27 +610,28 @@
 @keyframes lab-hint-glow { 50% { filter: drop-shadow(0 0 4px var(--accent)); } }
 .lab-hints-trigger svg { stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 800px) {
-  .lab-hint { font-size: 12px; padding: 7px 8px 7px 12px; }
+  .lab-hint { padding: 7px 8px 7px 12px; }
 }
 
 @media (min-width: 701px) and (min-height: 501px) {
   .lab-intro { max-width: 1340px; min-height: 620px; }
-  .lab-intro-heading h2 { font-size: clamp(28px, 2.6vw, 38px); }
-  .lab-intro-heading p { font-size: 16px; }
-  .lab-terminal { padding: clamp(16px, 1.6vw, 24px); font-size: clamp(15px, 1.25vw, 17px); line-height: 1.55; }
-  .lab-terminal-title { flex-wrap: wrap; gap: 6px 12px; font-size: 14px; }
-  .lab-terminal-title button, .lab-terminal-title .lab-skip { font-size: 13px; }
-  .lab-command { font-size: 20px; }
-  .lab-proposal-log { flex-wrap: wrap; gap: 4px 10px; margin-top: 16px; font-size: clamp(19px, 1.5vw, 22px); line-height: 1.25; }
+  .lab-terminal { padding: clamp(16px, 1.6vw, 24px); line-height: 1.55; }
+  .lab-terminal-title { flex-wrap: wrap; gap: 6px 12px; }
+  .lab-proposal-log { flex-wrap: wrap; gap: 4px 10px; margin-top: 16px; line-height: 1.25; }
   .lab-proposal-value { font-weight: 700; }
   .lab-intro-plot { padding-inline: 32px; }
-  .lab-plot-caption, .lab-curve-caption { font-size: 15px; }
-  .lab-plot-caption > span:first-child { font-size: 19px; }
-  .lab-plot-explore { min-height: 52px; gap: 16px; font-size: clamp(28px, 2.5vw, 36px); }
-  .lab-plot-explore .journey-primary { min-height: 52px; padding-inline: 20px; font-size: clamp(20px, 1.6vw, 22px); }
+  .lab-plot-explore { min-height: 52px; gap: 16px; }
+  .lab-plot-explore .journey-primary { min-height: 52px; padding-inline: 20px; }
   .lab-intro-plot svg { margin-top: 12px; overflow: visible; }
-  .lab-axes text { font-size: 17px; }
-  .lab-point text { font-size: 15px; }
   .lab-next line { stroke-width: 1.5; }
-  .lab-next text { font-size: clamp(20px, 1.7vw, 24px); font-weight: 700; }
+  .lab-next text { font-weight: 700; }
 }
+
+/* Chart text follows the fluid type scale (see --chart-base in style.css).
+   Sizes are written as calc(N * var(--chart-px)): N px on a 1280×720 laptop.
+   The Lab SVG stretches a minimum logical width onto phones, so --chart-zoom
+   (set from React) converts physical px into viewBox units. Groups that React
+   already scales by the same factor use plain units inside. */
+.journey-canvas, .lab-intro-plot svg { font-size: var(--chart-base); }
+.journey-canvas { --chart-px: calc(var(--chart-base) / 14.4 * var(--chart-zoom, 1)); }
+.journey-canvas .journey-tap-marker, .journey-canvas .journey-next-label { --chart-px: 1px; }

@@ -23,6 +23,22 @@
   --threshold: #808a99;
   --neutral-point: #7d8798;
   --shadow: #20283812;
+  /* Fluid type scale. Text sizes come from these tokens instead of per-device
+     px overrides: each grows with the viewport between a phone and a large
+     desktop (≈12px → 18px body). Use a token for any new text. */
+  --type-md: clamp(12px, 8px + 0.4vw + 0.3vh, 18px);
+  --type-2xs: calc(var(--type-md) * .75);
+  --type-xs: calc(var(--type-md) * .85);
+  --type-sm: calc(var(--type-md) * .92);
+  --type-lg: calc(var(--type-md) * 1.2);
+  --type-xl: clamp(17px, 11px + 1vw + 0.3vh, 30px);
+  --type-2xl: clamp(22px, 14px + 1.3vw + 0.3vh, 40px);
+  /* Display formulas (KaTeX renders 1.21× this). */
+  --type-math: clamp(17px, 12px + 0.45vw + 0.3vh, 24px);
+  /* Chart text is authored in px for a 1280×720 laptop, then multiplied by
+     --chart-px: ≈0.7× on phones, 1× on laptops, 1.25× on 1920×1080. */
+  --chart-base: clamp(10px, 5.6px + 0.52vw + 0.3vh, 18px);
+  --chart-px: calc(var(--chart-base) / 14.4);
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -936,25 +952,25 @@ main .visual-workspace { height: calc(100dvh - var(--app-header-height, 56px)); 
 /* One navigation row, with room for page actions and future audio controls. */
 :root { --app-header-height: 56px; }
 main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: nowrap; }
-.app-brand { flex-shrink: 0; margin: 0; font-size: 17px; line-height: 1; }
+.app-brand { flex-shrink: 0; margin: 0; font-size: var(--type-lg); line-height: 1; }
 .app-brand a { display: flex; align-items: center; gap: 9px; min-height: 44px; text-decoration: none; color: var(--text); white-space: nowrap; }
 .app-tabs { display: flex; align-items: center; gap: 4px; }
-.app-tabs a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 10px; color: var(--muted); text-decoration: none; font-size: 13px; border-bottom: 2px solid transparent; }
+.app-tabs a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 10px; color: var(--muted); text-decoration: none; font-size: var(--type-md); border-bottom: 2px solid transparent; }
 .app-tabs a[aria-current="page"] { color: var(--accent); border-color: currentColor; }
 .app-tabs a:hover, .page-picker-menu a:hover { color: var(--accent); background: var(--surface-muted); }
 .app-tabs .page-check { display: none; }
 .app-actions { display: flex; align-items: center; flex-shrink: 0; gap: 4px; margin-left: auto; }
 .lab-header-actions:empty { display: none; }
 .app-header .theme-toggle, .algorithm-trigger { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 44px; width: auto; height: 44px; padding: 0 10px; border: 0; border-radius: 6px; color: var(--text); background: transparent; cursor: pointer; }
-.algorithm-trigger { gap: 7px; font-size: 12px; }
+.algorithm-trigger { gap: 7px; font-size: var(--type-sm); }
 .algorithm-trigger svg { fill: none; stroke: currentColor; stroke-width: 1.5; }
 .app-header button:hover { background: var(--surface-muted); }
 .app-header :focus-visible, .algorithm-popover :focus-visible, .page-picker-menu :focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.page-picker { display: none; align-items: center; justify-content: space-between; gap: 14px; min-height: 44px; min-width: 96px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+.page-picker { display: none; align-items: center; justify-content: space-between; gap: 14px; min-height: 44px; min-width: 96px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: var(--type-lg); cursor: pointer; }
 .page-picker-menu, .algorithm-popover { position: fixed; inset: 56px 12px auto auto; margin: 0; padding: 8px; max-width: calc(100vw - 24px); max-height: calc(100dvh - 68px); overflow: auto; overscroll-behavior: contain; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); box-shadow: 0 8px 24px var(--shadow); }
 .page-picker-menu { left: 52px; right: auto; width: 200px; }
 .page-picker-menu nav { display: flex; flex-direction: column; }
-.page-picker-menu a { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 12px; border-radius: 6px; text-decoration: none; color: var(--text); font-size: 14px; }
+.page-picker-menu a { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 12px; border-radius: 6px; text-decoration: none; color: var(--text); font-size: var(--type-lg); }
 .page-picker-menu a[aria-current="page"] { color: var(--accent); background: var(--surface-muted); }
 .algorithm-popover { width: 320px; padding: 8px 12px 12px; }
 .algorithm-popover-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
