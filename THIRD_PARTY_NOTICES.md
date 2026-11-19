@@ -32,7 +32,7 @@ application.
 
 ## Project assets and references
 
-The project mascot's generation provenance is recorded in
+The project mascot's artwork files are listed in
 [design/fuwatane/README.md](design/fuwatane/README.md). The earlier, unused
 [Tippy illustration](src/assets/tippy.png) has a recorded
 [image-generation prompt](src/assets/tippy.prompt.txt) and is not imported by
