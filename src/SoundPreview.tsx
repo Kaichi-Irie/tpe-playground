@@ -95,7 +95,7 @@ function SoundPreview() {
       <h2 id="dice-heading">Roll the dice</h2>
       <p>候補をサンプリングするときの「カ・コン」（ド → ミ）です。</p>
       <div className="lab-sound-controls">
-        <button onClick={() => void sequence([() => audio.play("sample")], 0)}>振る</button>
+        <button onClick={() => void sequence([() => { audio.play("sample"); setStatus("Dice"); }], 0)}>振る</button>
         <button onClick={() => void sequence([-4.4, 0.3, 4.2].map((x) => () => audio.play("kernel", x)).concat([() => {}, () => audio.play("sample")]), 280)}>ドミソの後に振る</button>
       </div>
     </section>
@@ -107,7 +107,7 @@ function SoundPreview() {
         <input {...alphaGestureHandlers(audio)} aria-label="Prior alpha" type="range" min="0" max="10" step="0.25" value={prior}
           onChange={(event) => manual(setPrior, Number(event.target.value), () => playAlpha(Number(event.target.value)))} /></label>
       <div className="lab-sound-controls">
-        {[0, 5, 10].map((value) => <button key={value} onClick={() => void sequence([() => { setPrior(value); audio.auditionAlpha(value); }], 0)}>α = {value}</button>)}
+        {[0, 5, 10].map((value) => <button key={value} onClick={() => void sequence([() => { setPrior(value); audio.auditionAlpha(value); setStatus(`Prior · α = ${value}`); }], 0)}>α = {value}</button>)}
         {/* Each step extends the same chord; it fades 450 ms after the last one. */}
         <button onClick={() => void sequence(Array.from({ length: 41 }, (_, i) => () => playAlpha(i / 4)), 80)}>0 → 10 をスイープ</button>
       </div>
