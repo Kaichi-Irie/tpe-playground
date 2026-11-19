@@ -129,6 +129,8 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   const [seenHints, setSeenHints] = useState<ReadonlySet<LabHintId>>(() => new Set());
   const [usedHints, setUsedHints] = useState<ReadonlySet<LabHintId>>(() => new Set());
   const [dismissedTasks, setDismissedTasks] = useState<ReadonlySet<LabTaskGuideId>>(() => new Set());
+  const [guideSlotStage, setGuideSlotStage] = useState<number | null>(null);
+  const [announcedGuide, setAnnouncedGuide] = useState("");
   const [algorithmOpen, setAlgorithmOpen] = useState(false);
   const [weightDetailsOpen, setWeightDetailsOpen] = useState(false);
   useEffect(() => { if (!visible) setAlgorithmOpen(false); }, [visible]);
@@ -233,11 +235,12 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
 
   const taskPending = !intro && ((stage === 1 && !initialComplete) || (stage === 4 && !allKernels) || (stage === 6 && drawn < settings.candidates));
   const showSoundPrompt = !intro && stage === 1 && rounds === 0 && !soundPromptDismissed;
-  const guide = nextLabGuide({
+  const eligibleGuide = nextLabGuide({
     stage, taskPending, initialComplete, splitConfirmed, chosenCount: chosen.length, placedCount: placed.length,
     drawnCount: visibleDrawn, candidateCount: settings.candidates,
-    paused: !visible || intro || animating || showSoundPrompt || algorithmOpen || weightDetailsOpen,
+    paused: !visible || intro,
   }, seenHints, dismissedTasks);
+  const guide = animating || showSoundPrompt || algorithmOpen || weightDetailsOpen ? null : eligibleGuide;
   const activeHint = guide?.kind === "control" ? guide.id : null;
   const activeTask = guide?.kind === "task" ? guide.id : null;
   const hint = activeHint ? labHints[activeHint] : null;
@@ -247,21 +250,42 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     : activeTask ? taskGuides[activeTask].action : hint?.[hintPhase];
   const guideAnnouncement = activeTask ? taskGuides[activeTask].announcement
     : hint ? hintPhase === "meaning" ? hint.meaning : `Hint available for ${hint.label}.` : "";
-  const guideRegion = activeTask ? activeTask === "sample" ? "task" : "plot" : activeHint && hintPhase === "action" ? "control" : undefined;
+  const actionHint = hintPhase === "action" ? activeHint : null;
+  const guideRegion = activeTask ? activeTask === "sample" ? "task" : "plot" : actionHint ? "control" : undefined;
   const guidedTrial = activeTask === "kernels" ? history.find((trial) => !placed.includes(trial.id))?.id : undefined;
-  const hasGuideSlot = stage === 1 || stage === 2 || (stage >= 4 && stage <= 7);
+  // Keep the row steady once a cue appears, and reclaim it when the learner leaves that step.
+  const reservedGuideStage = guide || guideSlotStage === stage ? stage : null;
+  if (guideSlotStage !== reservedGuideStage) setGuideSlotStage(reservedGuideStage);
+
+  const hasEligibleGuide = eligibleGuide !== null;
+  useEffect(() => {
+    if (!hasEligibleGuide) setAnnouncedGuide("");
+    else if (guideAnnouncement) setAnnouncedGuide(guideAnnouncement);
+  }, [guideAnnouncement, hasEligibleGuide]);
+
+  useEffect(() => {
+    if (!actionHint || !window.matchMedia("(max-width: 800px)").matches) return;
+    const target = sectionRef.current?.querySelector("[data-guide-target]");
+    // On short screens, bring the full control into view without interrupting keyboard focus.
+    if (target && target.getBoundingClientRect().bottom + 8 > window.innerHeight) {
+      target.scrollIntoView({ block: "nearest", behavior: "instant" });
+    }
+  }, [actionHint]);
+
   function markHintsSeen(ids: Iterable<LabHintId>) {
     const next = new Set([...seenHints, ...ids]);
     if (next.size === seenHints.size) return;
     saveSeenHints(next);
     setSeenHints(next);
   }
-  function dismissGuide() {
+  function dismissGuide(keyboard: boolean) {
     if (!guide) return;
     const section = sectionRef.current;
     // The dismiss button unmounts; keep keyboard focus on the control it described.
     const target = section?.querySelector<HTMLElement | SVGElement>("[data-guide-target]");
-    (target ?? section)?.focus({ preventScroll: true });
+    // A pointer dismissal should leave all observation dots equally visible.
+    const restoreTarget = keyboard || activeTask !== "kernels";
+    (restoreTarget ? target ?? section : section)?.focus({ preventScroll: true });
     if (guide.kind === "control") markHintsSeen([guide.id]);
     else setDismissedTasks((current) => new Set([...current, guide.id]));
   }
@@ -475,11 +499,11 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     </g>;
   }
 
-  return <>{intro && <LabIntro trials={example.trials} nextX={nextTrial.x} objectivePreset={example.objectivePreset} onExplore={startLab} />}<section hidden={intro} ref={sectionRef} data-stage={stage} data-guide-region={guideRegion} data-hint={activeHint && hintPhase === "action" ? activeHint : undefined} className={`journey ${intro ? "journey-intro" : "journey-started"}  ${!intro && stage === 1 && !initialComplete ? "journey-picking" : ""}`} aria-label="Interactive TPE walkthrough" tabIndex={0} onKeyDown={(event) => {
+  return <>{intro && <LabIntro trials={example.trials} nextX={nextTrial.x} objectivePreset={example.objectivePreset} onExplore={startLab} />}<section hidden={intro} ref={sectionRef} data-stage={stage} data-guide-region={guideRegion} data-hint={actionHint ?? undefined} className={`journey ${intro ? "journey-intro" : "journey-started"}  ${!intro && stage === 1 && !initialComplete ? "journey-picking" : ""}`} aria-label="Interactive TPE walkthrough" tabIndex={0} onKeyDown={(event) => {
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); move(event.key === "ArrowRight" ? 1 : -1); }
   }}>
-    <span className="sr-only" role="status">{guideAnnouncement}</span>
+    <span className="sr-only" role="status">{visible ? announcedGuide : ""}</span>
     {showSoundPrompt && <div className="lab-sound-prompt" ref={soundPromptRef}>
       <p>Hear sound effects as you interact.</p>
       <div className="lab-sound-prompt-actions">
@@ -723,12 +747,14 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
       </g>}
     </svg>
     </div>
-    {hasGuideSlot && <div className="lab-guide-slot">
+    {reservedGuideStage !== null && <div className="lab-guide-slot">
       {guideMessage && <LabHintBubble message={guideMessage} phase={hintPhase} onDismiss={dismissGuide} />}
     </div>}
     {!intro && <div className="journey-task" aria-live="polite">
       {stage === 1 && !initialComplete && <><strong>Pick 3 points on the highlighted x-axis · {chosen.length} / 3</strong>{chosen.length === 3 && <span>Adding 7 spread-out inputs · {autoShown} / 7</span>}</>}
-      {(stage === 1 || stage === 2) && initialComplete && <span>{history.length} observations</span>}
+      {(stage === 1 || stage === 2) && initialComplete && <span>
+        {history.length} observations{stage === 1 && activeTask !== "split" && " · Tap a height on the grid to split."}
+      </span>}
       {stage === 4 && <strong>{allKernels ? "Kernels ready · tune h below" : placed.length >= 3 ? "Adding the remaining kernels…" : `Tap 3 points · ${placed.length} / 3`}</strong>}
       {stage === 6 && <>
         <button className={visibleDrawn === 0 ? "journey-action journey-primary journey-first-roll" : "journey-die"}

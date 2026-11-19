@@ -12,27 +12,27 @@ export const labHints: Record<LabHintId, LabHint> = {
   gamma: {
     label: "Good fraction",
     action: "Drag the Good fraction slider to move the Good/Bad line.",
-    meaning: "γ is the share of observations counted as Good. A smaller γ is pickier about what counts as good.",
+    meaning: "γ sets the share of observations counted as Good. A lower γ is more selective.",
   },
   bandwidth: {
     label: "Bandwidth",
     action: "Drag the Bandwidth slider to make the bumps wider or narrower.",
-    meaning: "h sets how far one observation's influence spreads. Wide bumps blur the data; narrow ones trust each point.",
+    meaning: "h sets how far each point influences the curve. Wider bumps smooth out detail.",
   },
   prior: {
     label: "Prior",
     action: "Drag the Prior slider to change how much of the pink layer is mixed in.",
-    meaning: "α mixes in a broad guess that good inputs could be anywhere, so the search keeps exploring.",
+    meaning: "α mixes in a broad guess so the search keeps exploring more of the range.",
   },
   weights: {
     label: "Weighting",
     action: "Choose a Weighting option to change the height of the bumps.",
-    meaning: "Weighting decides which observations count more: all equally, newer ones, or ones that improved more.",
+    meaning: "Weighting can favor newer or more improved points, or count all equally.",
   },
   candidates: {
     label: "Candidates",
     action: "Drag the Candidates slider to change how many candidates compete.",
-    meaning: "M is how many candidates are drawn from ℓ. Only the one with the best ℓ/g is evaluated.",
+    meaning: "Draw M candidates from ℓ. Evaluate the one with the best ℓ/g.",
   },
 };
 
@@ -60,7 +60,7 @@ export function nextHint(context: HintContext, seen: ReadonlySet<LabHintId>): La
 
 export const taskGuides = {
   observe: { action: "Tap or click three different positions along the highlighted x-axis.", announcement: "Hint available for choosing inputs." },
-  split: { action: "Tap or click a height on the grid to split the points into Good and Bad.", announcement: "Hint available for splitting the observations." },
+  split: { action: "Tap or click the grid at the height that divides Good and Bad.", announcement: "Hint available for splitting the observations." },
   kernels: { action: "Select any three dots to add their kernels. Try the outlined dot first.", announcement: "Hint available for adding kernels." },
   sample: { action: "Select Roll the dice to sample a candidate.", announcement: "Hint available for sampling candidates." },
 };

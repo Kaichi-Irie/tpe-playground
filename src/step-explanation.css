@@ -649,6 +649,7 @@
   position: relative;
   z-index: 5;
 }
+.journey-controls [data-guide-target] { scroll-margin-block-end: 8px; }
 .journey[data-guide-region="control"] label:has([data-guide-target]) {
   position: relative;
   z-index: 5;
@@ -680,8 +681,10 @@
 @keyframes lab-hint-glow { 50% { filter: drop-shadow(0 0 4px var(--accent)); } }
 .lab-hints-trigger svg { stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 480px) {
-  .lab-guide-slot { min-block-size: 172px; padding-inline: 8px; }
-  .lab-hint { padding: 9px 2px 9px 10px; gap: 0; }
+  .lab-guide-slot { min-block-size: 112px; padding: 4px 8px; }
+  .lab-guide { grid-template-columns: 54px minmax(0, 1fr); }
+  .lab-hint { padding: 6px 2px 6px 10px; gap: 0; line-height: 1.35; }
+  .journey .journey-roll-status { max-inline-size: 96px; }
 }
 @media (forced-colors: active) {
   .journey[data-guide-region]::after { display: none; }
@@ -709,4 +712,4 @@
    already scales by the same factor use plain units inside. */
 .journey-canvas, .lab-intro-plot svg { font-size: var(--chart-base); }
 .journey-canvas { --chart-px: calc(var(--chart-base) / 14.4 * var(--chart-zoom, 1)); }
-.journey-canvas .journey-tap-marker, .journey-canvas .journey-next-label { --chart-px: 1px; }
+.journey-canvas .journey-next-label { --chart-px: 1px; }
