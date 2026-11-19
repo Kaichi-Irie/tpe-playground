@@ -41,3 +41,25 @@ it("keeps dialog actions in the footer and the seed in Experiment", () => {
   expect(search).toContain("Candidates");
   expect(search).not.toContain("Search seed");
 });
+
+it("marks only the guided slider as the coachmark target", () => {
+  const html = renderToStaticMarkup(
+    <ModelSettingsPanel
+      experiment={{ page: "2d", preset: "quadratic", mode: "multivariate" }}
+      settings={defaultModelSettings2D}
+      defaultSettings={defaultModelSettings2D}
+      onChange={() => {}}
+      seed={42}
+      onNewSeed={() => {}}
+      trialLimit={settings2D.count}
+      widths={[]}
+      domainWidth={10}
+      guide={{ id: "gamma", describedBy: "play-guide-text-2d" }}
+    />,
+  );
+
+  expect(html).toMatch(/<input id="gamma"[^>]*data-guide-target="true"[^>]*aria-describedby="play-guide-text-2d"/);
+  const bandwidth = html.match(/<input id="bandwidth"[^>]*>/)?.[0];
+  expect(bandwidth).toBeDefined();
+  expect(bandwidth).not.toMatch(/data-guide-target|aria-describedby/);
+});

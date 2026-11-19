@@ -21,9 +21,10 @@ interface Props {
   idSuffix?: string;
   labelPrefix?: string;
   className?: string;
+  guide?: { id: "gamma" | "bandwidth"; describedBy: string };
 }
 
-export function ModelSettingsPanel({ children, experiment, settings, defaultSettings, onChange, seed, onNewSeed, trialLimit, widths, domainWidth, idSuffix = "", labelPrefix = "", className = "" }: Props) {
+export function ModelSettingsPanel({ children, experiment, settings, defaultSettings, onChange, seed, onNewSeed, trialLimit, widths, domainWidth, idSuffix = "", labelPrefix = "", className = "", guide }: Props) {
   const { gamma, bandwidth, priorWeight, startupTrials, candidates, weights } = settings;
   const bandwidthRule = settings.bandwidthRule ?? "constant";
   const id = (name: string) => `${name}${idSuffix}`;
@@ -98,7 +99,7 @@ export function ModelSettingsPanel({ children, experiment, settings, defaultSett
           </div>
           <output htmlFor={id("gamma")}>{Math.round(gamma * 100)}%</output>
         </div>
-        <input id={id("gamma")} type="range" {...gammaRange} value={gamma} aria-valuetext={`${Math.round(gamma * 100)} percent`} onChange={(event) => change({ gamma: Number(event.target.value) })} />
+        <input id={id("gamma")} data-guide-target={guide?.id === "gamma" || undefined} aria-describedby={guide?.id === "gamma" ? guide.describedBy : undefined} type="range" {...gammaRange} value={gamma} aria-valuetext={`${Math.round(gamma * 100)} percent`} onChange={(event) => change({ gamma: Number(event.target.value) })} />
       </div>
       <div className="parameter bandwidth-settings">
         <div className="parameter-label">
@@ -109,7 +110,7 @@ export function ModelSettingsPanel({ children, experiment, settings, defaultSett
         {bandwidthRule !== "constant" && <span className="bandwidth-mode">{bandwidthRule === "scott" ? "Scott" : "Silverman"} · good KDE · drag to set constant h</span>}
         <div className="bandwidth-controls">
 
-          <input id={id("bandwidth")} type="range" {...bandwidthRange} max={sliderMax} value={sliderWidth} aria-valuetext={displayedWidth === undefined ? "Available after 2 observations" : `${displayedWidth.toFixed(2)}${bandwidthRule === "constant" ? "" : ", good KDE"}`} onChange={(event) => change({ bandwidth: Number(event.target.value), bandwidthRule: "constant" })} />
+          <input id={id("bandwidth")} data-guide-target={guide?.id === "bandwidth" || undefined} aria-describedby={guide?.id === "bandwidth" ? guide.describedBy : undefined} type="range" {...bandwidthRange} max={sliderMax} value={sliderWidth} aria-valuetext={displayedWidth === undefined ? "Available after 2 observations" : `${displayedWidth.toFixed(2)}${bandwidthRule === "constant" ? "" : ", good KDE"}`} onChange={(event) => change({ bandwidth: Number(event.target.value), bandwidthRule: "constant" })} />
         </div>
       </div>
     </section></div>

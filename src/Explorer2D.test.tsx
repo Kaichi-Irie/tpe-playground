@@ -13,7 +13,8 @@ it("starts a sequential 2D search with no observations and a preview of its firs
   expect(html).toContain("KDEs appear after 2 observations.");
   expect(html).toContain("Next trial");
   expect(html).toContain("Previous trial");
-  expect(html).toContain("Play");
+  expect(html).toContain('<p id="play-guide-text-2d">Press Play, or step forward with →, to evaluate trials one at a time.</p>');
+  expect(html).not.toContain('id="lab-guide-text"');
   expect(html).not.toContain("Resample");
   expect(html).toContain("Performance");
   expect(html).toContain("Objective height scale");

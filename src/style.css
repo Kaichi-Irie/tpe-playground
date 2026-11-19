@@ -1021,3 +1021,17 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
   main > header.app-header { gap: 4px; }
   .page-picker { min-width: 64px; padding-inline: 6px; gap: 6px; }
 }
+
+.canvas-plot [data-guide-target]:not(.scene-2d),
+.live-model-controls .parameter:has([data-guide-target]),
+.scene-stage:has([data-guide-target]) {
+  outline: 2px dashed var(--accent);
+}
+.scene-stage:has([data-guide-target]) { outline-offset: -2px; }
+.canvas-plot .lab-guide { pointer-events: none; }
+.canvas-plot .lab-hint-dismiss { pointer-events: auto; }
+@media (forced-colors: active) {
+  .canvas-plot [data-guide-target]:not(.scene-2d),
+  .live-model-controls .parameter:has([data-guide-target]),
+  .scene-stage:has([data-guide-target]) { outline-color: Highlight; }
+}

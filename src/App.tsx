@@ -1,6 +1,9 @@
 import { TopBar } from "./TopBar";
 import { usePlotSize } from "./usePlotSize";
 import { PlaybackControls } from "./PlaybackControls";
+import LabHintBubble from "./LabHintBubble";
+import { playGuides } from "./playGuides";
+import { usePlayGuide } from "./usePlayGuide";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { weightOptions } from "./searchSettings";
 import { playHashes, readBrowserRoute, readSharedSearch, type Route, type SharedSearch } from "./shareSearch";
@@ -118,6 +121,8 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
     setPlayback(keepObservations);
   }
   const [visible, setVisible] = useState({ objective: true, good: true, bad: true, observations: true, acquisition: false });
+  const guide = usePlayGuide<HTMLDivElement>({ page: "1d", step, startupTrials, acquisitionVisible: visible.acquisition, seeking: false }, page === "1d");
+  const guideAcquisition = guide.active === "acquisition";
   const trials = useMemo(() => playback.trials.slice(0, step), [playback.trials, step]);
   const model = useMemo(() => buildView1D(trials, grid, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }), [trials, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
   const proposal = useMemo(() => step === trialLimit ? undefined : playback.proposals[step] ?? (model.fitted && step >= startupTrials ? proposal1DFromTrace(model.fitted.propose(seed)) : proposeTrial(trials, seed, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset })), [step, playback.proposals, model.fitted, trials, seed, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
@@ -147,17 +152,17 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
       {(labVisited || page === "lab") && <div hidden={page !== "lab"} className="lab-page"><Suspense fallback={<p>Loading explanation…</p>}><StepExplanation visible={page === "lab"} algorithmContainer={page === "lab" ? algorithmContainer : null} /></Suspense></div>}
       <div hidden={page === "about" || page === "lab"} className="play-page">
       {page === "2d" ? <Suspense fallback={<p>Loading 3D explorer…</p>}><Explorer2D key={route.visit} sharedSettings={route.share} /></Suspense> : null}
-      <div hidden={page !== "1d"} className="visual-workspace explorer-1d">
+      <div hidden={page !== "1d"} className="visual-workspace explorer-1d" ref={guide.workspaceRef} onKeyDown={guide.onKeyDown}>
       <section className="canvas-plot" aria-labelledby="plot-heading">
       <div className="canvas-controls">
-      <PlaybackControls step={step} limit={trialLimit} playing={playing} onMove={moveTo}
+      <PlaybackControls step={step} limit={trialLimit} playing={playing} guidePlay={guide.active === "playback"} guideDescribedBy={guide.textId} onMove={moveTo}
         onToggle={() => { if (step === trialLimit) moveTo(0); setPlaying(!playing); }} />
 
       </div>
 
         <h2 id="plot-heading" className="sr-only">Minimize the objective function</h2>
         <div className="plot-tools">
-        <div className="legend" aria-label="Plot layers">{([['objective', 'Objective f(x)'], ['good', 'Good KDE ℓ(x)'], ['bad', 'Bad KDE g(x)'], ['observations', 'Observations'], ['acquisition', 'Acquisition']] as const).map(([key, label]) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}><span className="swatch" /><span className="layer-label">{label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : "Acquisition"}</span></button>)}</div>
+        <div className="legend" aria-label="Plot layers">{([['objective', 'Objective f(x)'], ['good', 'Good KDE ℓ(x)'], ['bad', 'Bad KDE g(x)'], ['observations', 'Observations'], ['acquisition', 'Acquisition']] as const).map(([key, label]) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} data-guide-target={key === "acquisition" && guideAcquisition || undefined} aria-describedby={key === "acquisition" && guideAcquisition ? guide.textId : undefined} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}><span className="swatch" /><span className="layer-label">{label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : "Acquisition"}</span></button>)}</div>
         <div className="plot-guide"><Help label="how to read this plot"><strong>How to read this plot</strong>
         <span className="line-key"><span><i className="split-key" /> Horizontal gray dashes: good/bad split</span><span><i className="next-key" /> Vertical gray dashes: next evaluation</span><span>Gray ticks: sampled candidates</span></span>
         <span className="plot-guide-description">{compactChart ? "Objective: left axis. Good and bad KDEs share one scale. Acquisition uses its own scale, higher is better. Density and acquisition tick labels are omitted to leave more space for the plot." : "Objective: left axis · KDEs: right axis · acquisition log[ℓ(x)/g(x)]: far-right axis, higher is better."} {step < startupTrials ? "Acquisition is a preview during initial random exploration." : `The selected point is best among ${candidates} sampled candidate${candidates === 1 ? "" : "s"}, not necessarily the curve’s global maximum.`}</span></Help></div>
@@ -198,6 +203,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
         </svg></div>
 
         <div className="plot-foot"><span className="inspection" data-selected={selected !== null} aria-live="polite">{selected ? `Trial ${selected.id} · x = ${selected.x.toFixed(3)} · f(x) = ${selected.y.toFixed(3)} · ${groupName(selected)}` : "Hover, tap, or focus a point to inspect a trial."}</span><span>{model.threshold === null ? "KDEs appear after 2 observations." : `Horizontal gray dashes: split at f(x) = ${model.threshold.toFixed(3)}`}</span></div>
+        {guide.active && <LabHintBubble textId={guide.textId} message={playGuides[guide.active].action} phase="action" placement="bottom" onDismiss={guide.dismiss} />}
       </section>
       <div className="canvas-status">        <div className="proposal" aria-live="polite">
           <h3>{!proposal ? "Search complete" : proposal.method === "random" ? `Initial random exploration · ${step + 1} / ${startupTrials}` : `TPE proposal · trial ${step + 1}`}</h3>
@@ -208,8 +214,13 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
       </div>
       <ModelSettingsPanel key={page === "1d" ? route.visit : "hidden"}
         experiment={{ page: "1d", preset: objectivePreset }} settings={settings}
-        defaultSettings={defaultSearch.settings}
-        onChange={(next) => { setSearch({ ...search, settings: { ...next, bandwidthRule: next.bandwidthRule ?? "constant" } }); editModel(); }}
+        defaultSettings={defaultSearch.settings} guide={guide.settingsGuide}
+        onChange={(next) => {
+          if (next.gamma !== gamma) guide.retire("gamma");
+          if (next.bandwidth !== bandwidth) guide.retire("bandwidth");
+          setSearch({ ...search, settings: { ...next, bandwidthRule: next.bandwidthRule ?? "constant" } });
+          editModel();
+        }}
         seed={seed} onNewSeed={() => { setSearch({ ...search, seed: Math.floor(Math.random() * 100) }); setPlayback(emptyPlayback()); setPlaying(false); setSelected(null); }}
         trialLimit={trialLimit} widths={goodWidth === undefined ? [] : [{ label: "x", value: goodWidth }]} domainWidth={domainWidth} >
       <section className="search-toolbar" aria-label="Search controls">
