@@ -5,6 +5,12 @@ import { emptyPlayback, movePlayback } from "./playback";
 
 const presets = Object.keys(objectivePresets) as ObjectivePreset[];
 
+it("shows each preset formula without a long numeric offset", () => {
+  for (const preset of presets) {
+    expect(getObjective(preset).formula).not.toMatch(/\d{7,}/);
+  }
+});
+
 it("keeps every objective finite and within the shared plot axes, including boundaries", () => {
   for (const preset of presets) {
     const evaluate = getObjective(preset).evaluate;
