@@ -128,17 +128,15 @@ svg .axis-title { font-size: calc(14 * var(--chart-px)); fill: var(--muted); }
 .range-labels { display: flex; justify-content: space-between; font-size: var(--type-xs); color: var(--muted); margin: 4px 0 9px; }
 .weight-note { border-left: 1px solid var(--border); padding-left: 22px; }.weight-note strong { display: block; font-size: var(--type-md); margin: 5px 0; font-weight: 550; }.fixed-label { font-size: var(--type-xs); letter-spacing: 1.5px; color: var(--muted); }
 .notes { display: grid; grid-template-columns: 1fr 1fr; gap: 35px; padding: 22px 0; }.notes p { font-size: var(--type-sm); line-height: 1.8; }.notes strong { color: var(--text); }
-.references { border-top: 1px solid var(--border); padding: 24px 0; }
+.references { padding-bottom: 18px; }
 .references > p:not(.eyebrow) { max-width: 80ch; margin-top: 8px; }
-.references ol { margin: 20px 0 0; padding-left: 24px; }
+.references ol { margin: 0; padding-left: 24px; }
 .references li { padding-left: 6px; font-size: var(--type-sm); }
 .references li + li { margin-top: 20px; }
 .references li a { font-weight: 600; overflow-wrap: anywhere; }
 .references li p { margin-top: 5px; }
-.algorithm-comparison { margin: 26px 0; }
-.algorithm-comparison h3 { margin-bottom: 10px; font-size: var(--type-subheading); }
 .algorithm-comparison > p { font-size: var(--type-prose); line-height: 1.8; }
-.algorithm-table-scroll { overflow-x: auto; margin: 18px 0; }
+.algorithm-table-scroll { overflow-x: auto; }
 .algorithm-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: var(--type-sm); line-height: 1.7; }
 .algorithm-table th, .algorithm-table td { padding: 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
 .algorithm-table thead { background: var(--surface-muted); }
@@ -223,9 +221,6 @@ summary:hover { text-decoration: underline; text-underline-offset: 3px; }
 .guide { padding: 18px 0; }
 .notes { padding: 12px 0 0; gap: 28px; }
 .notes p { font-size: var(--type-sm); }
-.references { padding: 18px 0; }
-.references h2 { font-size: var(--type-md); }
-.references ol { margin-top: 12px; }
 button, input, summary { touch-action: manipulation; }
 @media (max-width: 700px) {
   .config { grid-template-columns: 1fr 1fr; gap: 14px 24px; padding: 16px; }
@@ -262,13 +257,16 @@ header .brand { margin: 0; line-height: 1.2; white-space: nowrap; }
 .tpe-mascot { float: right; width: 220px; margin: 0 0 18px 24px; text-align: center; }
 .tpe-mascot img { display: block; width: 100%; height: auto; }
 .tpe-mascot figcaption { margin-top: 4px; color: var(--muted); font-size: var(--type-xs); }
-.about-page > h3 { clear: both; }
 @media (max-width: 500px) { .tpe-mascot { width: 140px; margin-left: 14px; } }
-.about-page > h2 { font-size: var(--type-xl); margin-bottom: 12px; }
-.about-page > h3 { margin: 26px 0 10px; font-size: var(--type-subheading); }
+.about-page > h2, .algorithm-comparison h2, .references h2 {
+  margin: 26px 0 10px;
+  font-size: var(--type-subheading);
+}
+.about-page > h2:first-of-type { margin-top: 0; }
+.about-page > h2:not(:first-of-type) { clear: both; }
 .about-page > p + p { margin-top: 12px; }
 .about-page > p, .explanation-steps { font-size: var(--type-prose); line-height: 1.8; }
-.explanation-steps { padding-left: 22px; margin: 24px 0; }
+.explanation-steps { padding-left: 22px; margin: 0 0 24px; }
 .explanation-steps li + li { margin-top: 12px; }
 .about-page .notes { grid-template-columns: 1fr; gap: 16px; }
 [hidden] { display: none !important; }

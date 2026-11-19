@@ -232,18 +232,18 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
       </details>
       </div>
       </div>
-      <article hidden={page !== "about"} className="about-page" aria-labelledby="about-heading">
+      <article hidden={page !== "about"} className="about-page" aria-label="About">
         <figure className="tpe-mascot">
           <img src={new URL("./assets/fuwatane.webp", import.meta.url).href} width="640" height="585" alt="tippy, the fluffy TPE mascot holding red and blue crayons" decoding="async" />
           <figcaption>tippy</figcaption>
         </figure>
-        <h2 id="about-heading">What is TPE?</h2>
+        <h2>What is TPE?</h2>
         <p><strong>TPE (Tree-structured Parzen Estimator) is a Bayesian optimization algorithm for black-box functions.</strong> It uses past evaluations to choose promising inputs, without a formula or gradient (<a href="https://proceedings.neurips.cc/paper/2011/hash/86e8f7ab32cfd12577bc2619bc635690-Abstract.html">Bergstra et al., 2011</a>).</p>
         <p>Think of tuning a machine learning model’s learning rate. Each evaluation requires training, so Bayesian optimization aims to find good settings with fewer trials.</p>
-        <h3>TPE in Optuna</h3>
+        <h2>TPE in Optuna</h2>
         <p>TPE is the default sampler in <a href="https://optuna.org/">Optuna</a> (<a href="https://arxiv.org/abs/1907.10902">paper</a>), implemented as <a href="https://optuna.readthedocs.io/en/stable/reference/samplers/generated/optuna.samplers.TPESampler.html">TPESampler</a> (<a href="https://github.com/optuna/optuna/blob/master/optuna/samplers/_tpe/sampler.py">source</a>). For multi-objective studies, the default changed from NSGA-II in 4.x to TPE in <a href="https://optuna.readthedocs.io/en/stable/reference/generated/optuna.create_study.html">5.0</a>.</p>
         <p>TPESampler supports <a href="https://doi.org/10.1613/jair.1.13188">multi-objective</a> and <a href="https://arxiv.org/abs/2606.09889">black-box constrained optimization</a>.</p>
-        <h3>Inside TPE</h3>
+        <h2>Inside TPE</h2>
         <ol className="explanation-steps">
           <li><strong>Split.</strong> The best fraction γ of observations forms the good group; the rest form the other group.</li>
           <li><strong>Model.</strong> Fit densities ℓ(x) and g(x) to the two groups using kernel density estimation (KDE).</li>
@@ -252,7 +252,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
         <p>Explore the steps in <a href="#play">Play 2D</a> or <a href="#play-2d">Play 3D</a>. For bandwidths, weights, and other design choices, see <a href="https://arxiv.org/abs/2304.11127">Watanabe’s TPE tutorial</a>.</p>
         <p>TPE Playground uses a simplified educational implementation. <a href="https://github.com/Kaichi-Irie/tpe-playground">View the playground’s source code on GitHub</a>.</p>
         <section className="algorithm-comparison" aria-labelledby="comparison-heading">
-          <h3 id="comparison-heading">TPE and other optimizers</h3>
+          <h2 id="comparison-heading">TPE and other optimizers</h2>
           <div className="algorithm-table-scroll" role="region" aria-label="Optimization algorithm comparison" tabIndex={0}>
             <table className="algorithm-table">
               <thead><tr><th scope="col">Method</th><th scope="col">How it searches</th><th scope="col">Typical use</th></tr></thead>
