@@ -224,12 +224,15 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   const activeHint = intro || animating ? null : nextHint({ stage, taskPending }, seenHints);
   const hintPhase = activeHint && usedHints.has(activeHint) ? "meaning" : "action";
   function markHintsSeen(ids: Iterable<LabHintId>) {
-    setSeenHints((current) => {
-      const next = new Set([...current, ...ids]);
-      if (next.size === current.size) return current;
-      saveSeenHints(next);
-      return next;
-    });
+    const next = new Set([...seenHints, ...ids]);
+    if (next.size === seenHints.size) return;
+    saveSeenHints(next);
+    setSeenHints(next);
+  }
+  function dismissHint(id: LabHintId) {
+    markHintsSeen([id]);
+    // The dismiss button unmounts; keep keyboard focus on the control it described.
+    controlsRef.current?.querySelector<HTMLElement>(`[data-hint-anchor="${id}"] :is(input, select)`)?.focus();
   }
   function noteControlUsed(id: LabHintId) {
     if (activeHint === id && !usedHints.has(id)) setUsedHints((current) => new Set([...current, id]));
@@ -242,7 +245,6 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   // An explained hint is done once the learner leaves its stage.
   useEffect(() => {
     if (usedHints.size) markHintsSeen(usedHints);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
   function pickAt(clientX: number, clientY: number) {
     const matrix = canvas.ref.current?.getScreenCTM();
@@ -702,12 +704,12 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
 
     </div>}
     <div className="journey-controls" ref={controlsRef}>
-      {activeHint && <LabHintBubble key={activeHint} id={activeHint} phase={hintPhase} container={controlsRef} onDismiss={() => markHintsSeen([activeHint])} />}
+      {activeHint && <LabHintBubble key={activeHint} id={activeHint} phase={hintPhase} container={controlsRef} onDismiss={() => dismissHint(activeHint)} />}
       <fieldset disabled={stage === 8} aria-disabled={controlDisabled}>
-        {(stage === 2 || stage === 3 || stage === 4) && <Range hint="gamma" hinted={activeHint === "gamma"} name="Good fraction" symbol="γ" value={settings.gamma} min={1 / history.length} max={(history.length - 1) / history.length} step={1 / history.length} onChange={(gamma) => (noteControlUsed("gamma"), change({ gamma: fractionForCount(Math.round(gamma * history.length), history.length) }))} />}
+        {(stage === 2 || stage === 3 || stage === 4) && <Range hint="gamma" hinted={activeHint === "gamma"} name="Good fraction" symbol="γ" value={settings.gamma} min={1 / history.length} max={(history.length - 1) / history.length} step={1 / history.length} onChange={(gamma) => { noteControlUsed("gamma"); change({ gamma: fractionForCount(Math.round(gamma * history.length), history.length) }); }} />}
         {stage === 4 && <Range hint="bandwidth" hinted={activeHint === "bandwidth"} name="Bandwidth" symbol="h" value={settings.bandwidth} min={0.2} max={1.5} step={0.05} onChange={(bandwidth) => { noteControlUsed("bandwidth"); change({ bandwidth }); }} />}
         {stage === 5 && <><Range audio={audio} hint="prior" hinted={activeHint === "prior"} name="Prior" symbol="α" value={settings.priorWeight} min={0} max={10} step={0.25} onChange={(priorWeight) => { noteControlUsed("prior"); change({ priorWeight }); }} />
-          <label className="journey-weight" data-hint-anchor="weights">Weighting <select aria-label="Weighting" aria-describedby={activeHint === "weights" ? labHintElementId : undefined} value={settings.weights} onChange={(e) => (noteControlUsed("weights"), change({ weights: e.target.value as ExplanationSettings["weights"] }))}><option value="uniform">Uniform</option><option value="recency">Recency</option><option value="ei">Improvement</option></select></label>
+          <label className="journey-weight" data-hint-anchor="weights">Weighting <select aria-label="Weighting" aria-describedby={activeHint === "weights" ? labHintElementId : undefined} value={settings.weights} onChange={(e) => { noteControlUsed("weights"); change({ weights: e.target.value as ExplanationSettings["weights"] }); }}><option value="uniform">Uniform</option><option value="recency">Recency</option><option value="ei">Improvement</option></select></label>
           <details className="journey-weight-details"><summary aria-label="Weight formula" title="Weight formula">ⓘ</summary><div><span className="journey-weight-note">{weightDescription}</span><JourneyMath tex={weightMath} /></div></details></>}
         {(stage === 6 || stage === 7) && <><Range hint="candidates" hinted={activeHint === "candidates"} name="Candidates" symbol="M" value={settings.candidates} min={1} max={40} step={1} onChange={(candidates) => { noteControlUsed("candidates"); change({ candidates }); }} /><button className="journey-icon" aria-label="Resample candidates" title="Resample candidates" onClick={() => { if (controlDisabled) return; change({ seed: settings.seed + 1 }); }}>↻</button></>}
       </fieldset>
