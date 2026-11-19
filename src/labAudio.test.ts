@@ -9,7 +9,7 @@ function setup() {
   const context = {
     sampleRate: 8000, currentTime: 1, state: "running", destination: {},
     decodeAudioData: vi.fn(async () => ({ getChannelData: () => new Float32Array(800) })),
-    resume: vi.fn(async () => {}), close: vi.fn(async () => {}),
+    resume: vi.fn(async () => { context.state = "running"; }), suspend: vi.fn(async () => { context.state = "suspended"; }), close: vi.fn(async () => {}),
     createOscillator: vi.fn(() => ({ type: "sine", frequency: parameter(), connect: vi.fn(), disconnect: vi.fn(), start: vi.fn(), stop: vi.fn(), onended: null })),
     createBiquadFilter: vi.fn(() => ({ type: "lowpass", Q: parameter(), frequency: parameter(), connect: vi.fn(), disconnect: vi.fn() })),
     createGain: vi.fn(() => ({ gain: parameter(), connect: vi.fn(), disconnect: vi.fn() })),
@@ -52,6 +52,22 @@ it("does not enable after disposal during a pending resume", async () => {
   const ready = audio.enable(); audio.dispose(); finish();
   expect(await ready).toBe(false);
   expect(context.close).toHaveBeenCalledOnce();
+});
+it("suspends while hidden and resumes only when sound is on", async () => {
+  const { audio, context, voices } = setup();
+  await audio.enable(); audio.play("sample");
+  audio.suspend();
+  expect(voices.every((voice) => voice.stop.mock.calls.length === 1)).toBe(true);
+  expect(context.suspend).toHaveBeenCalledOnce();
+  await Promise.resolve();
+  context.resume.mockClear();
+  audio.resume();
+  expect(context.resume).toHaveBeenCalledOnce();
+  await Promise.resolve();
+  audio.disable(); audio.suspend(); await Promise.resolve();
+  context.resume.mockClear();
+  audio.resume();
+  expect(context.resume).not.toHaveBeenCalled();
 });
 it("handles unavailable audio and hidden pages", async () => {
   const { audio, context } = setup();

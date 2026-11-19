@@ -74,8 +74,13 @@ function Range({ name, symbol, value, min, max, step, onChange, audio, hint, hin
     <output>{Number(value.toFixed(2))}</output></label>;
 }
 
-export default function StepExplanation({ example = fixedExample, algorithmContainer }: { example?: ExplanationExample; algorithmContainer?: HTMLElement | null }) {
+export default function StepExplanation({ example = fixedExample, algorithmContainer, visible = true }: { example?: ExplanationExample; algorithmContainer?: HTMLElement | null; visible?: boolean }) {
   const [audio] = useState(() => new LabAudio());
+  // The Lab stays mounted on other tabs; release the audio thread until it is shown again.
+  useEffect(() => {
+    if (visible) audio.resume();
+    else audio.suspend();
+  }, [visible, audio]);
   useEffect(() => {
     const stop = () => audio.stop();
     document.addEventListener("visibilitychange", stop);
