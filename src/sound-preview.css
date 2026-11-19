@@ -24,3 +24,7 @@ a { color: inherit; }
 .alpha-audition-control { position: sticky; top: 0; z-index: 1; padding: 16px; margin-bottom: 20px; border: 1px solid #80808060; border-radius: 12px; background: light-dark(#f4f5ef, #17231d); }
 .alpha-audition-control > strong { display: block; margin-bottom: 12px; }
 .sound-family { text-transform: uppercase; letter-spacing: .08em; opacity: .65; font-size: 11px; }
+.audition-control { position: sticky; top: 0; z-index: 1; padding: 16px; margin-bottom: 8px; border: 1px solid #80808060; border-radius: 12px; background: light-dark(#f4f5ef, #17231d); }
+.kernel-pads { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.kernel-pads button { padding: 10px 6px; font-variant-numeric: tabular-nums; }
+.kernel-pads button span { margin-top: 4px; }

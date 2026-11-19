@@ -15,13 +15,21 @@ Open http://127.0.0.1:5173/tpe-playground/.
 
 For sound development, open [the dedicated audition pane](../sound-preview.html) at
 http://127.0.0.1:5173/tpe-playground/sound-preview.html. It uses the Lab's own
-synthesis and playback code. The original Felt piano C3 is the confirmed split piano.
-Compare nine sustained alpha directions B1–B9; pitch stays fixed within each
-candidate. Drag or hold an arrow key to smoothly change timbre without restarting
-the voice; release to fade out. Button and assistive-technology edits fade after
-inactivity. Candidate buttons enable audio; mute and stop are available. Adjust volume on your device.
-Selections affect this audition only. The Lab uses the confirmed B1 (Velvet). Split slider edits blend piano tails
-and avoid repeating the same pitch; explicit split confirmations still strike a note. This separate entry point is excluded from production builds.
+synthesis and playback code. Pitched voices use C major with whole-number partials,
+so overlapping tails stay consonant. The Lab plays the adopted voices, set in
+`adoptedVoices` in `src/labVoices.ts`; the other candidates are for comparison:
+
+- Split γ: S5 Ratchet, a short click per good-count step, slightly higher when the
+  divider moves up and lower when it moves down; a confirming tap is neutral.
+- Kernel: K3 Bubble on a C-major triad tone (C4–E5) chosen by the observation's x.
+- Bandwidth h: B0 Muted wood on C-major pentatonic notes (C3–C5), higher for narrower h.
+- Sampling (roll the dice): Claves · low transposed to C4 → E4, a just major third.
+- Prior α: A1 Warm pad, a chord built from C3 (C3, G3, C4, E4, G4) as α grows.
+
+Drag or hold an arrow key on the α slider to sustain the chord; release to fade out.
+Button and assistive-technology edits fade after inactivity. Candidate buttons enable
+audio; stop is available. Adjust volume on your device. Split slider edits skip
+repeated values; explicit split confirmations always strike. This separate entry point is excluded from production builds.
 
 ## Checks
 

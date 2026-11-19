@@ -1,6 +1,6 @@
 # Archived dice audition
 
-The app uses synthesized Claves · low. It does not fetch, decode, or bundle any
+The app uses synthesized Claves · low, transposed to C4 → E4. It does not fetch, decode, or bundle any
 third-party recording. A fresh clone and production build need no audio files.
 
 An earlier audition used the user-supplied `dice-95077.mp3` from

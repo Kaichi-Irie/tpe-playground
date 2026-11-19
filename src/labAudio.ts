@@ -1,7 +1,9 @@
-import { AlphaVoice } from "./alphaSynth";
 import { renderDice } from "./diceSounds";
-import { bandwidthFrequency, splitFrequency, kernelRotation, renderSound, type LabSound } from "./labSoundDesign";
+import { bandwidthFrequency, type LabSound } from "./labSoundDesign";
+import { type SustainedVoice, adoptedVoices, alphaStudies, bandwidthStudies, ChordPad, createBandwidthVoice, celesta, kernelStudies, kernelStudyNote, midiToHz, type SplitDirection, splitStudies, splitStudyNote } from "./labVoices";
 
+// Values per sound: split = good count k, kernel = observation x,
+// bandwidth = h, alpha = prior weight. A variant selects an audition voice.
 export class LabAudio {
   private context: AudioContext | undefined;
   private output: GainNode | undefined;
@@ -12,20 +14,30 @@ export class LabAudio {
   private lastSplitTime = -Infinity;
   private lastSplitInputTime = -Infinity;
   private fadingVoices = new Set<AudioBufferSourceNode>();
+  // One sustained voice at a time: the α chord or the bandwidth air band.
+  private sustained: SustainedVoice | undefined;
+  private alphaHeld = false;
+  private alphaTimer: ReturnType<typeof setTimeout> | undefined;
+  private buffers = new Map<string, AudioBuffer>();
+  private generation = 0;
+  private lastPlayed = -Infinity;
+  private lastBandwidthKey: string | undefined;
+  private lastBandwidthTime = -Infinity;
+  private lastSplitCount: number | undefined;
 
-  adjustSplit(height: number, variant = this.variants.split) {
+  adjustSplit(goodCount: number, variant: number = adoptedVoices.split) {
     clearTimeout(this.splitTimer);
     this.splitTimer = undefined;
     const context = this.context;
     if (!this.enabled || !context || context.state !== "running" || document.hidden) return;
-    const key = `${variant}:${splitFrequency(height, variant).toFixed(4)}`;
+    const key = `${variant}:${splitStudyNote(goodCount)}`;
     const continuing = context.currentTime - this.lastSplitInputTime < 0.35;
     this.lastSplitInputTime = context.currentTime;
     if (key === this.lastSplitKey && continuing) return;
     const play = () => {
       this.splitTimer = undefined;
       if (!this.enabled || context.state !== "running" || document.hidden) return;
-      this.play("split", height, variant, true);
+      this.play("split", goodCount, variant, true);
       this.lastSplitKey = key;
       this.lastSplitTime = context.currentTime;
     };
@@ -34,10 +46,6 @@ export class LabAudio {
     if (delay > 0) this.splitTimer = setTimeout(play, delay * 1000);
     else play();
   }
-  private variants = { kernel: 2, sample: 6, bandwidth: 2, split: 0, alpha: 0 };
-  private alphaVoice: AlphaVoice | undefined;
-  private alphaHeld = false;
-  private alphaTimer: ReturnType<typeof setTimeout> | undefined;
 
   beginAlphaGesture() {
     this.alphaHeld = true;
@@ -49,27 +57,19 @@ export class LabAudio {
     this.releaseAlpha();
   }
 
-  auditionAlpha(value: number, variant: number) {
+  auditionAlpha(value: number, variant: number = adoptedVoices.alpha) {
     this.endAlphaGesture();
     this.play("alpha", value, variant);
     clearTimeout(this.alphaTimer);
-    if (this.alphaVoice) this.alphaTimer = setTimeout(() => this.releaseAlpha(), 1600);
+    if (this.sustained) this.alphaTimer = setTimeout(() => this.releaseAlpha(), 1600);
   }
 
-  private releaseAlpha() {
+  private releaseAlpha(cut = false) {
     clearTimeout(this.alphaTimer);
     this.alphaTimer = undefined;
-    this.alphaVoice?.release();
-    this.alphaVoice = undefined;
+    this.sustained?.release(cut);
+    this.sustained = undefined;
   }
-
-  private kernelStep = 0;
-  private buffers = new Map<string, AudioBuffer>();
-
-  select(sound: LabSound, variant: number) { this.variants[sound] = variant; }
-  private generation = 0;
-  private lastPlayed = -Infinity;
-  private lastBandwidthKey: string | undefined;
 
   async enable(): Promise<boolean> {
     const generation = ++this.generation;
@@ -104,7 +104,8 @@ export class LabAudio {
     this.lastSplitTime = -Infinity;
     this.lastSplitInputTime = -Infinity;
     this.fadingVoices.clear();
-    this.endAlphaGesture();
+    this.alphaHeld = false;
+    this.releaseAlpha(true);
     for (const [voice, gain] of this.voices) {
       const now = this.context?.currentTime ?? 0;
       gain.gain.setTargetAtTime(0, now, 0.005);
@@ -113,6 +114,7 @@ export class LabAudio {
     this.voices.clear();
     this.lastPlayed = -Infinity;
     this.lastBandwidthKey = undefined;
+    this.lastBandwidthTime = -Infinity;
   }
 
   disable() {
@@ -128,27 +130,48 @@ export class LabAudio {
     if (sound === "alpha") {
       clearTimeout(this.splitTimer);
       this.splitTimer = undefined;
-      const variant = previewVariant ?? this.variants.alpha;
-      if (!this.alphaVoice || this.alphaVoice.variant !== variant) {
+      const study = alphaStudies[previewVariant ?? adoptedVoices.alpha] ?? alphaStudies[adoptedVoices.alpha];
+      if (this.sustained?.study !== study) {
         this.releaseAlpha();
-        this.alphaVoice = new AlphaVoice(context, this.output, variant);
+        this.sustained = new ChordPad(context, this.output, study, (midi) => this.playTone(`chime:${midi}`, () => celesta(midiToHz(midi), context.sampleRate), 1));
       }
-      this.alphaVoice.update(value ?? 4);
-      clearTimeout(this.alphaTimer);
-      // Pointer/key gestures sustain until release. AT and button edits settle
-      // after inactivity; a new edit extends the same voice, never restarts it.
-      if (!this.alphaHeld) this.alphaTimer = setTimeout(() => this.releaseAlpha(), 450);
+      this.sustained.update(value ?? 4);
+      this.settleSustained();
+      return;
+    }
+    if (sound === "bandwidth") {
+      this.playBandwidth(value ?? 0.55, previewVariant ?? adoptedVoices.bandwidth);
       return;
     }
     const now = context.currentTime;
-    if (now - this.lastPlayed < (sound === "bandwidth" ? 0.12 : sound === "split" ? 0 : 0.075)) return;
-    const rotation = sound === "kernel" && previewVariant === undefined ? kernelRotation[this.kernelStep++ % kernelRotation.length] : undefined;
-    const variant = previewVariant ?? rotation?.variant ?? this.variants[sound];
-    const key = `${sound}:${variant}:${sound === "bandwidth" ? bandwidthFrequency(value ?? 0.55).toFixed(4) : sound === "split" && value !== undefined ? splitFrequency(value, variant).toFixed(4) : ""}`;
-    if (sound === "bandwidth" && key === this.lastBandwidthKey) return;
+    if (now - this.lastPlayed < (sound === "split" ? 0 : 0.075)) return;
+    let key: string;
+    let render: () => Float32Array;
+    let level = sound === "sample" ? 0.8 : 1;
+    let crossfade = legato;
+    if (sound === "split") {
+      const study = splitStudies[previewVariant ?? adoptedVoices.split] ?? splitStudies[adoptedVoices.split];
+      const goodCount = Math.round(value ?? 1);
+      // Slider moves carry a direction; a confirming tap is neutral.
+      const direction: SplitDirection = legato && this.lastSplitCount !== undefined ? Math.sign(goodCount - this.lastSplitCount) as SplitDirection : 0;
+      this.lastSplitCount = goodCount;
+      level = study.level;
+      crossfade = legato && Boolean(study.legato);
+      key = `split:${study.id}:${goodCount}:${direction}`;
+      render = () => study.render(goodCount, direction, context.sampleRate);
+    } else if (sound === "kernel") {
+      const study = kernelStudies[previewVariant ?? adoptedVoices.kernel] ?? kernelStudies[adoptedVoices.kernel];
+      const midi = kernelStudyNote(value ?? 0);
+      key = `kernel:${study.id}:${midi}`;
+      render = () => study.render(midiToHz(midi), context.sampleRate);
+    } else {
+      const variant = previewVariant ?? adoptedVoices.sample;
+      key = `sample:${variant}`;
+      render = () => renderDice(variant, context.sampleRate);
+    }
     if (legato) {
       this.endAlphaGesture();
-      // Preserve a short piano tail while the new note gently enters.
+      // Preserve a short tail while the new note gently enters.
       for (const [source, previousGain] of this.voices) {
         if (this.fadingVoices.has(source)) continue;
         previousGain.gain.setTargetAtTime(0, now, 0.085);
@@ -157,10 +180,47 @@ export class LabAudio {
       }
     } else this.stop();
     this.lastPlayed = now;
-    if (sound === "bandwidth") this.lastBandwidthKey = key;
+    const gain = this.playTone(key, render, crossfade ? 0 : level);
+    if (crossfade) gain?.gain.setTargetAtTime(0.85 * level, now, 0.035);
+  }
+
+  // Pointer/key gestures sustain until release. AT and button edits settle
+  // after inactivity; a new edit extends the same voice, never restarts it.
+  private settleSustained() {
+    clearTimeout(this.alphaTimer);
+    if (!this.alphaHeld) this.alphaTimer = setTimeout(() => this.releaseAlpha(), 450);
+  }
+
+  private playBandwidth(h: number, variant: number) {
+    const context = this.context!;
+    const study = bandwidthStudies[variant] ?? bandwidthStudies[adoptedVoices.bandwidth];
+    if (study.kind === "sustain") {
+      if (this.sustained?.study !== study) {
+        this.releaseAlpha();
+        this.sustained = createBandwidthVoice(context, this.output!, study);
+      }
+      this.sustained.update(h);
+      this.settleSustained();
+      return;
+    }
+    const now = context.currentTime;
+    const original = study.id === "B0";
+    // The original pitched voice changes per note; the ticks change per slider step.
+    const key = `${study.id}:${original ? bandwidthFrequency(h).toFixed(4) : h.toFixed(2)}`;
+    if (key === this.lastBandwidthKey || now - this.lastBandwidthTime < (original ? 0.12 : 0.03)) return;
+    if (original) this.stop();
+    this.lastBandwidthKey = key;
+    this.lastBandwidthTime = now;
+    const bufferKey = `bandwidth:${study.id}:${study.id === "B2" ? "" : h.toFixed(2)}`;
+    this.playTone(bufferKey, () => study.render(h, context.sampleRate), study.level);
+  }
+
+  private playTone(key: string, render: () => Float32Array, level: number): GainNode | undefined {
+    const context = this.context;
+    if (!context || !this.output) return;
     let buffer = this.buffers.get(key);
     if (!buffer) {
-      const samples = sound === "sample" ? renderDice(variant, context.sampleRate) : renderSound(sound, variant, context.sampleRate, value);
+      const samples = render();
       buffer = context.createBuffer(1, samples.length, context.sampleRate);
       buffer.getChannelData(0).set(samples);
       if (this.buffers.size > 160) this.buffers.clear();
@@ -168,15 +228,14 @@ export class LabAudio {
     }
     const voice = context.createBufferSource();
     voice.buffer = buffer;
-    voice.playbackRate.value = rotation?.rate ?? 1;
     const gain = context.createGain();
-    gain.gain.setValueAtTime(legato ? 0 : sound === "sample" ? 0.8 : 1, now);
-    if (legato) gain.gain.setTargetAtTime(0.85, now, 0.035);
+    gain.gain.setValueAtTime(level, context.currentTime);
     voice.connect(gain);
     gain.connect(this.output);
     this.voices.set(voice, gain);
     voice.onended = () => { voice.disconnect(); gain.disconnect(); this.voices.delete(voice); this.fadingVoices.delete(voice); };
     voice.start();
+    return gain;
   }
 
   dispose() {
