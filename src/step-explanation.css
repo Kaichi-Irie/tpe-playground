@@ -630,3 +630,25 @@
 @media (max-width: 800px) {
   .lab-hint { font-size: 12px; padding: 7px 8px 7px 12px; }
 }
+
+@media (min-width: 701px) and (min-height: 501px) {
+  .lab-intro { max-width: 1340px; min-height: 620px; }
+  .lab-intro-heading h2 { font-size: clamp(28px, 2.6vw, 38px); }
+  .lab-intro-heading p { font-size: 16px; }
+  .lab-terminal { padding: clamp(16px, 1.6vw, 24px); font-size: clamp(15px, 1.25vw, 17px); line-height: 1.55; }
+  .lab-terminal-title { flex-wrap: wrap; gap: 6px 12px; font-size: 14px; }
+  .lab-terminal-title button, .lab-terminal-title .lab-skip { font-size: 13px; }
+  .lab-command { font-size: 20px; }
+  .lab-proposal-log { flex-wrap: wrap; gap: 4px 10px; margin-top: 16px; font-size: clamp(19px, 1.5vw, 22px); line-height: 1.25; }
+  .lab-proposal-value { font-weight: 700; }
+  .lab-intro-plot { padding-inline: 32px; }
+  .lab-plot-caption, .lab-curve-caption { font-size: 15px; }
+  .lab-plot-caption > span:first-child { font-size: 19px; }
+  .lab-plot-explore { min-height: 52px; gap: 16px; font-size: clamp(28px, 2.5vw, 36px); }
+  .lab-plot-explore .journey-primary { min-height: 52px; padding-inline: 20px; font-size: clamp(20px, 1.6vw, 22px); }
+  .lab-intro-plot svg { margin-top: 12px; overflow: visible; }
+  .lab-axes text { font-size: 17px; }
+  .lab-point text { font-size: 15px; }
+  .lab-next line { stroke-width: 1.5; }
+  .lab-next text { font-size: clamp(20px, 1.7vw, 24px); font-weight: 700; }
+}
