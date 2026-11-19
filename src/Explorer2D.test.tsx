@@ -17,8 +17,7 @@ it("starts a sequential 2D search with no observations and a preview of its firs
   expect(html).toContain("Objective height scale");
   expect(html).toContain("Log1p");
   expect(html).toContain("Estimated optimum ·");
-  expect(html).toContain("objective-contour");
-  expect(html).toContain('class="surface-objective"');
+  expect(html).toContain('class="scene-canvas-2d"');
   expect(html).toContain("About 2D density model");
   expect(html).toContain("preserving their pairing");
   for (const label of ["Good fraction", "Bandwidth", "Scott", "Silverman", "settings-dialog", "Prior weight", "Startup trials", "Candidates", "Weights", "Reset model defaults", "Quadratic", "Rosenbrock"]) expect(html).toContain(label);
@@ -26,9 +25,7 @@ it("starts a sequential 2D search with no observations and a preview of its firs
   expect(html).toContain("Density model");
   expect(html).toContain("Univariate");
   expect(html).toContain("preserve observations");
-  expect(html).not.toContain('class="observation-2d');
-  expect(html).not.toContain('class="surface-good"');
-  expect(html).not.toContain('class="surface-bad"');
+  expect(html).not.toContain('class="observation-target-2d');
 });
 
 it("does not build the closed comparison panel", () => {

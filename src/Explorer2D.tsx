@@ -1,7 +1,7 @@
 import { prepareSurface2D, projectSurface2D } from "./projectSurface2D";
 import { measure2D } from "./performance2D";
 import { seekPlayback2D } from "./seekPlayback2D";
-import { SvgScene2D, type SceneItem2D } from "./SvgScene2D";
+import { CanvasScene2D, fitViewBox2D, hitTestScene2D, type SceneItem2D, type ViewBox2D } from "./CanvasScene2D";
 import { mergeDepthSorted, surfaceMesh2D, type SurfaceVertex2D } from "./surfaceMesh2D";
 import { usePlotSize } from "./usePlotSize";
 import { PlaybackControls } from "./PlaybackControls";
@@ -9,7 +9,7 @@ import { createObjectiveView2D, type ObjectiveHeightScale } from "./objectiveVie
 import { ProgressComparison2D } from "./ProgressComparison2D";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { Help } from "./Help";
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { buildDemo2D, defaultModelSettings2D, getObjective2D, objectivePresets2D, emptyPlayback2D, movePlayback2D, proposeTrial2D, proposal2DFromTrace, settings2D, type DensityMode, type ObjectivePreset2D, type ModelSettings2D } from "./tpe2d";
 
 type Surface = "objective" | "good" | "bad" | "acquisition";
@@ -58,12 +58,22 @@ export default function Explorer2D() {
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const step = playback.trials.length;
   const complete = step === settings2D.count;
-  const model = useMemo(() => measure2D("model", () => buildDemo2D(playback.trials, mode, searchSettings)), [playback.trials, mode, searchSettings]);
+  // Slider drags and seeks emit many updates per second. Rebuilding the model and
+  // scene for each one queued more work than a phone could finish, freezing the
+  // page. The deferred copy is rendered at low priority, interrupted by newer
+  // input, so only the latest observations and settings are drawn.
+  const liveSceneInput = useMemo(() => ({ trials: playback.trials, mode, settings: searchSettings }), [playback.trials, mode, searchSettings]);
+  const sceneInput = useDeferredValue(liveSceneInput);
+  const model = useMemo(() => measure2D("model", () => buildDemo2D(sceneInput.trials, sceneInput.mode, sceneInput.settings)), [sceneInput]);
   const goodWidths = model.fitted?.snapshot.groups.flatMap((group) => {
     const kernel = group.good.kernels.find((item) => item.source.kind === "observation");
     return kernel ? group.parameterIds.map((id) => ({ label: id === "x1" ? "x₁" : "x₂", value: kernel.bandwidths[id] })) : [];
   }) ?? [];
-  const proposal = useMemo(() => complete ? null : model.fitted && step >= settings.startupTrials ? proposal2DFromTrace(model.fitted.propose(seed)) : proposeTrial2D(playback.trials, seed, mode, searchSettings), [complete, model.fitted, step, playback.trials, seed, mode, searchSettings]);
+  const proposal = useMemo(() => {
+    const { trials, mode, settings } = sceneInput;
+    if (trials.length === settings2D.count) return null;
+    return model.fitted && trials.length >= (settings.startupTrials ?? settings2D.startupTrials) ? proposal2DFromTrace(model.fitted.propose(seed)) : proposeTrial2D(trials, seed, mode, settings);
+  }, [sceneInput, model.fitted, seed]);
   useEffect(() => {
     if (!playing) return;
     if (complete) { setPlaying(false); return; }
@@ -142,7 +152,17 @@ export default function Explorer2D() {
   const aspect = sceneWidth / sceneHeight;
   const fitWidth = Math.max(maxX - minX + 64, (maxY - minY + 96) * aspect);
   const fitHeight = fitWidth / aspect;
-  const sceneBox = `${(minX + maxX - fitWidth) / 2} ${(minY + maxY - fitHeight) / 2} ${fitWidth} ${fitHeight}`;
+  const viewX = (minX + maxX - fitWidth) / 2, viewY = (minY + maxY - fitHeight) / 2;
+  const viewBox = useMemo<ViewBox2D>(() => ({ x: viewX, y: viewY, width: fitWidth, height: fitHeight }), [viewX, viewY, fitWidth, fitHeight]);
+  const sceneBox = `${viewX} ${viewY} ${fitWidth} ${fitHeight}`;
+  // Surfaces are pixels now; find the topmost painted triangle or contour.
+  function inspectAt(event: PointerEvent<SVGSVGElement>) {
+    if (drag.current || event.target !== event.currentTarget) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const fit = fitViewBox2D(viewBox, rect.width, rect.height);
+    const hit = hitTestScene2D(scene, (event.clientX - rect.left - fit.x) / fit.scale, (event.clientY - rect.top - fit.y) / fit.scale, 3 / fit.scale);
+    if (hit && (hit.kind === "triangle" || hit.kind === "segment")) hit.inspect();
+  }
   // Keep compact-screen detail stable while dragging: reuse the resting mesh
   // instead of flattening peaks and rebuilding topology at each drag boundary.
   const objectiveStride = compact ? 2 : 1;
@@ -176,8 +196,7 @@ export default function Explorer2D() {
     objectiveView.contours.forEach(({ level, a, b }, index) => {
       const start = project(a.x1, a.x2, scale("objective", level));
       const end = project(b.x1, b.x2, scale("objective", level));
-      const id = `contour-${index}`;
-      items.push({ id, depth: (start.depth + end.depth) / 2 + 0.01, path: `M${start.x},${start.y}L${end.x},${end.y}`, className: "objective-contour", inspect: () => { if (!drag.current) setInspection(`Objective contour · f(x) = ${level.toPrecision(4)}`); } });
+      items.push({ id: `contour-${index}`, kind: "segment", depth: (start.depth + end.depth) / 2 + 0.01, points: [start.x, start.y, end.x, end.y], inspect: () => { if (!drag.current) setInspection(`Objective contour · f(x) = ${level.toPrecision(4)}`); } });
     });
     return measure2D("objective-sort", () => items.sort((a, b) => a.depth - b.depth));
   }), [preparedObjective, objectiveView, objectiveDefinition, heightScale, view, visible.objective]);
@@ -189,28 +208,38 @@ export default function Explorer2D() {
     }
     if (visible.observations) for (const trial of model.trials) {
       const p = project(trial.x1, trial.x2, scale("objective", trial.value));
-      const good = model.goodIds.has(trial.id);
-      const group = !model.hasDensities ? "Unclassified" : good ? "Good" : "Bad";
-      const label = `Trial ${trial.id} · ${group} · x₁ = ${trial.x1.toFixed(2)}, x₂ = ${trial.x2.toFixed(2)} · f(x) = ${trial.value.toFixed(3)}`;
-      items.push({ id: `trial-${trial.id}`, depth: p.depth + 0.02, node: <circle key={`trial-${trial.id}`} cx={p.x} cy={p.y} r={4.5} className={`observation-2d ${!model.hasDensities ? "unclassified" : good ? "good" : "bad"}`} tabIndex={0} aria-label={label} onFocus={() => setInspection(label)} onPointerEnter={() => { if (!drag.current) setInspection(label); }}><title>{label}</title></circle> });
+      const group = !model.hasDensities ? "unclassified" : model.goodIds.has(trial.id) ? "good" : "bad";
+      items.push({ id: `trial-${trial.id}`, kind: "trial", depth: p.depth + 0.02, x: p.x, y: p.y, group });
     }
     if (proposal) {
       const p = project(proposal.x1, proposal.x2, scale("objective", objectiveDefinition.evaluate(proposal.x1, proposal.x2)));
       const floor = project(proposal.x1, proposal.x2, 0);
-      const label = `Next evaluation · x₁ = ${proposal.x1.toFixed(3)}, x₂ = ${proposal.x2.toFixed(3)}`;
-      items.push({ id: "next-trial", depth: p.depth + 0.03, node: <g key="next-trial" className="proposal-2d" aria-label={label}><title>{label}</title><line x1={floor.x} y1={floor.y} x2={p.x} y2={p.y} /><circle cx={p.x} cy={p.y} r={7} /></g> });
-    }
-    if (visible.objective) {
-      const optimum = objectiveView.optimum;
-      const p = project(optimum.x1, optimum.x2, scale("objective", optimum.value));
-      const label = `${objectivePreset === "multimodal" ? "Estimated optimum" : "Optimum"} · x₁ = ${optimum.x1.toFixed(3)}, x₂ = ${optimum.x2.toFixed(3)} · f(x) = ${optimum.value.toPrecision(4)}`;
-      items.push({ id: "optimum", depth: Infinity, node: <g key="optimum" className="optimum-2d" role="img" tabIndex={0} aria-label={label} onFocus={() => setInspection(label)} onPointerEnter={() => { if (!drag.current) setInspection(label); }}>
-        <title>{label}</title><path d={`M${p.x},${p.y - 7} l7,7 l-7,7 l-7,-7 Z`} /><text x={p.x + 12} y={p.y - 12}>{`Optimum (${optimum.x1.toFixed(objectivePreset === "multimodal" ? 2 : 1)}, ${optimum.x2.toFixed(objectivePreset === "multimodal" ? 2 : 1)})`}</text>
-      </g> });
+      items.push({ id: "next-trial", kind: "proposal", depth: p.depth + 0.03, x: p.x, y: p.y, floorX: floor.x, floorY: floor.y });
     }
     return measure2D("merge-sort", () => mergeDepthSorted(objectiveScene, items.sort((a, b) => a.depth - b.depth)));
   // Projection and scaling depend exclusively on these immutable inputs.
-  }), [model, view, visible, proposal, objectiveView, objectivePreset, heightScale, objectiveScene, preparedDensities]);
+  }), [model, view, visible, proposal, objectiveView, heightScale, objectiveScene, preparedDensities]);
+  // Painted markers live in the canvas; these invisible SVG twins keep trials
+  // focusable, labelled and hoverable without adding per-frame paint work.
+  const markerTargets = visible.observations ? model.trials.map((trial) => {
+    const p = project(trial.x1, trial.x2, scale("objective", trial.value));
+    const group = !model.hasDensities ? "Unclassified" : model.goodIds.has(trial.id) ? "Good" : "Bad";
+    const label = `Trial ${trial.id} · ${group} · x₁ = ${trial.x1.toFixed(2)}, x₂ = ${trial.x2.toFixed(2)} · f(x) = ${trial.value.toFixed(3)}`;
+    return <circle key={`trial-${trial.id}`} cx={p.x} cy={p.y} r={4.5} className="observation-target-2d" tabIndex={0} aria-label={label} onFocus={() => setInspection(label)} onPointerEnter={() => { if (!drag.current) setInspection(label); }}><title>{label}</title></circle>;
+  }) : null;
+  const proposalLabel = proposal ? `Next evaluation · x₁ = ${proposal.x1.toFixed(3)}, x₂ = ${proposal.x2.toFixed(3)}` : null;
+  const optimumMarker = (() => {
+    if (!visible.objective) return null;
+    const optimum = objectiveView.optimum;
+    const p = project(optimum.x1, optimum.x2, scale("objective", optimum.value));
+    const label = `${objectivePreset === "multimodal" ? "Estimated optimum" : "Optimum"} · x₁ = ${optimum.x1.toFixed(3)}, x₂ = ${optimum.x2.toFixed(3)} · f(x) = ${optimum.value.toPrecision(4)}`;
+    return <g className="optimum-2d" role="img" tabIndex={0} aria-label={label} onFocus={() => setInspection(label)} onPointerEnter={() => { if (!drag.current) setInspection(label); }}>
+      <title>{label}</title><path d={`M${p.x},${p.y - 7} l7,7 l-7,7 l-7,-7 Z`} /><text x={p.x + 12} y={p.y - 12}>{`Optimum (${optimum.x1.toFixed(objectivePreset === "multimodal" ? 2 : 1)}, ${optimum.x2.toFixed(objectivePreset === "multimodal" ? 2 : 1)})`}</text>
+    </g>;
+  })();
+  const floor = useMemo(() => [-5, -2.5, 0, 2.5, 5].flatMap((tick) => [[project(tick, -5, 0), project(tick, 5, 0)], [project(-5, tick, 0), project(5, tick, 0)]].map(([a, b]) => [a.x, a.y, b.x, b.y] as const)),
+  // project depends only on the camera.
+  [view]);
   const origin = project(-5, -5, 0);
   const axes = [{ end: project(5, -5, 0), label: "x₁", value: "5" }, { end: project(-5, 5, 0), label: "x₂", value: "5" }, { end: project(-5, -5, 1), label: "Objective / Density", value: "1" }];
   const zoom = (factor: number) => setView((v) => ({ ...v, zoom: clamp(v.zoom * factor, 0.55, 1.7) }));
@@ -223,14 +252,16 @@ export default function Explorer2D() {
     </div>
     <div className="legend" aria-label="2D plot layers">{layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : "Acquisition"}</span></button>)}</div>
     <div className="scene-stage">
+    <CanvasScene2D items={scene} floor={floor} viewBox={viewBox} />
     <svg className="scene-2d" ref={sceneRef} viewBox={sceneBox} role="group" aria-label="Interactive 3D landscape and KDE surfaces" aria-describedby="view-help" tabIndex={0}
-      onPointerDown={(event) => { if (event.button !== 0 || drag.current) return; drag.current = { x: event.clientX, y: event.clientY, id: event.pointerId }; event.currentTarget.setPointerCapture(event.pointerId); }}
-      onPointerMove={(event) => { const last = drag.current; if (!last || last.id !== event.pointerId) return; const dx = event.clientX - last.x, dy = event.clientY - last.y; drag.current = { x: event.clientX, y: event.clientY, id: event.pointerId }; pendingRotation.current.yaw += dx * 0.008; pendingRotation.current.pitch += dy * 0.008; if (cameraFrame.current === null) cameraFrame.current = requestAnimationFrame(flushRotation); }}
+      onPointerDown={(event) => { if (event.button !== 0 || drag.current) return; inspectAt(event); drag.current = { x: event.clientX, y: event.clientY, id: event.pointerId }; event.currentTarget.setPointerCapture(event.pointerId); }}
+      onPointerMove={(event) => { const last = drag.current; if (!last) { inspectAt(event); return; } if (last.id !== event.pointerId) return; const dx = event.clientX - last.x, dy = event.clientY - last.y; drag.current = { x: event.clientX, y: event.clientY, id: event.pointerId }; pendingRotation.current.yaw += dx * 0.008; pendingRotation.current.pitch += dy * 0.008; if (cameraFrame.current === null) cameraFrame.current = requestAnimationFrame(flushRotation); }}
       onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={endDrag}
       onKeyDown={(event) => { if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "+", "=", "-"].includes(event.key)) return; event.preventDefault(); if (["+", "=", "-"].includes(event.key)) zoom(event.key === "-" ? 1 / 1.15 : 1.15); else setView((v) => ({ ...v, yaw: v.yaw + (event.key === "ArrowLeft" ? -0.12 : event.key === "ArrowRight" ? 0.12 : 0), pitch: clamp(v.pitch + (event.key === "ArrowUp" ? 0.1 : event.key === "ArrowDown" ? -0.1 : 0), 0.15, 1.4) })); }}>
       <title>Objective landscape, good and bad densities, and optional log density ratio</title>
-      <g className="floor-2d">{[-5, -2.5, 0, 2.5, 5].flatMap((tick) => [[project(tick, -5, 0), project(tick, 5, 0)], [project(-5, tick, 0), project(5, tick, 0)]].map(([a, b], index) => <line key={`${tick}-${index}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} />))}</g>
-      <SvgScene2D items={scene} staticGeometry={objectiveScene} />
+      {markerTargets}
+      {proposalLabel && <g className="proposal-2d" aria-label={proposalLabel}><title>{proposalLabel}</title></g>}
+      {optimumMarker}
       <g className="axes-2d" pointerEvents="none">{axes.map(({ end, label, value }) => <g key={label}><line x1={origin.x} y1={origin.y} x2={end.x} y2={end.y} /><text x={end.x} y={end.y - 12} textAnchor={label === "Objective / Density" ? "start" : "middle"}>{label} · {value}</text></g>)}<text x={origin.x} y={origin.y + 24} textAnchor="middle">−5, −5 · 0</text></g>
     </svg>
       <div className="view-controls"><label className="objective-height-control">Objective height <select aria-label="Objective height scale" value={heightScale} onChange={(event) => setHeightScale(event.target.value as ObjectiveHeightScale)}><option value="linear">Linear</option><option value="log">Log1p</option></select></label><span id="view-help" className="sr-only">Drag to rotate · arrow keys rotate · + / − zoom</span><div><button onClick={() => zoom(1.15)} aria-label="Zoom in">+</button><button onClick={() => zoom(1 / 1.15)} aria-label="Zoom out">−</button><button onClick={() => setView(initialView)}>Reset view</button></div></div>

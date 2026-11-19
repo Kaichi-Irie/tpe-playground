@@ -333,25 +333,17 @@ progress::-moz-progress-bar { background: var(--accent); }
 .explorer-2d .plot-header p { font-size: 12px; margin-top: 4px; }
 .scene-2d { display: block; width: 100%; height: auto; touch-action: none; cursor: grab; }
 .scene-2d:active { cursor: grabbing; }
-.scene-2d :is(.surface-objective, .surface-good, .surface-bad, .surface-acquisition) { stroke-width: .35; stroke-linejoin: round; }
-.surface-objective { fill: var(--objective); fill-opacity: .12; stroke: var(--objective); stroke-opacity: .22; }
-.surface-good { fill: var(--good); fill-opacity: .45; stroke: var(--good); stroke-opacity: .3; }
-.surface-bad { fill: var(--bad); fill-opacity: .35; stroke: var(--bad); stroke-opacity: .3; }
-.surface-acquisition { fill: var(--acquisition); fill-opacity: .3; stroke: var(--acquisition); stroke-opacity: .4; }
-.floor-2d line { stroke: var(--grid); stroke-width: 1; }
+/* Surfaces, contours, floor and markers are painted by CanvasScene2D. */
+.scene-canvas-2d { display: block; pointer-events: none; }
 .axes-2d line { stroke: var(--muted); stroke-width: 1; }
 .axes-2d text { fill: var(--text); font-size: 13px; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; }
-.observation-2d { stroke: var(--surface); stroke-width: 1.5; }
-.observation-2d.good { fill: var(--good); }
-.observation-2d.bad { fill: var(--bad); }
-.observation-2d:focus { outline: none; stroke: var(--text); stroke-width: 3; }
+/* Invisible, focusable twins of the painted trial markers. */
+.observation-target-2d { fill: transparent; stroke: none; }
+.observation-target-2d:focus { outline: none; stroke: var(--text); stroke-width: 3; }
 .scaling-2d { padding: 16px 22px; border-top: 1px solid var(--border); }
 .scaling-2d p { font-size: 12px; margin-top: 10px; max-width: 100ch; }
 @media (max-width: 700px) { .scene-2d { min-height: 360px; } .view-controls > span { flex-basis: 100%; } }
-.observation-2d.unclassified { fill: var(--muted); }
 .proposal-2d { pointer-events: none; }
-.proposal-2d line { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
-.proposal-2d circle { fill: var(--surface); stroke: var(--text); stroke-width: 2; }
 .explorer-2d .proposal > p:last-child { flex-basis: 100%; margin-left: 0; }
 .explorer-2d .proposal p { font-size: 12px; color: var(--muted); }
 
@@ -601,7 +593,7 @@ header { height: 64px; padding: 10px 0; border: 0; }
 .explorer-2d .scene-panel-content dd { margin: 0; }
 .explorer-2d .canvas-plot .legend { padding: 6px 20px 0; }
 .explorer-2d .scene-stage { position: relative; flex: 1; min-height: 0; }
-.explorer-2d .scene-2d { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; }
+.explorer-2d :is(.scene-2d, .scene-canvas-2d) { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; }
 .explorer-2d .view-controls { position: absolute; right: 16px; bottom: 8px; padding: 0; }
 .explorer-2d .view-controls > div { display: flex; gap: 4px; }
 .explorer-2d .view-controls button { background: var(--surface); padding: 5px 10px; font-size: 11px; }
@@ -633,7 +625,6 @@ header { height: 64px; padding: 10px 0; border: 0; }
 .explorer-2d .objective-picker select { max-width: 145px; }
 .explorer-2d .objective-picker .help-trigger { width: 20px; height: 20px; }
 .explorer-2d .view-controls { top: 12px; bottom: auto; }
-.explorer-2d .objective-contour { fill: none; stroke: var(--objective); stroke-width: 1.1; stroke-opacity: .7; vector-effect: non-scaling-stroke; }
 .explorer-2d .scaling-2d { top: auto; bottom: 74px; left: 20px; right: auto; }
 .explorer-2d .scaling-content { left: 0; right: auto; top: auto; bottom: calc(100% + 8px); }
 @media (max-width: 1000px) {
@@ -649,8 +640,6 @@ header { height: 64px; padding: 10px 0; border: 0; }
   .explorer-2d .scaling-2d { top: auto; bottom: 92px; left: 12px; }
 }
 
-/* A continuous faint membrane supports the contours without a triangle mesh. */
-.explorer-2d .surface-objective { fill-opacity: .075; stroke: none; }
 .explorer-2d .objective-picker,
 .explorer-2d .density-picker { position: relative; }
 .explorer-2d .objective-picker > .help,

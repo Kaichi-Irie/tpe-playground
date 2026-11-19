@@ -134,6 +134,24 @@ detail strides and three camera configurations. Browser checks covered retained
 marker focus during rotation, layer hide/show and original-value inspection. This
 is not an exhaustive pixel comparison across all camera angles, themes or devices.
 
+### Canvas surfaces and deferred rebuilds
+
+The scene's ~9,600 SVG paths (5,596 contour segments, 3,074 objective and 900 KDE
+triangles; 18,248 page elements) are painted into one canvas. Only invisible,
+focusable marker targets, the proposal label and the optimum remain SVG; surface
+and contour inspection uses a JS hit test. Model and scene rebuilds read a
+`useDeferredValue` input, so rapid slider or playback updates coalesce instead of
+queueing one synchronous rebuild each.
+
+Chromium, 375 px viewport: page elements 18,248 → 697 (1,064 at 200 trials), SVG
+scene elements ~9,600 → 48, DOM mutations per update ~1,750 → 1. Forty rapid
+bandwidth inputs produced 2 scene rebuilds and 1 canvas draw (2.8 ms). iOS
+Simulator Safari (iPhone 17e), 200 trials, 8 s of rapid bandwidth drags: the old
+build stalled several seconds and dropped a tap until queued input drained; the
+canvas build applied every value and the next tap at once. Not yet measured on a
+physical phone. `browser2d.js` fingerprints only SVG markup, so its hash no longer
+covers painted geometry; compare canvas output visually or by pixels instead.
+
 ## Issue status
 
 - Density evaluation: lazy hidden-layer grids, shared Univariate axes and shared
@@ -145,8 +163,8 @@ is not an exhaustive pixel comparison across all camera angles, themes or device
   and explicit slider-event batching remain candidates. About 235–238 ms elapsed
   is not one uninterrupted block; sampled maximum frame gap was about 50 ms.
 - Rendering: production comparisons and projection/sort/SVG measures exist, with
-  the gains above. React commit versus paint/GPU is not fully isolated. Contour
-  batching, Canvas and adaptive quality remain candidates.
+  the gains above. Canvas painting with batched contours is implemented; adaptive
+  quality remains a candidate.
 - Other duplicate work: mesh preparation and coordinate formatting are reused.
   Proposal-preview reuse, explicit GC/buffer analysis and broader settings-event
   coalescing remain outstanding.
