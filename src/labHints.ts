@@ -62,7 +62,10 @@ const storageKey = "tpe-lab-hints-seen";
 
 export function loadSeenHints(): Set<LabHintId> {
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "[]");
+    localStorage.removeItem(storageKey);
+  } catch { /* The legacy key is independent of the current tab's storage. */ }
+  try {
+    const parsed: unknown = JSON.parse(sessionStorage.getItem(storageKey) ?? "[]");
     return new Set(Array.isArray(parsed) ? parsed.filter((id): id is LabHintId => typeof id === "string" && id in labHints) : []);
   } catch {
     return new Set();
@@ -70,8 +73,17 @@ export function loadSeenHints(): Set<LabHintId> {
 }
 
 export function saveSeenHints(seen: ReadonlySet<LabHintId>) {
+  if (!seen.size) {
+    clearSeenHints();
+    return;
+  }
   try {
-    if (seen.size) localStorage.setItem(storageKey, JSON.stringify([...seen]));
-    else localStorage.removeItem(storageKey);
+    sessionStorage.setItem(storageKey, JSON.stringify([...seen]));
+  } catch { /* Hints still work for this visit when storage is blocked. */ }
+}
+
+export function clearSeenHints() {
+  try {
+    sessionStorage.removeItem(storageKey);
   } catch { /* Hints still work for this visit when storage is blocked. */ }
 }
