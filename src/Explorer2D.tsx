@@ -7,6 +7,9 @@ import { usePlotSize } from "./usePlotSize";
 import { PlaybackControls } from "./PlaybackControls";
 import { createObjectiveView2D, type ObjectiveHeightScale } from "./objectiveView2D";
 import { ProgressComparison2D } from "./ProgressComparison2D";
+import LabHintBubble from "./LabHintBubble";
+import { playGuides } from "./playGuides";
+import { usePlayGuide } from "./usePlayGuide";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { Help } from "./Help";
 import { readSharedSearch, type SharedSearch } from "./shareSearch";
@@ -51,6 +54,8 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
   const objectiveView = useMemo(() => createObjectiveView2D(objectivePreset), [objectivePreset]);
   const [heightScale, setHeightScale] = useState<ObjectiveHeightScale>("log");
   function editSettings(next: ModelSettings2D) {
+    if (next.gamma !== settings.gamma) guide.retire("gamma");
+    if (next.bandwidth !== settings.bandwidth) guide.retire("bandwidth");
     cancelSeek();
     setSettings(next);
     setPlaying(false);
@@ -117,6 +122,8 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
   }
 
   const [visible, setVisible] = useState<Record<Layer, boolean>>({ objective: true, good: true, bad: true, observations: true, acquisition: false });
+  const guide = usePlayGuide({ page: "2d", step, startupTrials: settings.startupTrials, acquisitionVisible: visible.acquisition, seeking: seekTarget !== null });
+  const guideAcquisition = guide.active === "acquisition";
   const [view, setView] = useState(initialView);
   const [inspection, setInspection] = useState("");
   const drag = useRef<{ x: number; y: number; id: number } | null>(null);
@@ -130,7 +137,7 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     cameraFrame.current = null;
     const { yaw, pitch } = pendingRotation.current;
     pendingRotation.current = { yaw: 0, pitch: 0 };
-    if (yaw || pitch) setView((v) => ({ ...v, yaw: v.yaw + yaw, pitch: clamp(v.pitch + pitch, 0.15, 1.4) }));
+    if (yaw || pitch) rotate(yaw, pitch);
   }
   function endDrag(event: PointerEvent<SVGSVGElement>) {
     if (drag.current?.id !== event.pointerId) return;
@@ -268,23 +275,30 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
   const heightLabelAnchor = heightEnd.x - viewX > heightLabelWidth
     && x1End.x >= heightEnd.x && x1End.x - heightEnd.x < heightLabelWidth
     && Math.abs(x1End.y - heightEnd.y) < 16 * labelScale ? "end" : "start";
-  const zoom = (factor: number) => setView((v) => ({ ...v, zoom: clamp(v.zoom * factor, 0.55, 1.7) }));
+  function rotate(yaw: number, pitch: number) {
+    guide.retire("rotate");
+    setView((v) => ({ ...v, yaw: v.yaw + yaw, pitch: clamp(v.pitch + pitch, 0.15, 1.4) }));
+  }
+  function zoom(factor: number) {
+    guide.retire("rotate");
+    setView((v) => ({ ...v, zoom: clamp(v.zoom * factor, 0.55, 1.7) }));
+  }
   const bestValue = step ? Math.min(...playback.trials.map((trial) => trial.value)).toFixed(3) : "—";
-  return <section className="visual-workspace explorer-2d" aria-labelledby="explorer-2d-heading">
+  return <section className="visual-workspace explorer-2d" ref={guide.workspaceRef} onKeyDown={guide.onKeyDown} aria-labelledby="explorer-2d-heading">
     <div className="canvas-plot">
     <div className="canvas-controls">
-    <PlaybackControls targetStep={seekTarget} step={step} limit={settings2D.count} playing={playing} idSuffix="-2d" labelPrefix="2D " describedBy="trial-seek-help-2d" onMove={moveTo}
+    <PlaybackControls targetStep={seekTarget} step={step} limit={settings2D.count} playing={playing} guidePlay={guide.active === "playback"} guideDescribedBy={guide.textId} idSuffix="-2d" labelPrefix="2D " describedBy="trial-seek-help-2d" onMove={moveTo}
       onToggle={() => { cancelSeek(); if (complete) moveTo(0); setPlaying(!playing || complete); }} />
 
     </div>
-    <div className="legend" aria-label="2D plot layers">{layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : "Acquisition"}</span></button>)}</div>
+    <div className="legend" aria-label="2D plot layers">{layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} data-guide-target={key === "acquisition" && guideAcquisition || undefined} aria-describedby={key === "acquisition" && guideAcquisition ? guide.textId : undefined} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : "Acquisition"}</span></button>)}</div>
     <div className="scene-stage">
     <CanvasScene2D items={scene} floor={floor} viewBox={viewBox} />
-    <svg className="scene-2d" ref={sceneRef} viewBox={sceneBox} style={{ "--chart-zoom": chartZoom } as CSSProperties} role="group" aria-label="Interactive 3D landscape and KDE surfaces" aria-describedby="view-help" tabIndex={0}
+    <svg className="scene-2d" ref={sceneRef} viewBox={sceneBox} style={{ "--chart-zoom": chartZoom } as CSSProperties} role="group" aria-label="Interactive 3D landscape and KDE surfaces" data-guide-target={guide.active === "rotate" || undefined} aria-describedby={guide.active === "rotate" ? `view-help ${guide.textId}` : "view-help"} tabIndex={0}
       onPointerDown={(event) => { if (event.button !== 0 || drag.current) return; inspectAt(event); drag.current = { x: event.clientX, y: event.clientY, id: event.pointerId }; event.currentTarget.setPointerCapture(event.pointerId); }}
       onPointerMove={(event) => { const last = drag.current; if (!last) { inspectAt(event); return; } if (last.id !== event.pointerId) return; const dx = event.clientX - last.x, dy = event.clientY - last.y; drag.current = { x: event.clientX, y: event.clientY, id: event.pointerId }; pendingRotation.current.yaw += dx * 0.008; pendingRotation.current.pitch += dy * 0.008; if (cameraFrame.current === null) cameraFrame.current = requestAnimationFrame(flushRotation); }}
       onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={endDrag}
-      onKeyDown={(event) => { if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "+", "=", "-"].includes(event.key)) return; event.preventDefault(); if (["+", "=", "-"].includes(event.key)) zoom(event.key === "-" ? 1 / 1.15 : 1.15); else setView((v) => ({ ...v, yaw: v.yaw + (event.key === "ArrowLeft" ? -0.12 : event.key === "ArrowRight" ? 0.12 : 0), pitch: clamp(v.pitch + (event.key === "ArrowUp" ? 0.1 : event.key === "ArrowDown" ? -0.1 : 0), 0.15, 1.4) })); }}>
+      onKeyDown={(event) => { if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "+", "=", "-"].includes(event.key)) return; event.preventDefault(); if (["+", "=", "-"].includes(event.key)) zoom(event.key === "-" ? 1 / 1.15 : 1.15); else rotate(event.key === "ArrowLeft" ? -0.12 : event.key === "ArrowRight" ? 0.12 : 0, event.key === "ArrowUp" ? 0.1 : event.key === "ArrowDown" ? -0.1 : 0); }}>
       <title>Objective landscape, good and bad densities, and optional log density ratio</title>
       {markerTargets}
       {proposalLabel && <g className="proposal-2d" aria-label={proposalLabel}><title>{proposalLabel}</title></g>}
@@ -305,9 +319,10 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
       <p>Heights are rescaled to share one view: Linear keeps relative heights; Log1p expands the valley floor. Scaling never changes the optimizer, and hover shows original values.</p>
     </div></details>
     <div className="scene-inspection" aria-live="polite">{seekTarget === null ? inspection : `Moving to trial ${seekTarget}…`}</div>
+    {guide.active && <LabHintBubble textId={guide.textId} message={playGuides[guide.active].action} phase="action" placement="bottom" onDismiss={guide.dismiss} />}
     </div>
 
-    <ModelSettingsPanel experiment={{ page: "2d", preset: objectivePreset, mode }} className="settings-2d" idSuffix="-2d" labelPrefix="2D " defaultSettings={defaultModelSettings2D} trialLimit={settings2D.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} onChange={editSettings} seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); restart(); }}
+    <ModelSettingsPanel experiment={{ page: "2d", preset: objectivePreset, mode }} className="settings-2d" idSuffix="-2d" labelPrefix="2D " defaultSettings={defaultModelSettings2D} trialLimit={settings2D.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); restart(); }}
       status={<div className="proposal">
         <span>{!proposal ? "Search complete" : proposal.method === "random" ? `Random start · ${step + 1} / ${settings.startupTrials}` : `TPE · trial ${step + 1}`}</span>
         <Help label="2D trial playback">
