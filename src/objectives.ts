@@ -74,10 +74,8 @@ export function objective(x: number): number {
 
 export const objectivePresets = Object.fromEntries((Object.keys(rawPresets) as ObjectivePreset[]).map((preset) => {
   const raw = rawPresets[preset];
-  const offset = 1 - rawMinima[preset].y;
   return [preset, {
     ...raw,
-    formula: `${raw.formula} + ${offset.toPrecision(17)}`,
     evaluate: preset === "multimodal" ? objective : (x: number) => raw.evaluate(x) - rawMinima[preset].y + 1,
   }];
 })) as Record<ObjectivePreset, ObjectiveDefinition>;

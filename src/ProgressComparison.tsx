@@ -44,7 +44,7 @@ export function ComparisonPanel({ trials, randomTrials, minimum, relative = true
       </div>
       <Help key={metric} label={title}>
         <strong>{title}</strong><br />
-        {metric === "best" ? relative ? "The smallest gap to the optimum found so far, relative to the optimum." : "The smallest gap to the optimum found so far. Absolute gaps support objectives whose minimum is zero." : "The average gap to the optimum across all evaluations so far."}<br />
+        {metric === "best" ? relative ? "The smallest gap to the optimum found so far, relative to the optimum." : "The smallest gap to the optimum found so far." : "The average gap to the optimum across all evaluations so far."}<br />
         {definition}<br />
         {approximate && <>The optimum reference is numerically estimated.<br /></>}
         The vertical axis uses a logarithmic scale. Values ≤ {floor.toExponential(0)} are drawn at the bottom.

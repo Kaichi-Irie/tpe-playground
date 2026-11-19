@@ -33,7 +33,7 @@ it("renders the density explorer with playback controls and an empty initial his
   expect(html).toContain('id="bandwidth-rule"');
   expect(html).toContain("Scott");
   expect(html).toContain("Silverman");
-  expect(html).toContain("Moving Width switches to Constant");
+  expect(html).toContain("Dragging sets a constant width.");
   expect(html).toContain("Gaussian prior");
   expect(html).toContain("About Gaussian prior");
   expect(html).toContain("Algorithms for Hyper-Parameter Optimization");
@@ -41,7 +41,7 @@ it("renders the density explorer with playback controls and an empty initial his
   expect(html).toContain("↻ New seed");
   expect(html).toContain("Initial random exploration");
   expect(html).toContain("Next x =");
-  expect(html).toContain("TPE proposals start after 10 evaluated trials.");
+  expect(html).toContain("Uniform random draw until TPE starts at trial 11.");
   expect(html).toContain('<a href="https://github.com/Kaichi-Irie/tpe-playground">View the playground’s source code on GitHub</a>');
 });
 

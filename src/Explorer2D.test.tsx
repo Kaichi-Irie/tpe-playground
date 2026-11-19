@@ -6,7 +6,7 @@ it("starts a sequential 2D search with no observations and a preview of its firs
   const html = renderToStaticMarkup(<Explorer2D />);
   expect(html).toContain("Trial 0 / 200");
   expect(html).toContain("Initial random exploration · 1 / 10");
-  expect(html).toContain("Next (x₁, x₂) =");
+  expect(html).toContain("Uniform random draw until TPE starts at trial 11.");
   expect(html).toContain("Next evaluation ·");
   expect(html).toContain("KDEs appear after 2 observations.");
   expect(html).toContain("Next trial");
@@ -19,12 +19,13 @@ it("starts a sequential 2D search with no observations and a preview of its firs
   expect(html).toContain("Estimated optimum ·");
   expect(html).toContain('class="scene-canvas-2d"');
   expect(html).toContain("About 2D density model");
-  expect(html).toContain("preserving their pairing");
+  expect(html).toContain("keeping each (x₁, x₂) pair together.");
   for (const label of ["Good fraction", "Bandwidth", "Scott", "Silverman", "settings-dialog", "Prior weight", "Startup trials", "Candidates", "Weights", "Reset model defaults", "Quadratic", "Rosenbrock"]) expect(html).toContain(label);
   expect(html).not.toContain("coming soon");
   expect(html).toContain("Density model");
   expect(html).toContain("Univariate");
-  expect(html).toContain("preserve observations");
+  expect(html).toContain('id="trial-seek-help-2d">Seeking back discards later trials.</span>');
+  expect(html).toContain('aria-describedby="trial-seek-help-2d"');
   expect(html).not.toContain('class="observation-target-2d');
 });
 

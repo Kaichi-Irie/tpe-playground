@@ -8,7 +8,7 @@ export const startupTrialCounts = (trialLimit: number) => [2, 5, 10, 20, 30, 50,
 export const gammaRange = { min: 0.05, max: 0.5, step: 0.05 };
 export const bandwidthRange = { min: 0.01, step: 0.01 };
 export const weightOptions = [
-  { value: "uniform", label: "Uniform", description: "Each observation has equal weight within its group." },
-  { value: "recency", label: "Recency", description: "Within each group, weights increase linearly from oldest (1) to newest (n)." },
-  { value: "ei", label: "EI weights", description: "Good weights ∝ max(split threshold − f(x), 0); bad weights stay uniform. All-zero improvements fall back to uniform." },
+  { value: "uniform", label: "Uniform", description: "Every observation counts equally." },
+  { value: "recency", label: "Recency", description: "Newer observations count more within each group." },
+  { value: "ei", label: "EI weights", description: "Good observations count more the further they fall below the split; bad ones count equally." },
 ] as const;

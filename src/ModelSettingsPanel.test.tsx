@@ -29,6 +29,13 @@ it("keeps dialog actions in the footer and the seed in Experiment", () => {
   expect(experiment).toContain('<output aria-label="Search seed">42</output>');
   expect(experiment).toContain("New seed");
 
+  const model = html.match(/<legend>Model<\/legend>([\s\S]*?)<\/fieldset>/)?.[1];
+  expect(model).toContain('aria-label="About bandwidth rule"');
+
+  const bandwidth = html.match(/aria-label="About bandwidth"[^>]*>ⓘ<\/button><span[^>]*>([^<]*)<\/span>/)?.[1];
+  expect(bandwidth).toContain("Width of each Gaussian kernel.");
+  expect(bandwidth).not.toContain("magic clipping");
+
   const search = html.match(/<legend>Search<\/legend>([\s\S]*?)<\/fieldset>/)?.[1];
   expect(search).toContain("Startup trials");
   expect(search).toContain("Candidates");
