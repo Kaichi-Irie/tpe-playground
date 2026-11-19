@@ -37,11 +37,19 @@ const defaultSearch: SharedSearch<ObjectivePreset> = {
 };
 
 export default function App({ initialRoute = { page: "1d", share: null } }: { initialRoute?: Route } = {}) {
-  const { ref: chartRef, width, height } = usePlotSize();
-  const W = Math.max(240, width), H = Math.max(200, height);
+  const { ref: chartRef, width, height, typeScale } = usePlotSize();
+  const W = Math.max(240, width), H = Math.max(96 * typeScale, height);
   const compactChart = W < 600;
-  const box = { left: 28, right: W - (compactChart ? 12 : 92), top: 32, bottom: H - 48 };
-  const acquisitionX = W - 38;
+  // Short plots keep their full-size labels with a tighter bottom gutter and fewer y-axis labels.
+  const shortChart = H < 160 * typeScale;
+  const yTickLabels = shortChart ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
+  const box = {
+    left: 28 * typeScale,
+    right: W - (compactChart ? 12 : 92) * typeScale,
+    top: 32 * typeScale,
+    bottom: H - (shortChart ? 36 : 48) * typeScale,
+  };
+  const acquisitionX = W - 38 * typeScale;
   const sx = (x: number) => box.left + (x + 5) / 10 * (box.right - box.left);
   const sy = (y: number) => box.bottom - y / 8 * (box.bottom - box.top);
   const path = (ys: number[], scale: (y: number) => number) => ys.map((y, i) => `${i ? "L" : "M"}${sx(grid[i]).toFixed(2)},${scale(y).toFixed(2)}`).join(" ");
@@ -160,17 +168,23 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
         <div className="chart-scroll"><svg ref={chartRef} viewBox={`0 0 ${W} ${H}`} aria-labelledby="chart-title chart-description" role="img">
           <title id="chart-title">Objective function, {step} observations, good and bad KDEs, and acquisition</title><desc id="chart-description">Search parameter x from -5 to 5. {compactChart ? "Left axis: objective value. Density and acquisition tick labels are omitted in this compact view. Good and bad densities share one scale; the log density ratio uses a separate scale, higher is better." : "Left axis: objective value. Right axis: probability density. Far-right axis: log density ratio, higher is better."} Horizontal gray dashes mark the split; vertical gray dashes mark the next evaluation. Select an observation to inspect it.</desc>
           <defs><clipPath id="plot-clip"><rect x={box.left} y={box.top} width={box.right - box.left} height={box.bottom - box.top} /></clipPath></defs>
-          <text x={box.left} y="20" className="axis-title">Minimize f(x) ↓</text><text x={box.right} y="20" textAnchor="end" className="axis-title">{compactChart ? (visible.acquisition ? "KDE · log ℓ/g" : "Good / Bad KDE") : "Probability density"}</text>
+          <text x={box.left} y={20 * typeScale} className="axis-title">Minimize f(x) ↓</text><text x={box.right} y={20 * typeScale} textAnchor="end" className="axis-title">{compactChart ? (visible.acquisition ? "KDE · log ℓ/g" : "Good / Bad KDE") : "Probability density"}</text>
           {!compactChart && visible.acquisition && model.acquisition.length > 0 && <g className="acquisition-axis">
-            <text x={W - 4} y="20" textAnchor="end" className="axis-title">log ℓ/g ↑</text>
+            <text x={W - 4 * typeScale} y={20 * typeScale} textAnchor="end" className="axis-title">log ℓ/g ↑</text>
             <line x1={acquisitionX} x2={acquisitionX} y1={box.top} y2={box.bottom} />
-            {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
+            {yTickLabels.map((fraction) => {
               const value = acquisitionMin + fraction * (acquisitionMax - acquisitionMin);
-              return <text key={fraction} x={acquisitionX + 5} y={sa(value) + 4}>{value.toFixed(1)}</text>;
+              return <text key={fraction} x={acquisitionX + 5 * typeScale} y={sa(value) + 4 * typeScale}>{value.toFixed(1)}</text>;
             })}
           </g>}
-          {[0, 2, 4, 6, 8].map((y, i) => <g key={y}><line x1={box.left} x2={box.right} y1={sy(y)} y2={sy(y)} className="grid" /><text x={box.left - 14} y={sy(y) + 4} textAnchor="end">{y}</text>{!compactChart && <text x={box.right + 14} y={sy(y) + 4}>{(densityMax * i / 4).toFixed(2)}</text>}</g>)}
-          {(compactChart ? [-5, 0, 5] : [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]).map((x) => <g key={x}><line x1={sx(x)} x2={sx(x)} y1={box.top} y2={box.bottom} className="grid vertical" /><text x={sx(x)} y={box.bottom + 22} textAnchor="middle">{x}</text></g>)}
+          {[0, 2, 4, 6, 8].map((y) => <g key={y}>
+            <line x1={box.left} x2={box.right} y1={sy(y)} y2={sy(y)} className="grid" />
+            {yTickLabels.includes(y / 8) && <>
+              <text x={box.left - 14 * typeScale} y={sy(y) + 4 * typeScale} textAnchor="end">{y}</text>
+              {!compactChart && <text x={box.right + 14 * typeScale} y={sy(y) + 4 * typeScale}>{(densityMax * y / 8).toFixed(2)}</text>}
+            </>}
+          </g>)}
+          {(compactChart ? [-5, 0, 5] : [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]).map((x) => <g key={x}><line x1={sx(x)} x2={sx(x)} y1={box.top} y2={box.bottom} className="grid vertical" /><text x={sx(x)} y={box.bottom + (shortChart ? 10 : 22) * typeScale} textAnchor="middle">{x}</text></g>)}
           <g clipPath="url(#plot-clip)">
             {visible.bad && model.bad.length > 0 && <><path d={area(badPath)} className="bad-area" /><path d={badPath} className="bad-line" /></>}
             {visible.good && model.good.length > 0 && <><path d={area(goodPath)} className="good-area" /><path d={goodPath} className="good-line" /></>}
@@ -183,7 +197,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
             </g>}
             {visible.observations && model.trials.map((trial) => <circle key={trial.id} cx={sx(trial.x)} cy={sy(trial.y)} r={selected?.id === trial.id ? 7 : 4.5} className={`point ${step < 2 ? "unclassified-point" : goodIds.has(trial.id) ? "good-point" : "bad-point"}`} tabIndex={0} role="button" aria-label={`Trial ${trial.id}, x ${trial.x.toFixed(3)}, objective ${trial.y.toFixed(3)}, ${groupName(trial)}`} onMouseEnter={() => setSelected(trial)} onFocus={() => setSelected(trial)} onClick={() => setSelected(trial)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelected(trial); } }}><title>Trial {trial.id}: x = {trial.x.toFixed(3)}, f(x) = {trial.y.toFixed(3)}</title></circle>)}
           </g>
-          <text x={(box.left + box.right) / 2} y={H - 6} textAnchor="middle" className="axis-title">Search parameter · x</text>
+          <text x={(box.left + box.right) / 2} y={H - 6 * typeScale} textAnchor="middle" className="axis-title">Search parameter · x</text>
         </svg></div>
 
         <div className="plot-foot"><span className="inspection" data-selected={selected !== null} aria-live="polite">{selected ? `Trial ${selected.id} · x = ${selected.x.toFixed(3)} · f(x) = ${selected.y.toFixed(3)} · ${groupName(selected)}` : "Hover, tap, or focus a point to inspect a trial."}</span><span>{model.threshold === null ? "KDEs appear after 2 observations." : `Horizontal gray dashes: split at f(x) = ${model.threshold.toFixed(3)}`}</span></div>
