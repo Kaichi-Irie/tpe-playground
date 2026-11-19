@@ -10,6 +10,8 @@ Runs entirely in your browser.
 
 Currently a simplified, single-objective, unconstrained TPE implementation for learning.
 
+In Play 2D or Play 3D, open **Settings → Copy share link** to share the objective, seed, and model and search settings. The link starts a fresh run at trial 0. The app applies the settings once and returns the address bar to the tab URL. Open the share link again to start over with its settings.
+
 ## Planned
 
 - [ ] Constrained optimization (c-TPE)

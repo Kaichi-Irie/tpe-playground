@@ -65,3 +65,14 @@ it("renders a synchronized comparison with no results before evaluation", () => 
   expect(html).toContain("settings-dialog");
   expect(html).toContain("How to read this plot");
 });
+
+it("starts a shared Play 2D search at trial zero with the linked settings", () => {
+  const initialRoute = { page: "1d", share: new URLSearchParams("preset=quadratic&seed=0&startupTrials=2&gamma=0.15") } as const;
+  const html = renderToStaticMarkup(<App initialRoute={initialRoute} />);
+  expect(html).toContain("Trial 0 / 200");
+  expect(html).toContain("Initial random exploration · 1 / 2");
+  expect(html).toContain('value="quadratic" selected=""');
+  expect(html).toContain('aria-label="Search seed">0</output>');
+  expect(html).toContain('aria-valuetext="15 percent"');
+  expect(html).toContain("Copy share link");
+});

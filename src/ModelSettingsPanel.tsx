@@ -1,19 +1,15 @@
 import type { ReactNode } from "react";
 import { ResponsiveSettings } from "./ResponsiveSettings";
 import type { BandwidthRule } from "./model/bandwidth";
-import type { TpeConfig, WeightStrategy } from "./model/types";
+import type { WeightStrategy } from "./model/types";
 import { Help } from "./Help";
-
-export type ModelSettings = Omit<TpeConfig, "mode">;
-export const weightOptions = [
-  { value: "uniform", label: "Uniform", description: "Each observation has equal weight within its group." },
-  { value: "recency", label: "Recency", description: "Within each group, weights increase linearly from oldest (1) to newest (n)." },
-  { value: "ei", label: "EI weights", description: "Good weights ∝ max(split threshold − f(x), 0); bad weights stay uniform. All-zero improvements fall back to uniform." },
-] as const;
-
+import { ShareSearchLink } from "./ShareSearchLink";
+import type { ShareExperiment } from "./shareSearch";
+import { bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrialCounts, weightOptions, type ModelSettings } from "./searchSettings";
 
 interface Props {
   children?: ReactNode;
+  experiment: ShareExperiment;
   settings: ModelSettings;
   defaultSettings: ModelSettings;
   onChange: (settings: ModelSettings) => void;
@@ -27,7 +23,7 @@ interface Props {
   className?: string;
 }
 
-export function ModelSettingsPanel({ children, settings, defaultSettings, onChange, seed, onNewSeed, trialLimit, widths, domainWidth, idSuffix = "", labelPrefix = "", className = "" }: Props) {
+export function ModelSettingsPanel({ children, experiment, settings, defaultSettings, onChange, seed, onNewSeed, trialLimit, widths, domainWidth, idSuffix = "", labelPrefix = "", className = "" }: Props) {
   const { gamma, bandwidth, priorWeight, startupTrials, candidates, weights } = settings;
   const bandwidthRule = settings.bandwidthRule ?? "constant";
   const id = (name: string) => `${name}${idSuffix}`;
@@ -43,7 +39,7 @@ export function ModelSettingsPanel({ children, settings, defaultSettings, onChan
   return (
     <div className="model-controls">
     <ResponsiveSettings action={<button className="settings-reset" disabled={isDefault} onClick={() => onChange(defaultSettings)} aria-label="Reset model defaults">Reset defaults</button>}><div className="settings-form">
-      <fieldset className="settings-fields"><legend>Experiment</legend>{children}</fieldset>
+      <fieldset className="settings-fields"><legend>Experiment</legend>{children}<ShareSearchLink experiment={experiment} seed={seed} settings={settings} /></fieldset>
       <fieldset className="settings-fields"><legend>Model</legend>
             <div className="parameter"><label htmlFor={id("bandwidth-rule")}>Bandwidth rule</label>
           <select id={id("bandwidth-rule")} aria-label={`${labelPrefix}Bandwidth rule`} value={bandwidthRule} onChange={(event) => change({ bandwidthRule: event.target.value as BandwidthRule })}><option value="constant">Constant</option><option value="scott">Scott</option><option value="silverman">Silverman</option></select>
@@ -60,7 +56,7 @@ export function ModelSettingsPanel({ children, settings, defaultSettings, onChan
                 <div><label htmlFor={id("prior-weight")}>Prior weight</label><Help label="Gaussian prior">Include a broad Gaussian prior with mean 0 and σ = 10 on each axis in each KDE. Weight 0 disables it; weight 1 equals one observation. It affects densities and candidate sampling, with decreasing relative influence as observations accumulate. Broader coverage does not guarantee better results.</Help>
                 </div>
               </div>
-              <select id={id("prior-weight")} value={priorWeight} onChange={(event) => change({ priorWeight: Number(event.target.value) })}>{[0, 0.1, 0.5, 1, 2, 5].map((weight) => <option key={weight} value={weight}>{weight === 0 ? "0 · Off" : weight}</option>)}</select>
+              <select id={id("prior-weight")} value={priorWeight} onChange={(event) => change({ priorWeight: Number(event.target.value) })}>{priorWeights.map((weight) => <option key={weight} value={weight}>{weight === 0 ? "0 · Off" : weight}</option>)}</select>
             </div>
       </fieldset>
       <fieldset className="settings-fields"><legend>Search</legend>
@@ -69,14 +65,14 @@ export function ModelSettingsPanel({ children, settings, defaultSettings, onChan
                 <div><label htmlFor={id("startup-trials")}>Startup trials</label><Help label="startup trials">Use uniform random proposals while fewer than {startupTrials} observations exist. At least two observations are needed for the good/bad split. Setting {trialLimit} makes a fresh search entirely random. Changes keep existing observations and affect future proposals.</Help>
                 </div>
               </div>
-              <select id={id("startup-trials")} value={startupTrials} onChange={(event) => change({ startupTrials: Number(event.target.value) })}>{[2, 5, 10, 20, 30, 50, 100, trialLimit].map((count) => <option key={count} value={count}>{count === trialLimit ? `${trialLimit} · Random only` : count}</option>)}</select>
+              <select id={id("startup-trials")} value={startupTrials} onChange={(event) => change({ startupTrials: Number(event.target.value) })}>{startupTrialCounts(trialLimit).map((count) => <option key={count} value={count}>{count === trialLimit ? `${trialLimit} · Random only` : count}</option>)}</select>
             </div>
             <div className="parameter">
               <div className="parameter-label">
                 <div><label htmlFor={id("candidates")}>Candidates</label><Help label="candidate count">Draw this many candidates per variable group from ℓ(x), then evaluate only the one with the highest density ratio. More candidates do not mean more objective evaluations or guarantee better results.</Help>
                 </div>
               </div>
-              <select id={id("candidates")} value={candidates} onChange={(event) => change({ candidates: Number(event.target.value) })}>{[1, 4, 8, 24, 64, 128].map((count) => <option key={count} value={count}>{count}</option>)}</select>
+              <select id={id("candidates")} value={candidates} onChange={(event) => change({ candidates: Number(event.target.value) })}>{candidateCounts.map((count) => <option key={count} value={count}>{count}</option>)}</select>
             </div>
             <div className="parameter seed-settings">
               <div className="parameter-label"><span>Seed</span>
@@ -93,7 +89,7 @@ export function ModelSettingsPanel({ children, settings, defaultSettings, onChan
           </div>
           <output htmlFor={id("gamma")}>{Math.round(gamma * 100)}%</output>
         </div>
-        <input id={id("gamma")} type="range" min="0.05" max="0.5" step="0.05" value={gamma} aria-valuetext={`${Math.round(gamma * 100)} percent`} onChange={(event) => change({ gamma: Number(event.target.value) })} />
+        <input id={id("gamma")} type="range" {...gammaRange} value={gamma} aria-valuetext={`${Math.round(gamma * 100)} percent`} onChange={(event) => change({ gamma: Number(event.target.value) })} />
       </div>
       <div className="parameter bandwidth-settings">
         <div className="parameter-label">
@@ -104,7 +100,7 @@ export function ModelSettingsPanel({ children, settings, defaultSettings, onChan
         {bandwidthRule !== "constant" && <span className="bandwidth-mode">{bandwidthRule === "scott" ? "Scott" : "Silverman"} · good KDE · drag to set constant h</span>}
         <div className="bandwidth-controls">
 
-          <input id={id("bandwidth")} type="range" min="0.01" max={sliderMax} step="0.01" value={sliderWidth} aria-valuetext={displayedWidth === undefined ? "Available after 2 observations" : `${displayedWidth.toFixed(2)}${bandwidthRule === "constant" ? "" : ", good KDE"}`} onChange={(event) => change({ bandwidth: Number(event.target.value), bandwidthRule: "constant" })} />
+          <input id={id("bandwidth")} type="range" {...bandwidthRange} max={sliderMax} value={sliderWidth} aria-valuetext={displayedWidth === undefined ? "Available after 2 observations" : `${displayedWidth.toFixed(2)}${bandwidthRule === "constant" ? "" : ", good KDE"}`} onChange={(event) => change({ bandwidth: Number(event.target.value), bandwidthRule: "constant" })} />
         </div>
       </div>
     </section></div>

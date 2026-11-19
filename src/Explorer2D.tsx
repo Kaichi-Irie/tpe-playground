@@ -9,6 +9,7 @@ import { createObjectiveView2D, type ObjectiveHeightScale } from "./objectiveVie
 import { ProgressComparison2D } from "./ProgressComparison2D";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { Help } from "./Help";
+import { readSharedSearch, type SharedSearch } from "./shareSearch";
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { buildDemo2D, defaultModelSettings2D, getObjective2D, objectivePresets2D, emptyPlayback2D, movePlayback2D, proposeTrial2D, proposal2DFromTrace, settings2D, type DensityMode, type ObjectivePreset2D, type ModelSettings2D } from "./tpe2d";
 
@@ -22,7 +23,15 @@ const layers: { key: Layer; label: string }[] = [
 const initialView = { yaw: -0.65, pitch: 0.5, zoom: 1 };
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
-export default function Explorer2D() {
+const domainWidth = 10;
+const defaultSearch: SharedSearch<ObjectivePreset2D> = {
+  seed: settings2D.seed,
+  preset: "multimodal",
+  settings: { ...defaultModelSettings2D, bandwidthRule: defaultModelSettings2D.bandwidthRule ?? "constant" },
+};
+
+export default function Explorer2D({ sharedSettings = null }: { sharedSettings?: URLSearchParams | null } = {}) {
+  const [initialSearch] = useState(() => readSharedSearch(sharedSettings, defaultSearch, objectivePresets2D, settings2D.count, domainWidth));
   const { ref: sceneRef, width: sceneWidth, height: sceneHeight } = usePlotSize();
   const compact = sceneWidth < 640;
   const [playback, setPlayback] = useState(emptyPlayback2D);
@@ -34,9 +43,9 @@ export default function Explorer2D() {
     setSeekTarget(null);
   }
   useEffect(() => () => seekController.current?.abort(), []);
-  const [mode, setMode] = useState<DensityMode>("multivariate");
-  const [settings, setSettings] = useState(defaultModelSettings2D);
-  const [objectivePreset, setObjectivePreset] = useState<ObjectivePreset2D>("multimodal");
+  const [mode, setMode] = useState<DensityMode>(() => sharedSettings?.get("mode") === "univariate" ? "univariate" : "multivariate");
+  const [settings, setSettings] = useState<ModelSettings2D>(initialSearch.settings);
+  const [objectivePreset, setObjectivePreset] = useState(initialSearch.preset);
   const searchSettings = useMemo(() => ({ ...settings, objectivePreset }), [settings, objectivePreset]);
   const objectiveDefinition = getObjective2D(objectivePreset);
   const objectiveView = useMemo(() => createObjectiveView2D(objectivePreset), [objectivePreset]);
@@ -53,7 +62,7 @@ export default function Explorer2D() {
     setPlaying(false);
     setInspection("");
   }
-  const [seed, setSeed] = useState(settings2D.seed);
+  const [seed, setSeed] = useState(initialSearch.seed);
   const [playing, setPlaying] = useState(false);
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const step = playback.trials.length;
@@ -274,7 +283,7 @@ export default function Explorer2D() {
       <span>{!proposal ? "Search complete" : proposal.method === "random" ? `Initial random exploration · ${step + 1} / ${settings.startupTrials}` : `TPE proposal · trial ${step + 1}`}</span>
       <Help label="2D trial playback">{!proposal ? "Search complete" : proposal.method === "random" ? `Initial random exploration · ${step + 1} / ${settings.startupTrials}` : `TPE proposal · trial ${step + 1}`}<br />{proposal ? `Next (x₁, x₂) = (${proposal.x1.toFixed(3)}, ${proposal.x2.toFixed(3)})` : `All ${settings2D.count} trials evaluated.`}<br />1 s / trial. <span id="trial-seek-help-2d">Moving backward discards later trials. Continue with the current model settings.</span></Help>
     </div>
-    <ModelSettingsPanel className="settings-2d" idSuffix="-2d" labelPrefix="2D " defaultSettings={defaultModelSettings2D} trialLimit={settings2D.count} domainWidth={10} widths={goodWidths} settings={settings} onChange={editSettings} seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); restart(); }} >
+    <ModelSettingsPanel experiment={{ page: "2d", preset: objectivePreset, mode }} className="settings-2d" idSuffix="-2d" labelPrefix="2D " defaultSettings={defaultModelSettings2D} trialLimit={settings2D.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} onChange={editSettings} seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); restart(); }} >
       <h2 id="explorer-2d-heading" className="sr-only">Explore two dimensions</h2>
       <div className="scene-toolbar-group">
         <div className="objective-picker parameter">

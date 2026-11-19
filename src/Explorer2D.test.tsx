@@ -33,3 +33,15 @@ it("does not build the closed comparison panel", () => {
   expect(html).toContain("Performance");
   expect(html).not.toContain('aria-label="Search performance"');
 });
+
+it("starts a shared Play 3D search at trial zero with the linked density mode and settings", () => {
+  const sharedSettings = new URLSearchParams("preset=rosenbrock&seed=7&mode=univariate&startupTrials=5&gamma=0.5");
+  const html = renderToStaticMarkup(<Explorer2D sharedSettings={sharedSettings} />);
+  expect(html).toContain("Trial 0 / 200");
+  expect(html).toContain("Initial random exploration · 1 / 5");
+  expect(html).toContain('value="rosenbrock" selected=""');
+  expect(html).toContain('value="univariate" selected=""');
+  expect(html).toContain('aria-label="2D Search seed">7</output>');
+  expect(html).toContain('aria-valuetext="50 percent"');
+  expect(html).toContain("Copy share link");
+});
