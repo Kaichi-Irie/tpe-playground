@@ -6,6 +6,7 @@ it("renders a collapsed info trigger and a hidden tooltip by default", () => {
   const html = renderToStaticMarkup(<Help label="Bandwidth">Kernel width</Help>);
   expect(html).toMatch(/<button[^>]*aria-label="About Bandwidth"[^>]*aria-expanded="false"[^>]*>ⓘ<\/button>/);
   expect(html).toMatch(/<span[^>]*role="tooltip"[^>]*hidden="">Kernel width<\/span>/);
+  expect(html).not.toContain("data-placement");
 });
 
 it("keeps a custom trigger and appends a custom root class", () => {
