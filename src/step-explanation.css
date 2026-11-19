@@ -222,7 +222,7 @@
 .journey .journey-action { padding: 8px 14px; }
 .journey .journey-die { width: 64px; height: 64px; border: 2px solid var(--acquisition); border-radius: 13px; display: grid; place-content: center; text-align: center; color: var(--acquisition); box-shadow: 3px 3px 0 var(--border); }
 .journey .journey-die small { font-size: var(--type-xs); line-height: 1; }
-.journey .journey-die strong { font-size: 1.5625rem; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.journey .journey-die strong { font-size: var(--type-xl); line-height: 1.3; font-variant-numeric: tabular-nums; }
 .journey-intro .journey-welcome { padding: 10px; flex-shrink: 0; }
 .journey-intro .journey-welcome h2 { font-size: var(--type-2xl); margin: 4px; }
 .journey-intro .journey-welcome .journey-eyebrow { display: none; }

@@ -38,8 +38,6 @@
   --type-math: clamp(1.0625rem, 0.75rem + 0.45vw + 0.3vh, 1.5rem);
   /* Chart text is authored for a 1280×720 laptop and scaled by --chart-px. */
   --chart-base: clamp(0.75rem, 0.35rem + 0.52vw + 0.3vh, 1.125rem);
-  --chart-px: ≈0.7× on phones, 1× on laptops, 1.25× on 1920×1080. */
-  --chart-base: clamp(10px, 5.6px + 0.52vw + 0.3vh, 18px);
   --chart-px: calc(var(--chart-base) / 14.4);
 }
 :root[data-theme="dark"] {
@@ -810,6 +808,7 @@ header { height: 64px; padding: 10px 0; border: 0; }
   .explorer-2d .view-controls { top: 4px; right: 8px; gap: 4px; }
   .explorer-2d .view-controls button { min-width: 40px; min-height: 36px; }
   .explorer-2d .scene-inspection { left: 10px; bottom: 46px; max-width: calc(100% - 20px); }
+  .explorer-2d .optimum-2d text { display: none; }
   .about-page { padding-inline: 16px; }
 }
 @media (max-width: 380px) {
@@ -947,11 +946,6 @@ main .visual-workspace { height: calc(100dvh - var(--app-header-height, 56px)); 
   main:not(.page-about) { padding: 0; }
   main:not(.page-about) > header { height: 48px; padding: 0 8px; }
   main .visual-workspace { height: calc(100dvh - 48px); min-height: 0; }
-}
-@media (max-height: 450px) {
-  /* Let the page scroll rather than shrinking the density chart and its labels. */
-  main .visual-workspace.explorer-1d { height: auto; }
-  .visual-workspace.explorer-1d .chart-scroll { flex: none; height: 206px; }
 }
 
 /* One navigation row, with room for page actions and future audio controls. */

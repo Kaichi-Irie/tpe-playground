@@ -18,8 +18,13 @@ export function useChartTypeScale(ref: RefObject<SVGSVGElement | null>) {
     // The viewport can change --chart-base while the SVG keeps its dimensions.
     const update = () => setTypeScale(readTypeScale(element));
     update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+    };
   }, [ref]);
   return typeScale;
 }

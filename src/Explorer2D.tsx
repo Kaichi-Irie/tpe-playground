@@ -10,7 +10,7 @@ import { ProgressComparison2D } from "./ProgressComparison2D";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { Help } from "./Help";
 import { readSharedSearch, type SharedSearch } from "./shareSearch";
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { buildDemo2D, defaultModelSettings2D, getObjective2D, objectivePresets2D, emptyPlayback2D, movePlayback2D, proposeTrial2D, proposal2DFromTrace, settings2D, type DensityMode, type ObjectivePreset2D, type ModelSettings2D } from "./tpe2d";
 
 type Surface = "objective" | "good" | "bad" | "acquisition";
@@ -163,6 +163,12 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
   const fitHeight = fitWidth / aspect;
   const chartZoom = fitWidth / sceneWidth;
   const labelScale = chartZoom * typeScale;
+  const heightLabelRef = useRef<SVGTextElement>(null);
+  const [heightLabelWidth, setHeightLabelWidth] = useState(0);
+  useLayoutEffect(() => {
+    const label = heightLabelRef.current;
+    if (label) setHeightLabelWidth(label.getComputedTextLength());
+  }, [chartZoom, typeScale]);
   const viewX = (minX + maxX - fitWidth) / 2, viewY = (minY + maxY - fitHeight) / 2;
   const viewBox = useMemo<ViewBox2D>(() => ({ x: viewX, y: viewY, width: fitWidth, height: fitHeight }), [viewX, viewY, fitWidth, fitHeight]);
   const sceneBox = `${viewX} ${viewY} ${fitWidth} ${fitHeight}`;
@@ -259,7 +265,6 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
   // on the other side of its tick when the projected x₁ label crowds it.
   const originLabelInset = 32 * labelScale;
   const originLabelX = clamp(origin.x, viewX + originLabelInset, viewX + fitWidth - originLabelInset);
-  const heightLabelWidth = 160 * labelScale;
   const heightLabelAnchor = heightEnd.x - viewX > heightLabelWidth
     && x1End.x >= heightEnd.x && x1End.x - heightEnd.x < heightLabelWidth
     && Math.abs(x1End.y - heightEnd.y) < 16 * labelScale ? "end" : "start";
@@ -286,7 +291,7 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
       <g className="axes-2d" pointerEvents="none">
         {axes.map(({ end, label, value }) => <g key={label}><line x1={origin.x} y1={origin.y} x2={end.x} y2={end.y} /><text x={end.x} y={end.y - 12 * labelScale} textAnchor="middle">{label} · {value}</text></g>)}
         <line x1={origin.x} y1={origin.y} x2={heightEnd.x} y2={heightEnd.y} />
-        <text x={heightEnd.x} y={heightEnd.y - 12 * labelScale} textAnchor={heightLabelAnchor}>Objective / Density · 1</text>
+        <text ref={heightLabelRef} x={heightEnd.x} y={heightEnd.y - 12 * labelScale} textAnchor={heightLabelAnchor}>Objective / Density · 1</text>
         <text x={originLabelX} y={origin.y + 24 * labelScale} textAnchor="middle">−5, −5 · 0</text>
       </g>
     </svg>

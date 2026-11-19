@@ -38,9 +38,17 @@ const defaultSearch: SharedSearch<ObjectivePreset> = {
 
 export default function App({ initialRoute = { page: "1d", share: null } }: { initialRoute?: Route } = {}) {
   const { ref: chartRef, width, height, typeScale } = usePlotSize();
-  const W = Math.max(240, width), H = Math.max(200, height);
+  const W = Math.max(240, width), H = Math.max(96 * typeScale, height);
   const compactChart = W < 600;
-  const box = { left: 28 * typeScale, right: W - (compactChart ? 12 : 92) * typeScale, top: 32 * typeScale, bottom: H - 48 * typeScale };
+  // Short plots keep their full-size labels with a tighter bottom gutter and fewer y-axis labels.
+  const shortChart = H < 160 * typeScale;
+  const yTickLabels = shortChart ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
+  const box = {
+    left: 28 * typeScale,
+    right: W - (compactChart ? 12 : 92) * typeScale,
+    top: 32 * typeScale,
+    bottom: H - (shortChart ? 36 : 48) * typeScale,
+  };
   const acquisitionX = W - 38 * typeScale;
   const sx = (x: number) => box.left + (x + 5) / 10 * (box.right - box.left);
   const sy = (y: number) => box.bottom - y / 8 * (box.bottom - box.top);
@@ -164,13 +172,19 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
           {!compactChart && visible.acquisition && model.acquisition.length > 0 && <g className="acquisition-axis">
             <text x={W - 4 * typeScale} y={20 * typeScale} textAnchor="end" className="axis-title">log ℓ/g ↑</text>
             <line x1={acquisitionX} x2={acquisitionX} y1={box.top} y2={box.bottom} />
-            {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
+            {yTickLabels.map((fraction) => {
               const value = acquisitionMin + fraction * (acquisitionMax - acquisitionMin);
               return <text key={fraction} x={acquisitionX + 5 * typeScale} y={sa(value) + 4 * typeScale}>{value.toFixed(1)}</text>;
             })}
           </g>}
-          {[0, 2, 4, 6, 8].map((y, i) => <g key={y}><line x1={box.left} x2={box.right} y1={sy(y)} y2={sy(y)} className="grid" /><text x={box.left - 14 * typeScale} y={sy(y) + 4 * typeScale} textAnchor="end">{y}</text>{!compactChart && <text x={box.right + 14 * typeScale} y={sy(y) + 4 * typeScale}>{(densityMax * i / 4).toFixed(2)}</text>}</g>)}
-          {(compactChart ? [-5, 0, 5] : [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]).map((x) => <g key={x}><line x1={sx(x)} x2={sx(x)} y1={box.top} y2={box.bottom} className="grid vertical" /><text x={sx(x)} y={box.bottom + 22 * typeScale} textAnchor="middle">{x}</text></g>)}
+          {[0, 2, 4, 6, 8].map((y) => <g key={y}>
+            <line x1={box.left} x2={box.right} y1={sy(y)} y2={sy(y)} className="grid" />
+            {yTickLabels.includes(y / 8) && <>
+              <text x={box.left - 14 * typeScale} y={sy(y) + 4 * typeScale} textAnchor="end">{y}</text>
+              {!compactChart && <text x={box.right + 14 * typeScale} y={sy(y) + 4 * typeScale}>{(densityMax * y / 8).toFixed(2)}</text>}
+            </>}
+          </g>)}
+          {(compactChart ? [-5, 0, 5] : [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]).map((x) => <g key={x}><line x1={sx(x)} x2={sx(x)} y1={box.top} y2={box.bottom} className="grid vertical" /><text x={sx(x)} y={box.bottom + (shortChart ? 10 : 22) * typeScale} textAnchor="middle">{x}</text></g>)}
           <g clipPath="url(#plot-clip)">
             {visible.bad && model.bad.length > 0 && <><path d={area(badPath)} className="bad-area" /><path d={badPath} className="bad-line" /></>}
             {visible.good && model.good.length > 0 && <><path d={area(goodPath)} className="good-area" /><path d={goodPath} className="good-line" /></>}
