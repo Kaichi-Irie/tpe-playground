@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 /** Design size of --chart-base: chart text and label geometry are authored at 1×. */
 export const chartBaseDesignPx = 14.4;
@@ -10,26 +10,38 @@ function readTypeScale(element: Element) {
   return Number.isFinite(size) && size > 0 ? Math.round(size / chartBaseDesignPx * 1000) / 1000 : 1;
 }
 
+export function useChartTypeScale(ref: RefObject<SVGSVGElement | null>) {
+  const [typeScale, setTypeScale] = useState(1);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    // The viewport can change --chart-base while the SVG keeps its dimensions.
+    const update = () => setTypeScale(readTypeScale(element));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    window.addEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [ref]);
+  return typeScale;
+}
+
 export function usePlotSize() {
   const ref = useRef<SVGSVGElement>(null);
-  const [size, setSize] = useState({ width: 1110, height: 470, typeScale: 1 });
+  const typeScale = useChartTypeScale(ref);
+  const [size, setSize] = useState({ width: 1110, height: 470 });
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
     const update = (width: number, height: number) => {
-      const typeScale = readTypeScale(element);
-      if (width > 0 && height > 0) setSize((previous) => previous.width === width && previous.height === height && previous.typeScale === typeScale ? previous : { width, height, typeScale });
+      if (width > 0 && height > 0) setSize((previous) => previous.width === width && previous.height === height ? previous : { width, height });
     };
     const observer = new ResizeObserver(([entry]) => update(Math.round(entry.contentRect.width), Math.round(entry.contentRect.height)));
-    // --chart-base depends on vw/vh, which can change while the plot keeps its
-    // size (e.g. a short window pinned at the plot's minimum height).
-    const onViewportResize = () => {
-      const box = element.getBoundingClientRect();
-      update(Math.round(box.width), Math.round(box.height));
-    };
     observer.observe(element);
-    window.addEventListener("resize", onViewportResize);
-    return () => { observer.disconnect(); window.removeEventListener("resize", onViewportResize); };
+    return () => observer.disconnect();
   }, []);
-  return { ref, ...size };
+  return { ref, ...size, typeScale };
 }
