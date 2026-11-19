@@ -10,7 +10,7 @@ import { ProgressComparison2D } from "./ProgressComparison2D";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { Help } from "./Help";
 import { readSharedSearch, type SharedSearch } from "./shareSearch";
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { buildDemo2D, defaultModelSettings2D, getObjective2D, objectivePresets2D, emptyPlayback2D, movePlayback2D, proposeTrial2D, proposal2DFromTrace, settings2D, type DensityMode, type ObjectivePreset2D, type ModelSettings2D } from "./tpe2d";
 
 type Surface = "objective" | "good" | "bad" | "acquisition";
@@ -32,7 +32,7 @@ const defaultSearch: SharedSearch<ObjectivePreset2D> = {
 
 export default function Explorer2D({ sharedSettings = null }: { sharedSettings?: URLSearchParams | null } = {}) {
   const [initialSearch] = useState(() => readSharedSearch(sharedSettings, defaultSearch, objectivePresets2D, settings2D.count, domainWidth));
-  const { ref: sceneRef, width: sceneWidth, height: sceneHeight } = usePlotSize();
+  const { ref: sceneRef, width: sceneWidth, height: sceneHeight, typeScale } = usePlotSize();
   const compact = sceneWidth < 640;
   const [playback, setPlayback] = useState(emptyPlayback2D);
   const [seekTarget, setSeekTarget] = useState<number | null>(null);
@@ -161,6 +161,14 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
   const aspect = sceneWidth / sceneHeight;
   const fitWidth = Math.max(maxX - minX + 64, (maxY - minY + 96) * aspect);
   const fitHeight = fitWidth / aspect;
+  const chartZoom = fitWidth / sceneWidth;
+  const labelScale = chartZoom * typeScale;
+  const heightLabelRef = useRef<SVGTextElement>(null);
+  const [heightLabelWidth, setHeightLabelWidth] = useState(0);
+  useLayoutEffect(() => {
+    const label = heightLabelRef.current;
+    if (label) setHeightLabelWidth(label.getComputedTextLength());
+  }, [chartZoom, typeScale]);
   const viewX = (minX + maxX - fitWidth) / 2, viewY = (minY + maxY - fitHeight) / 2;
   const viewBox = useMemo<ViewBox2D>(() => ({ x: viewX, y: viewY, width: fitWidth, height: fitHeight }), [viewX, viewY, fitWidth, fitHeight]);
   const sceneBox = `${viewX} ${viewY} ${fitWidth} ${fitHeight}`;
@@ -243,14 +251,23 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     const p = project(optimum.x1, optimum.x2, scale("objective", optimum.value));
     const label = `${objectivePreset === "multimodal" ? "Estimated optimum" : "Optimum"} · x₁ = ${optimum.x1.toFixed(3)}, x₂ = ${optimum.x2.toFixed(3)} · f(x) = ${optimum.value.toPrecision(4)}`;
     return <g className="optimum-2d" role="img" tabIndex={0} aria-label={label} onFocus={() => setInspection(label)} onPointerEnter={() => { if (!drag.current) setInspection(label); }}>
-      <title>{label}</title><path d={`M${p.x},${p.y - 7} l7,7 l-7,7 l-7,-7 Z`} /><text x={p.x + 12} y={p.y - 12}>{`Optimum (${optimum.x1.toFixed(objectivePreset === "multimodal" ? 2 : 1)}, ${optimum.x2.toFixed(objectivePreset === "multimodal" ? 2 : 1)})`}</text>
+      <title>{label}</title><path d={`M${p.x},${p.y - 7} l7,7 l-7,7 l-7,-7 Z`} /><text x={p.x + 12 * labelScale} y={p.y - 12 * labelScale}>{`Optimum (${optimum.x1.toFixed(objectivePreset === "multimodal" ? 2 : 1)}, ${optimum.x2.toFixed(objectivePreset === "multimodal" ? 2 : 1)})`}</text>
     </g>;
   })();
   const floor = useMemo(() => [-5, -2.5, 0, 2.5, 5].flatMap((tick) => [[project(tick, -5, 0), project(tick, 5, 0)], [project(-5, tick, 0), project(5, tick, 0)]].map(([a, b]) => [a.x, a.y, b.x, b.y] as const)),
   // project depends only on the camera.
   [view]);
   const origin = project(-5, -5, 0);
-  const axes = [{ end: project(5, -5, 0), label: "x₁", value: "5" }, { end: project(-5, 5, 0), label: "x₂", value: "5" }, { end: project(-5, -5, 1), label: "Objective / Density", value: "1" }];
+  const x1End = project(5, -5, 0);
+  const heightEnd = project(-5, -5, 1);
+  const axes = [{ end: x1End, label: "x₁", value: "5" }, { end: project(-5, 5, 0), label: "x₂", value: "5" }];
+  // Give the origin caption room on narrow plots and place the height caption
+  // on the other side of its tick when the projected x₁ label crowds it.
+  const originLabelInset = 32 * labelScale;
+  const originLabelX = clamp(origin.x, viewX + originLabelInset, viewX + fitWidth - originLabelInset);
+  const heightLabelAnchor = heightEnd.x - viewX > heightLabelWidth
+    && x1End.x >= heightEnd.x && x1End.x - heightEnd.x < heightLabelWidth
+    && Math.abs(x1End.y - heightEnd.y) < 16 * labelScale ? "end" : "start";
   const zoom = (factor: number) => setView((v) => ({ ...v, zoom: clamp(v.zoom * factor, 0.55, 1.7) }));
   return <section className="visual-workspace explorer-2d" aria-labelledby="explorer-2d-heading">
     <div className="canvas-plot">
@@ -262,7 +279,7 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     <div className="legend" aria-label="2D plot layers">{layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : "Acquisition"}</span></button>)}</div>
     <div className="scene-stage">
     <CanvasScene2D items={scene} floor={floor} viewBox={viewBox} />
-    <svg className="scene-2d" ref={sceneRef} viewBox={sceneBox} role="group" aria-label="Interactive 3D landscape and KDE surfaces" aria-describedby="view-help" tabIndex={0}
+    <svg className="scene-2d" ref={sceneRef} viewBox={sceneBox} style={{ "--chart-zoom": chartZoom } as CSSProperties} role="group" aria-label="Interactive 3D landscape and KDE surfaces" aria-describedby="view-help" tabIndex={0}
       onPointerDown={(event) => { if (event.button !== 0 || drag.current) return; inspectAt(event); drag.current = { x: event.clientX, y: event.clientY, id: event.pointerId }; event.currentTarget.setPointerCapture(event.pointerId); }}
       onPointerMove={(event) => { const last = drag.current; if (!last) { inspectAt(event); return; } if (last.id !== event.pointerId) return; const dx = event.clientX - last.x, dy = event.clientY - last.y; drag.current = { x: event.clientX, y: event.clientY, id: event.pointerId }; pendingRotation.current.yaw += dx * 0.008; pendingRotation.current.pitch += dy * 0.008; if (cameraFrame.current === null) cameraFrame.current = requestAnimationFrame(flushRotation); }}
       onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={endDrag}
@@ -271,7 +288,12 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
       {markerTargets}
       {proposalLabel && <g className="proposal-2d" aria-label={proposalLabel}><title>{proposalLabel}</title></g>}
       {optimumMarker}
-      <g className="axes-2d" pointerEvents="none">{axes.map(({ end, label, value }) => <g key={label}><line x1={origin.x} y1={origin.y} x2={end.x} y2={end.y} /><text x={end.x} y={end.y - 12} textAnchor={label === "Objective / Density" ? "start" : "middle"}>{label} · {value}</text></g>)}<text x={origin.x} y={origin.y + 24} textAnchor="middle">−5, −5 · 0</text></g>
+      <g className="axes-2d" pointerEvents="none">
+        {axes.map(({ end, label, value }) => <g key={label}><line x1={origin.x} y1={origin.y} x2={end.x} y2={end.y} /><text x={end.x} y={end.y - 12 * labelScale} textAnchor="middle">{label} · {value}</text></g>)}
+        <line x1={origin.x} y1={origin.y} x2={heightEnd.x} y2={heightEnd.y} />
+        <text ref={heightLabelRef} x={heightEnd.x} y={heightEnd.y - 12 * labelScale} textAnchor={heightLabelAnchor}>Objective / Density · 1</text>
+        <text x={originLabelX} y={origin.y + 24 * labelScale} textAnchor="middle">−5, −5 · 0</text>
+      </g>
     </svg>
       <div className="view-controls"><label className="objective-height-control">Objective height <select aria-label="Objective height scale" value={heightScale} onChange={(event) => setHeightScale(event.target.value as ObjectiveHeightScale)}><option value="linear">Linear</option><option value="log">Log1p</option></select></label><span id="view-help" className="sr-only">Drag to rotate · arrow keys rotate · + / − zoom</span><div><button onClick={() => zoom(1.15)} aria-label="Zoom in">+</button><button onClick={() => zoom(1 / 1.15)} aria-label="Zoom out">−</button><button onClick={() => setView(initialView)}>Reset view</button></div></div>
     </div>
