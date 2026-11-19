@@ -23,6 +23,22 @@
   --threshold: #808a99;
   --neutral-point: #7d8798;
   --shadow: #20283812;
+  /* Fluid type scale. Text sizes come from these tokens instead of per-device
+     px overrides: each grows with the viewport between a phone and a large
+     desktop (≈12px → 18px body). Use a token for any new text. */
+  --type-md: clamp(12px, 8px + 0.4vw + 0.3vh, 18px);
+  --type-2xs: calc(var(--type-md) * .75);
+  --type-xs: calc(var(--type-md) * .85);
+  --type-sm: calc(var(--type-md) * .92);
+  --type-lg: calc(var(--type-md) * 1.2);
+  --type-xl: clamp(17px, 11px + 1vw + 0.3vh, 30px);
+  --type-2xl: clamp(22px, 14px + 1.3vw + 0.3vh, 40px);
+  /* Display formulas (KaTeX renders 1.21× this). */
+  --type-math: clamp(17px, 12px + 0.45vw + 0.3vh, 24px);
+  /* Chart text is authored in px for a 1280×720 laptop, then multiplied by
+     --chart-px: ≈0.7× on phones, 1× on laptops, 1.25× on 1920×1080. */
+  --chart-base: clamp(10px, 5.6px + 0.52vw + 0.3vh, 18px);
+  --chart-px: calc(var(--chart-base) / 14.4);
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
