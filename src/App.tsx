@@ -218,9 +218,8 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
       <section className="search-toolbar" aria-label="Search controls">
         <div className="plot-header">
           <div className="objective-picker parameter">
-            <h2><label htmlFor="objective-preset">Objective</label></h2>
+            <div className="parameter-label"><label htmlFor="objective-preset">Objective</label><Help label={`${objectiveDefinition.label} preset`}><strong>{objectiveDefinition.label}</strong><br />{objectiveDefinition.description}<br />{objectiveDefinition.formula}<br />Changing the preset restarts the search.</Help></div>
             <select id="objective-preset" value={objectivePreset} onChange={(event) => { setSearch({ ...search, preset: event.target.value as ObjectivePreset }); setPlayback(emptyPlayback()); setPlaying(false); setSelected(null); }}>{(Object.keys(objectivePresets) as ObjectivePreset[]).map((preset) => <option key={preset} value={preset}>{objectivePresets[preset].label}</option>)}</select>
-            <span className="preset-details"><Help label={`${objectiveDefinition.label} preset`} trigger="Preset details"><strong>{objectiveDefinition.label}</strong><br />{objectiveDefinition.description}<br />{objectiveDefinition.formula}<br />Changing the preset restarts the search.</Help></span>
           </div>
         </div>
 
