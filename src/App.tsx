@@ -124,6 +124,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
   const trials = useMemo(() => playback.trials.slice(0, step), [playback.trials, step]);
   const model = useMemo(() => buildView1D(trials, grid, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }), [trials, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
   const proposal = useMemo(() => step === trialLimit ? undefined : playback.proposals[step] ?? (model.fitted && step >= startupTrials ? proposal1DFromTrace(model.fitted.propose(seed)) : proposeTrial(trials, seed, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset })), [step, playback.proposals, model.fitted, trials, seed, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
+  const bestValue = trials.length ? Math.min(...trials.map((trial) => trial.y)).toFixed(3) : "—";
   const acquisitionLow = Math.min(0, ...model.acquisition);
   const acquisitionHigh = Math.max(1, ...model.acquisition);
   const acquisitionPadding = (acquisitionHigh - acquisitionLow) * 0.12;
@@ -163,7 +164,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
         <div className="legend" aria-label="Plot layers">{([['objective', 'Objective f(x)'], ['good', 'Good KDE ℓ(x)'], ['bad', 'Bad KDE g(x)'], ['observations', 'Observations'], ['acquisition', 'Acquisition']] as const).map(([key, label]) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}><span className="swatch" /><span className="layer-label">{label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : "Acquisition"}</span></button>)}</div>
         <div className="plot-guide"><Help label="how to read this plot"><strong>How to read this plot</strong>
         <span className="line-key"><span><i className="split-key" /> Horizontal gray dashes: good/bad split</span><span><i className="next-key" /> Vertical gray dashes: next evaluation</span><span>Gray ticks: sampled candidates</span></span>
-        <span className="plot-guide-description">{compactChart ? "Objective: left axis. Good and bad KDEs share one scale. Acquisition uses its own scale, higher is better. Density and acquisition tick labels are omitted to leave more space for the plot." : "Objective: left axis · KDEs: right axis · acquisition log[ℓ(x)/g(x)]: far-right axis, higher is better."} {step < startupTrials ? "Acquisition is a preview during initial random exploration." : `The selected point is best among ${candidates} sampled candidate${candidates === 1 ? "" : "s"}, not necessarily the curve’s global maximum.`}</span></Help></div>
+        <span className="plot-guide-description">{compactChart ? "Objective: left axis. Good and bad KDEs share one scale. Acquisition uses its own scale, higher is better. Density and acquisition tick labels are omitted to leave more space for the plot." : "Objective: left axis · KDEs: right axis · acquisition log[ℓ(x)/g(x)]: far-right axis, higher is better."} KDEs appear after 2 observations. {step < startupTrials ? "Acquisition is a preview during initial random exploration." : `The selected point is best among ${candidates} sampled candidate${candidates === 1 ? "" : "s"}, not necessarily the curve’s global maximum.`}</span></Help></div>
         </div>
         <div className="chart-scroll"><svg ref={chartRef} viewBox={`0 0 ${W} ${H}`} aria-labelledby="chart-title chart-description" role="img">
           <title id="chart-title">Objective function, {step} observations, good and bad KDEs, and acquisition</title><desc id="chart-description">Search parameter x from -5 to 5. {compactChart ? "Left axis: objective value. Density and acquisition tick labels are omitted in this compact view. Good and bad densities share one scale; the log density ratio uses a separate scale, higher is better." : "Left axis: objective value. Right axis: probability density. Far-right axis: log density ratio, higher is better."} Horizontal gray dashes mark the split; vertical gray dashes mark the next evaluation. Select an observation to inspect it.</desc>
@@ -200,21 +201,26 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
           <text x={(box.left + box.right) / 2} y={H - 6 * typeScale} textAnchor="middle" className="axis-title">Search parameter · x</text>
         </svg></div>
 
-        <div className="plot-foot"><span className="inspection" data-selected={selected !== null} aria-live="polite">{selected ? `Trial ${selected.id} · x = ${selected.x.toFixed(3)} · f(x) = ${selected.y.toFixed(3)} · ${groupName(selected)}` : "Hover, tap, or focus a point to inspect a trial."}</span><span>{model.threshold === null ? "KDEs appear after 2 observations." : `Horizontal gray dashes: split at f(x) = ${model.threshold.toFixed(3)}`}</span></div>
+        <div className="plot-inspection" data-selected={selected !== null} aria-live="polite">{selected ? `Trial ${selected.id} · x = ${selected.x.toFixed(3)} · f(x) = ${selected.y.toFixed(3)} · ${groupName(selected)}` : null}</div>
       </section>
-      <div className="canvas-status">        <div className="proposal" aria-live="polite">
-          <h3>{!proposal ? "Search complete" : proposal.method === "random" ? `Initial random exploration · ${step + 1} / ${startupTrials}` : `TPE proposal · trial ${step + 1}`}</h3>
-          <Help label="trial selection">{!proposal ? `All ${trialLimit} trials evaluated. Replay to inspect each decision.` : proposal.method === "random" ? (startupTrials === trialLimit ? "Every trial in this search is random." : `Uniform random draw until TPE starts at trial ${startupTrials + 1}.`) : `Drew ${candidates} candidate${candidates === 1 ? "" : "s"} from ℓ(x) and picked the largest ℓ(x)/g(x). Gray ticks show candidates; the dashed line marks the pick.`}</Help>
-          {proposal && <p><strong>Next x = {proposal.x.toFixed(3)}</strong>{proposal.method === "tpe" && ` · log ℓ/g = ${Math.max(...proposal.candidates.map((candidate) => candidate.logRatio)).toFixed(3)}`}</p>}
-        </div>
-        <div className="stats"><span className="good-text"><strong>{model.good.length}</strong> good</span><span className="bad-text"><strong>{model.bad.length}</strong> bad</span><span>Objective: <strong>Minimize f(x)</strong><Help label="objective function">Lower is better, over −5 ≤ x ≤ 5.</Help></span></div>
-      </div>
       <ModelSettingsPanel key={page === "1d" ? route.visit : "hidden"}
         experiment={{ page: "1d", preset: objectivePreset }} settings={settings}
         defaultSettings={defaultSearch.settings}
         onChange={(next) => { setSearch({ ...search, settings: { ...next, bandwidthRule: next.bandwidthRule ?? "constant" } }); editModel(); }}
         seed={seed} onNewSeed={() => { setSearch({ ...search, seed: Math.floor(Math.random() * 100) }); setPlayback(emptyPlayback()); setPlaying(false); setSelected(null); }}
-        trialLimit={trialLimit} widths={goodWidth === undefined ? [] : [{ label: "x", value: goodWidth }]} domainWidth={domainWidth} >
+        trialLimit={trialLimit} widths={goodWidth === undefined ? [] : [{ label: "x", value: goodWidth }]} domainWidth={domainWidth}
+        status={<>
+          <div className="proposal">
+            <h3>{!proposal ? "Search complete" : proposal.method === "random" ? `Random start · ${step + 1} / ${startupTrials}` : `TPE · trial ${step + 1}`}</h3>
+            <Help label="trial selection">
+              {!proposal ? `Search complete. All ${trialLimit} trials evaluated. Replay to inspect each decision.` : proposal.method === "random"
+                ? `Initial random exploration · ${step + 1} / ${startupTrials}. ${startupTrials === trialLimit ? "Every trial in this search is random." : `Uniform random draw until TPE starts at trial ${startupTrials + 1}.`}`
+                : `TPE proposal · trial ${step + 1}. Drew ${candidates} candidate${candidates === 1 ? "" : "s"} from ℓ(x) and picked the largest ℓ(x)/g(x). Gray ticks show candidates; the dashed line marks the pick.`}
+            </Help>
+            {proposal && <p><strong>Next x = {proposal.x.toFixed(3)}</strong>{proposal.method === "tpe" && ` · log ℓ/g = ${Math.max(...proposal.candidates.map((candidate) => candidate.logRatio)).toFixed(3)}`}</p>}
+          </div>
+          <div className="stats"><span className="good-text"><strong>{model.good.length}</strong> good</span><span className="bad-text"><strong>{model.bad.length}</strong> bad</span></div>
+        </>}>
       <section className="search-toolbar" aria-label="Search controls">
         <div className="plot-header">
           <div className="objective-picker parameter">
@@ -226,7 +232,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
       </section>
       </ModelSettingsPanel>
     <details className="performance-monitor">
-        <summary><span className="performance-caption">Best f(x) <strong>{trials.length ? Math.min(...trials.map((trial) => trial.y)).toFixed(3) : "—"}</strong></span><span>Performance <span aria-hidden="true">⌄</span></span></summary>
+        <summary><span className="performance-caption">Best f(x) <strong title={bestValue}>{bestValue}</strong></span><span>Performance <span aria-hidden="true">⌄</span></span></summary>
         <ProgressComparison trials={trials} seed={seed} objectivePreset={objectivePreset} />
       </details>
       </div>

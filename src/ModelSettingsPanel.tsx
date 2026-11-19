@@ -9,6 +9,7 @@ import { bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrial
 
 interface Props {
   children?: ReactNode;
+  status?: ReactNode;
   experiment: ShareExperiment;
   settings: ModelSettings;
   defaultSettings: ModelSettings;
@@ -23,7 +24,7 @@ interface Props {
   className?: string;
 }
 
-export function ModelSettingsPanel({ children, experiment, settings, defaultSettings, onChange, seed, onNewSeed, trialLimit, widths, domainWidth, idSuffix = "", labelPrefix = "", className = "" }: Props) {
+export function ModelSettingsPanel({ children, status, experiment, settings, defaultSettings, onChange, seed, onNewSeed, trialLimit, widths, domainWidth, idSuffix = "", labelPrefix = "", className = "" }: Props) {
   const { gamma, bandwidth, priorWeight, startupTrials, candidates, weights } = settings;
   const bandwidthRule = settings.bandwidthRule ?? "constant";
   const id = (name: string) => `${name}${idSuffix}`;
@@ -91,6 +92,7 @@ export function ModelSettingsPanel({ children, experiment, settings, defaultSett
             </div>
       </fieldset>
     </div></ResponsiveSettings>
+    {status != null && <div className="model-status" aria-live="polite">{status}</div>}
     <section className={`config live-model-controls ${className}`} aria-label={`${labelPrefix}Interactive model controls`}>
       <div className="parameter">
         <div className="parameter-label">
