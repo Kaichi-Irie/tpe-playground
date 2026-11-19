@@ -372,6 +372,7 @@
   .journey-weight-details { position: static; }
   .journey-weight-details > div { right: 0; width: 100%; }
   .journey .journey-task { min-height: 0; padding: 4px 10px; }
+  .journey .journey-task:has(.journey-die), .journey .journey-task:has(.journey-first-roll) { min-height: 69px; }
   .journey .journey-die { width: 60px; height: 60px; }
   .journey .journey-first-roll { min-height: 60px; }
   .journey[data-stage="6"] .journey-controls { padding-block: 1px; }
