@@ -11,7 +11,7 @@ function reference(mesh: SurfaceVertex2D[][], project: (x: number, y: number, z:
     const corners = [mesh[i][j], mesh[i + 1][j], mesh[i + 1][j + 1], mesh[i][j + 1]];
     for (const indices of [[0, 1, 2], [0, 2, 3]]) {
       const points = indices.map((k) => project(corners[k].x1, corners[k].x2, corners[k].height));
-      result.push({ path: `M${points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join("L")}Z`,
+      result.push({ points: points.flatMap((p) => [p.x, p.y]),
         depth: points.reduce((sum, p) => sum + p.depth, 0) / 3 });
     }
   }
@@ -31,7 +31,7 @@ describe("prepared surface projection", () => {
             const v = x * Math.sin(yaw) + y * Math.cos(yaw), z = height * 4;
             return { x: 500 + u * 48 * zoom, y: 350 + (v * Math.sin(pitch) - z * Math.cos(pitch)) * 48 * zoom, depth: v * Math.cos(pitch) + z * Math.sin(pitch) };
           };
-          expect(projectSurface2D(prepared, project).map(({ path, depth }) => ({ path, depth }))).toEqual(reference(mesh, project));
+          expect(projectSurface2D(prepared, project).map((item) => ({ points: item.kind === "triangle" ? item.points : [], depth: item.depth }))).toEqual(reference(mesh, project));
         }
       }
     });
@@ -43,7 +43,7 @@ describe("prepared surface projection", () => {
     const prepared = prepareSurface2D(mesh, "good", (x, y) => inspected.push([x, y]));
     let calls = 0;
     const result = projectSurface2D(prepared, (x, y, depth) => { calls++; return { x, y, depth }; });
-    result.forEach((item) => item.inspect());
+    result.forEach((item) => { if (item.kind === "triangle") item.inspect(); });
     expect(calls).toBe(4);
     expect(inspected).toEqual([[5 / 3, -5 / 3], [-5 / 3, 5 / 3]]);
     expect(result.map((item) => item.id)).toEqual(["good-0-0-0", "good-0-0-1"]);
