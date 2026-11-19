@@ -15,21 +15,18 @@ Open http://127.0.0.1:5173/tpe-playground/.
 
 For sound development, open [the dedicated audition pane](../sound-preview.html) at
 http://127.0.0.1:5173/tpe-playground/sound-preview.html. It uses the Lab's own
-synthesis and playback code. Pitched voices use C major with whole-number partials,
-so overlapping tails stay consonant. The Lab plays the adopted voices, set in
-`adoptedVoices` in `src/labVoices.ts`; the other candidates are for comparison:
+synthesis and playback code. Every Lab sound is in C major:
 
-- Split γ: S5 Ratchet, a short click per good-count step, slightly higher when the
-  divider moves up and lower when it moves down; a confirming tap is neutral.
-- Kernel: K3 Bubble on a C-major triad tone (C4–E5) chosen by the observation's x.
-- Bandwidth h: B0 Muted wood on C-major pentatonic notes (C3–C5), higher for narrower h.
-- Sampling (roll the dice): Claves · low transposed to C4 → E4, a just major third.
-- Prior α: A1 Warm pad, a chord built from C3 (C3, G3, C4, E4, G4) as α grows.
+- Split γ: a ratchet click per good-count step, slightly higher when the divider
+  moves up and lower when it moves down; a confirming tap is neutral.
+- Kernel: a soft "pop" on a C-major triad tone (C4–E5) chosen by the observation's x.
+- Bandwidth h: a muted wooden note on C-major pentatonic notes (C3–C5), higher for narrower h.
+- Roll the dice: a low claves tap, C4 → E4.
+- Prior α: a warm pad chord built from C3 (C3, G3, C4, E4, G4) as α grows. Drag or
+  hold an arrow key to sustain it; release to fade out. Button and assistive-technology
+  edits fade after inactivity.
 
-Drag or hold an arrow key on the α slider to sustain the chord; release to fade out.
-Button and assistive-technology edits fade after inactivity. Candidate buttons enable
-audio; stop is available. Adjust volume on your device. Split slider edits skip
-repeated values; explicit split confirmations always strike. This separate entry point is excluded from production builds.
+Adjust volume on your device. This separate entry point is excluded from production builds.
 
 ## Checks
 

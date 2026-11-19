@@ -345,7 +345,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     if (intro || controlDisabled) return;
     setSettings((current) => ({ ...current, ...patch }));
     if (patch.bandwidth !== undefined && patch.bandwidth !== settings.bandwidth && (allKernels || placed.length > 0)) audio.play("bandwidth", patch.bandwidth);
-    if (patch.gamma !== undefined && patch.gamma !== settings.gamma) audio.adjustSplit(splitTrials(history, patch.gamma).good.length);
+    if (patch.gamma !== undefined && patch.gamma !== settings.gamma) audio.adjustSplit(splitTrials(history, patch.gamma).good.length, splitTrials(history, settings.gamma).good.length);
     if (patch.priorWeight !== undefined && patch.priorWeight !== settings.priorWeight) audio.play("alpha", patch.priorWeight);
     setInspected(null);
     if (patch.seed !== undefined) dispatchSampling({ type: "reset", revealed: stage === 7 ? settings.candidates : 0 });
@@ -712,7 +712,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
       {activeHint && <LabHintBubble key={activeHint} id={activeHint} phase={hintPhase} container={controlsRef} onDismiss={() => dismissHint(activeHint)} />}
       <fieldset disabled={stage === 8} aria-disabled={controlDisabled}>
         {(stage === 2 || stage === 3 || stage === 4) && <Range hint="gamma" hinted={activeHint === "gamma"} name="Good fraction" symbol="γ" value={settings.gamma} min={1 / history.length} max={(history.length - 1) / history.length} step={1 / history.length} onChange={(gamma) => { noteControlUsed("gamma"); change({ gamma: fractionForCount(Math.round(gamma * history.length), history.length) }); }} />}
-        {stage === 4 && <Range audio={audio} hint="bandwidth" hinted={activeHint === "bandwidth"} name="Bandwidth" symbol="h" value={settings.bandwidth} min={0.2} max={1.5} step={0.05} onChange={(bandwidth) => { noteControlUsed("bandwidth"); change({ bandwidth }); }} />}
+        {stage === 4 && <Range hint="bandwidth" hinted={activeHint === "bandwidth"} name="Bandwidth" symbol="h" value={settings.bandwidth} min={0.2} max={1.5} step={0.05} onChange={(bandwidth) => { noteControlUsed("bandwidth"); change({ bandwidth }); }} />}
         {stage === 5 && <><Range audio={audio} hint="prior" hinted={activeHint === "prior"} name="Prior" symbol="α" value={settings.priorWeight} min={0} max={10} step={0.25} onChange={(priorWeight) => { noteControlUsed("prior"); change({ priorWeight }); }} />
           <label className="journey-weight" data-hint-anchor="weights">Weighting <select aria-label="Weighting" aria-describedby={activeHint === "weights" ? labHintElementId : undefined} value={settings.weights} onChange={(e) => { noteControlUsed("weights"); change({ weights: e.target.value as ExplanationSettings["weights"] }); }}><option value="uniform">Uniform</option><option value="recency">Recency</option><option value="ei">Improvement</option></select></label>
           <details className="journey-weight-details"><summary aria-label="Weight formula" title="Weight formula">ⓘ</summary><div><span className="journey-weight-note">{weightDescription}</span><JourneyMath tex={weightMath} /></div></details></>}

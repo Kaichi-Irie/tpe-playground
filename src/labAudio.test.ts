@@ -1,6 +1,6 @@
+import { alphaVoiceLevels, alphaVoicing } from "./alphaSynth";
 import { afterEach, expect, it, vi } from "vitest";
-import { renderSound, bandwidthFrequency, soundDesigns, bandwidthNotes } from "./labSoundDesign";
-import { adoptedVoices, alphaStudies, alphaVoicing, bandwidthStudies, midiToHz, splitStudies } from "./labVoices";
+import { bandwidthFrequency, bandwidthNotes, kernelNote, kernelTones, midiToHz, renderBandwidth, renderKernel, renderSplit } from "./labSoundDesign";
 import { LabAudio } from "./labAudio";
 
 function setup() {
@@ -101,23 +101,24 @@ it("does not retrigger bandwidth within one note, but allows a new gesture after
   expect(context.createBufferSource).toHaveBeenCalledTimes(3);
 });
 
-it("renders distinct, repeatable material studies with headroom and silent boundaries", () => {
-  const signatures = new Set<string>();
-  for (const sound of ["sample", "bandwidth"] as const) {
-    for (let index = 0; index < soundDesigns[sound].length; index++) {
-      const samples = renderSound(sound, index, 8000);
-      expect(samples).toEqual(renderSound(sound, index, 8000));
-      expect(samples[0]).toBe(0);
-      expect(samples[samples.length - 1]).toBe(0);
-      expect(samples.every((value) => Number.isFinite(value) && Math.abs(value) <= 0.751)).toBe(true);
-      expect(samples.some((value) => Math.abs(value) > 0.1)).toBe(true);
-      signatures.add(samples.slice(0, 200).join(","));
-    }
+it("renders repeatable sounds with headroom that end in silence", () => {
+  const sounds = [renderSplit(-1, 8000), renderSplit(0, 8000), renderSplit(1, 8000), renderKernel(60, 8000), renderKernel(76, 8000), renderBandwidth(0.2, 8000), renderBandwidth(1.5, 8000)];
+  for (const samples of sounds) {
+    // Clicks start on their impulse; every sound fades to silence.
+    expect(Math.abs(samples[samples.length - 1])).toBe(0);
+    expect(samples.every((value) => Number.isFinite(value) && Math.abs(value) <= 0.751)).toBe(true);
+    expect(samples.some((value) => Math.abs(value) > 0.1)).toBe(true);
   }
-  expect(signatures.size).toBe(12);
+  expect(renderSplit(1, 8000)).toEqual(renderSplit(1, 8000));
+  expect(new Set(sounds.slice(0, 3).map((samples) => samples.join(","))).size).toBe(3);
 });
 
-it("plays kernels on C-major triad tones by x, reusing cached buffers", async () => {
+it("maps kernel x positions monotonically onto C-major triad tones", () => {
+  const notes = Array.from({ length: 101 }, (_, i) => kernelNote(-5 + i / 10));
+  expect(notes.every((note, i) => [0, 4, 7].includes(note % 12) && (i === 0 || note >= notes[i - 1]))).toBe(true);
+  expect([notes[0], notes[100], kernelNote(NaN)]).toEqual([kernelTones[0], kernelTones[4], 67]);
+});
+it("plays kernels by x, reusing one cached buffer per tone", async () => {
   const { audio, context } = setup();
   await audio.enable();
   for (const x of [-4.4, 4.2, -4.4, 4.2]) {
@@ -127,31 +128,78 @@ it("plays kernels on C-major triad tones by x, reusing cached buffers", async ()
   expect(context.createBufferSource).toHaveBeenCalledTimes(4);
   expect(context.createBuffer).toHaveBeenCalledTimes(2);
 });
-it("uses the adopted synthesized dice voice without fetching or decoding audio", async () => {
+it("uses the synthesized dice without fetching or decoding audio", async () => {
   const { audio, context } = setup();
   await audio.enable(); audio.play("sample");
   expect(fetch).not.toHaveBeenCalled();
   expect(context.decodeAudioData).not.toHaveBeenCalled();
-  const buffer = context.createBuffer.mock.results[0].value;
-  expect(buffer.getChannelData).toBeDefined();
   expect(context.createBufferSource.mock.results[0].value.start).toHaveBeenCalledOnce();
   expect(context.createGain.mock.results.at(-1)?.value.gain.setValueAtTime).toHaveBeenCalledWith(0.8, 1);
-  audio.stop(); audio.play("sample", 0.55, adoptedVoices.sample);
+  audio.stop(); audio.play("sample");
   expect(context.createBuffer).toHaveBeenCalledOnce();
 });
 
-
-it("strikes one cached buffer per scale note for confirmed splits", async () => {
+it("clicks once per split step, by direction, without cutting other sounds", async () => {
+  const { audio, context, voices } = setup();
+  await audio.enable();
+  audio.play("bandwidth", 0.5);
+  audio.play("split", 3);
+  context.currentTime += 0.2; audio.adjustSplit(4, 3);
+  context.currentTime += 0.2; audio.adjustSplit(3, 4);
+  context.currentTime += 0.2; audio.adjustSplit(4, 3);
+  // Neutral tap, up and down: three cached click buffers after the bandwidth note.
+  expect(context.createBuffer).toHaveBeenCalledTimes(4);
+  expect(context.createBufferSource).toHaveBeenCalledTimes(5);
+  expect(voices[0].stop).not.toHaveBeenCalled();
+});
+it("makes the first audible step directional, even with no click before it", async () => {
   const { audio, context } = setup();
   await audio.enable();
-  for (const goodCount of [1, 2, 3, 4, 5, 6, 7, 8, 9, 1]) {
-    context.currentTime += 1;
-    audio.play("split", goodCount);
-  }
-  expect(context.createBuffer).toHaveBeenCalledTimes(9);
-  expect(context.createBufferSource).toHaveBeenCalledTimes(10);
+  audio.adjustSplit(5, 4);
+  expect(context.createBuffer).toHaveBeenCalledOnce();
+  const up = context.createBuffer.mock.calls.length;
+  audio.stop();
+  audio.adjustSplit(4, 5);
+  expect(context.createBuffer).toHaveBeenCalledTimes(up + 1);
+});
+it("does not repeat a split click for the same good count, however many observations", async () => {
+  const { audio, context } = setup();
+  await audio.enable();
+  audio.adjustSplit(15, 14);
+  context.currentTime += 0.1; audio.adjustSplit(16, 15);
+  context.currentTime += 0.1; audio.adjustSplit(16, 16);
+  expect(context.createBufferSource).toHaveBeenCalledTimes(2);
+  // An explicit confirmation always strikes.
+  audio.play("split", 16);
+  expect(context.createBufferSource).toHaveBeenCalledTimes(3);
+});
+it("coalesces fast split changes to the final value and cancels pending clicks on stop", async () => {
+  vi.useFakeTimers();
+  const { audio, context } = setup();
+  await audio.enable();
+  audio.adjustSplit(1, 2);
+  context.currentTime += 0.02;
+  audio.adjustSplit(2, 1); audio.adjustSplit(3, 2); audio.adjustSplit(5, 3);
+  expect(context.createBufferSource).toHaveBeenCalledOnce();
+  context.currentTime += 0.1;
+  vi.advanceTimersByTime(100);
+  expect(context.createBufferSource).toHaveBeenCalledTimes(2);
+  audio.adjustSplit(5, 5);
+  expect(context.createBufferSource).toHaveBeenCalledTimes(2);
+  audio.adjustSplit(1, 5);
+  audio.stop();
+  vi.advanceTimersByTime(1000);
+  expect(context.createBufferSource).toHaveBeenCalledTimes(2);
+  expect(vi.getTimerCount()).toBe(0);
 });
 
+it("builds the prior chord from the root as alpha grows", () => {
+  expect(alphaVoiceLevels(0)).toEqual([1, 0, 0, 0, 0]);
+  expect(alphaVoiceLevels(10)).toEqual([1, 1, 1, 1, 1]);
+  expect(alphaVoiceLevels(NaN)).toEqual([1, 0, 0, 0, 0]);
+  const totals = Array.from({ length: 41 }, (_, i) => alphaVoiceLevels(i / 4).reduce((sum, level) => sum + level, 0));
+  expect(totals.every((total, i) => i === 0 || total >= totals[i - 1])).toBe(true);
+});
 it("sustains one alpha chord across rapid edits and stationary holds, then fades on release", async () => {
   vi.useFakeTimers();
   const { audio, context } = setup();
@@ -160,17 +208,19 @@ it("sustains one alpha chord across rapid edits and stationary holds, then fades
   for (const value of [0, 4, 4.25, 8, 10, 0]) audio.play("alpha", value);
   expect(context.createOscillator).toHaveBeenCalledTimes(alphaVoicing.length);
   const sources = context.createOscillator.mock.results.map(({ value }) => value);
-  vi.advanceTimersByTime(5000);
-  expect(sources.every((source) => source.stop.mock.calls.length === 0)).toBe(true);
   expect(sources.map((source) => source.frequency.value)).toEqual(alphaVoicing.map(midiToHz));
   // α = 0 leaves only the root sounding.
   const levels = context.createGain.mock.results.slice(-alphaVoicing.length).map(({ value }) => value.gain.setTargetAtTime.mock.lastCall[0]);
   expect(levels[0]).toBeGreaterThan(0);
   expect(levels.slice(1)).toEqual([0, 0, 0, 0]);
+  vi.advanceTimersByTime(5000);
+  expect(sources.every((source) => source.stop.mock.calls.length === 0)).toBe(true);
   audio.endAlphaGesture();
   expect(sources.every((source) => source.stop.mock.calls.length === 1)).toBe(true);
+  sources[0].onended();
+  expect(sources.every((source) => source.disconnect.mock.calls.length === 1)).toBe(true);
+  expect(context.createBiquadFilter.mock.results[0].value.disconnect).toHaveBeenCalledOnce();
 });
-
 it("extends alpha feedback for AT edits and cancels it on mute or stop", async () => {
   vi.useFakeTimers();
   const { audio, context } = setup();
@@ -183,153 +233,13 @@ it("extends alpha feedback for AT edits and cancels it on mute or stop", async (
   expect(source.stop).not.toHaveBeenCalled();
   vi.advanceTimersByTime(200);
   expect(source.stop).toHaveBeenCalledOnce();
-  audio.beginAlphaGesture(); audio.play("alpha", 4);
+  audio.auditionAlpha(4);
   const next = context.createOscillator.mock.results.at(-1)!.value;
   audio.disable(); audio.play("alpha", 5);
   expect(next.stop).toHaveBeenCalledOnce();
   expect(vi.getTimerCount()).toBe(0);
-});
-
-it("supports every alpha direction with bounded smoothed controls and cleans up all nodes", async () => {
-  vi.useFakeTimers();
-  for (let variant = 0; variant < alphaStudies.length; variant++) {
-    const { audio, context } = setup();
-    await audio.enable();
-    audio.beginAlphaGesture();
-    for (const value of [0, 0.25, 5, 10, NaN]) audio.play("alpha", value, variant);
-    expect(context.createOscillator).toHaveBeenCalledTimes(alphaVoicing.length);
-    // Only the chime study adds struck notes as voices join.
-    expect(context.createBufferSource.mock.calls.length > 0).toBe(alphaStudies[variant].chime);
-    for (const { value: gain } of context.createGain.mock.results) {
-      expect(gain.gain.setTargetAtTime.mock.calls.every(([target]: [number]) => Number.isFinite(target) && target >= 0 && target <= 1.4)).toBe(true);
-    }
-    audio.stop();
-    const sources = [...context.createOscillator.mock.results, ...context.createBufferSource.mock.results].map(({ value }) => value);
-    for (const source of sources) {
-      expect(source.stop).toHaveBeenCalledOnce();
-      (source.onended as (() => void) | null)?.();
-    }
-    for (const source of sources) expect(source.disconnect).toHaveBeenCalledOnce();
-    expect(context.createBiquadFilter.mock.results[0].value.disconnect).toHaveBeenCalledOnce();
-  }
-});
-
-it("crossfades candidate changes and cancels previews on navigation/stop", async () => {
-  vi.useFakeTimers();
-  const { audio, context } = setup();
-  await audio.enable();
-  audio.auditionAlpha(4, 0);
-  const first = context.createOscillator.mock.results[0].value;
-  audio.play("alpha", 4, 1);
-  expect(first.stop).toHaveBeenCalledOnce();
-  audio.stop();
-  expect(vi.getTimerCount()).toBe(0);
-  const count = context.createOscillator.mock.calls.length;
   vi.stubGlobal("document", { hidden: true });
-  audio.play("alpha", 8);
+  const count = context.createOscillator.mock.calls.length;
+  await audio.enable(); audio.play("alpha", 8);
   expect(context.createOscillator).toHaveBeenCalledTimes(count);
-});
-
-it("crossfades long split tones without retriggering the same note", async () => {
-  const { audio, context } = setup();
-  await audio.enable();
-  const piano = splitStudies.findIndex((study) => study.legato);
-  audio.adjustSplit(0, piano);
-  const first = context.createBufferSource.mock.results[0].value;
-  // Counts below one clamp to the lowest note, C4.
-  audio.adjustSplit(1, piano);
-  expect(context.createBufferSource).toHaveBeenCalledOnce();
-  context.currentTime += 0.15;
-  audio.adjustSplit(4, piano);
-  expect(context.createBufferSource).toHaveBeenCalledTimes(2);
-  expect(first.stop).toHaveBeenCalledWith(context.currentTime + 0.4);
-  const latestGain = context.createGain.mock.results.at(-1)!.value.gain;
-  expect(latestGain.setValueAtTime).toHaveBeenCalledWith(0, context.currentTime);
-  expect(latestGain.setTargetAtTime).toHaveBeenCalledWith(0.85, context.currentTime, 0.035);
-  // Explicit confirmation always strikes, even on the same note.
-  audio.play("split", 4, piano);
-  expect(context.createBufferSource).toHaveBeenCalledTimes(3);
-});
-
-it("coalesces fast split changes to the final value and cancels pending notes on stop", async () => {
-  vi.useFakeTimers();
-  const { audio, context } = setup();
-  await audio.enable();
-  audio.adjustSplit(0);
-  context.currentTime += 0.02;
-  audio.adjustSplit(2); audio.adjustSplit(4); audio.adjustSplit(8);
-  expect(context.createBufferSource).toHaveBeenCalledOnce();
-  context.currentTime += 0.1;
-  vi.advanceTimersByTime(100);
-  expect(context.createBufferSource).toHaveBeenCalledTimes(2);
-  audio.adjustSplit(8);
-  expect(context.createBufferSource).toHaveBeenCalledTimes(2);
-  audio.adjustSplit(0);
-  audio.stop();
-  vi.advanceTimersByTime(1000);
-  expect(context.createBufferSource).toHaveBeenCalledTimes(2);
-  expect(vi.getTimerCount()).toBe(0);
-});
-
-it("lets bandwidth ticks overlap, one per slider step", async () => {
-  const { audio, context, voices } = setup();
-  await audio.enable();
-  const tick = bandwidthStudies.findIndex((study) => study.id === "B1");
-  audio.play("bandwidth", 0.5, tick);
-  context.currentTime += 0.01; audio.play("bandwidth", 0.55, tick);
-  expect(context.createBufferSource).toHaveBeenCalledOnce();
-  context.currentTime += 0.05; audio.play("bandwidth", 0.55, tick);
-  context.currentTime += 0.05; audio.play("bandwidth", 0.55, tick);
-  expect(context.createBufferSource).toHaveBeenCalledTimes(2);
-  context.currentTime += 0.05; audio.play("bandwidth", 0.6, tick);
-  expect(context.createBufferSource).toHaveBeenCalledTimes(3);
-  expect(voices[0].stop).not.toHaveBeenCalled();
-});
-
-it("sustains the bandwidth air band while held and releases it after", async () => {
-  vi.useFakeTimers();
-  const { audio, context } = setup();
-  await audio.enable();
-  const air = bandwidthStudies.findIndex((study) => study.kind === "sustain");
-  audio.beginAlphaGesture();
-  for (const h of [0.2, 0.7, 1.5]) audio.play("bandwidth", h, air);
-  expect(context.createBufferSource).toHaveBeenCalledOnce();
-  const source = context.createBufferSource.mock.results[0].value;
-  vi.advanceTimersByTime(3000);
-  expect(source.stop).not.toHaveBeenCalled();
-  audio.endAlphaGesture();
-  expect(source.stop).toHaveBeenCalledOnce();
-});
-
-it("holds every sustained bandwidth voice while dragging and cleans it up", async () => {
-  vi.useFakeTimers();
-  for (const study of bandwidthStudies.filter((entry) => entry.kind === "sustain")) {
-    const { audio, context } = setup();
-    await audio.enable();
-    audio.beginAlphaGesture();
-    for (const h of [0.2, 0.9, 1.5, NaN]) audio.play("bandwidth", h, bandwidthStudies.indexOf(study));
-    const sources = [...context.createOscillator.mock.results, ...context.createBufferSource.mock.results].map(({ value }) => value);
-    expect(sources).toHaveLength(1);
-    vi.advanceTimersByTime(2000);
-    expect(sources[0].stop).not.toHaveBeenCalled();
-    audio.endAlphaGesture();
-    expect(sources[0].stop).toHaveBeenCalledOnce();
-    (sources[0].onended as () => void)();
-    expect(context.createBiquadFilter.mock.results[0].value.disconnect).toHaveBeenCalledOnce();
-  }
-});
-
-it("strikes split clicks at once and tells slider direction apart from a confirming tap", async () => {
-  const { audio, context } = setup();
-  await audio.enable();
-  const ratchet = splitStudies.findIndex((study) => study.id === "S5");
-  audio.play("split", 3, ratchet);
-  context.currentTime += 0.2; audio.adjustSplit(4, ratchet);
-  context.currentTime += 0.2; audio.adjustSplit(3, ratchet);
-  // Neutral tap, then up, then down: three distinct buffers.
-  expect(context.createBuffer).toHaveBeenCalledTimes(3);
-  const gains = context.createGain.mock.results.slice(-3).map(({ value }) => value.gain);
-  expect(gains.every((gain) => gain.setValueAtTime.mock.calls[0][0] === splitStudies[ratchet].level)).toBe(true);
-  // No fade-in: only the next step's crossfade ever lowers a click.
-  expect(gains.at(-1).setTargetAtTime).not.toHaveBeenCalled();
 });

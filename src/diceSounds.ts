@@ -1,27 +1,10 @@
-// Instrument-inspired synthesis, not recordings of these instruments.
-// The first nine hold the original phrase constant across timbre comparisons:
-// 220 Hz → 275 Hz (A3 → C♯4, a just major third), with 75 ms between attacks.
-// The last three transpose Claves · low into C major.
-const phrase = { frequency: 220, notes: [1, 1.25], spacing: 0.075 } as const;
-const clavesLow = { spacing: phrase.spacing, ratios: [1, 2.4, 4.6], levels: [1, 0.25, 0.08], decay: 0.027, attack: 0.0015 } as const;
-export const diceSounds = [
-  { ...phrase, name: "Pizzicato · original", hint: "Reference · soft string", ratios: [1, 2, 3, 4, 5], levels: [1, 0.4, 0.2, 0.08, 0.04], decay: 0.095, attack: 0.004 },
-  { ...phrase, name: "Pizzicato · velvet", hint: "Softer attack · rounder body", ratios: [1, 2, 3, 4, 5], levels: [1, 0.24, 0.09, 0.035, 0.01], decay: 0.115, attack: 0.008 },
-  { ...phrase, name: "Pizzicato · dry", hint: "Shorter · close pluck", ratios: [1, 2, 3, 4, 5], levels: [1, 0.46, 0.23, 0.1, 0.045], decay: 0.065, attack: 0.003 },
-  { ...phrase, name: "Woodblock · hollow", hint: "Low hollow knock", ratios: [1, 1.63, 2.9], levels: [1, 0.4, 0.12], decay: 0.045, attack: 0.002 },
-  { ...phrase, name: "Woodblock · soft", hint: "Padded strike · warm wood", ratios: [1, 1.63, 2.9], levels: [1, 0.22, 0.055], decay: 0.075, attack: 0.006 },
-  { ...phrase, name: "Woodblock · string", hint: "Wooden knock + plucked body", ratios: [1, 1.63, 2, 3, 4], levels: [1, 0.18, 0.26, 0.12, 0.035], decay: 0.085, attack: 0.004 },
-  { ...phrase, name: "Claves · low", hint: "Low crisp tap", ratios: [1, 2.4, 4.6], levels: [1, 0.25, 0.08], decay: 0.027, attack: 0.0015 },
-  { ...phrase, name: "Claves · rounded", hint: "Gentler edge · longer body", ratios: [1, 2.4, 4.6], levels: [1, 0.13, 0.025], decay: 0.05, attack: 0.004 },
-  { ...phrase, name: "Claves · string", hint: "Crisp contact + warm string", ratios: [1, 2, 2.4, 3, 4.6], levels: [1, 0.3, 0.13, 0.12, 0.035], decay: 0.07, attack: 0.003 },
-  // Claves · low moved into C major (the Lab's other voices); timbre and rhythm unchanged.
-  { ...clavesLow, frequency: 196, notes: [1, 1.25], name: "Claves · low · ソ→シ", hint: "G3 → B3 · 長3度、今より全音低い" },
-  { ...clavesLow, frequency: 261.63, notes: [1, 1.25], name: "Claves · low · ド→ミ", hint: "C4 → E4 · 主音からの長3度" },
-  { ...clavesLow, frequency: 220, notes: [1, 1.2], name: "Claves · low · ラ→ド", hint: "A3 → C4 · 短3度、少し控えめ" },
-] as const;
+// Instrument-inspired synthesis, not a recording: a low claves tap played as
+// C4 → E4 (a just major third, in the Lab's C major), 75 ms between attacks.
+const dice = { frequency: 261.63, notes: [1, 1.25], spacing: 0.075, ratios: [1, 2.4, 4.6], levels: [1, 0.25, 0.08], decay: 0.027, attack: 0.0015 } as const;
+export const diceNotes = dice.notes.map((ratio) => dice.frequency * ratio);
 
-export function renderDice(variant: number, sampleRate: number): Float32Array {
-  const preset: { frequency: number; notes: readonly number[]; spacing: number; ratios: readonly number[]; levels: readonly number[]; decay: number; attack: number } = diceSounds[variant] ?? diceSounds[0];
+export function renderDice(sampleRate: number): Float32Array {
+  const preset = dice;
   const samples = new Float32Array(Math.ceil(sampleRate * 0.75));
   for (let note = 0; note < preset.notes.length; note++) {
     const onset = note * preset.spacing;
