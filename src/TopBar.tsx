@@ -1,9 +1,9 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { playHashes, type Page } from "./shareSearch";
 
-export type Page = "1d" | "2d" | "lab" | "about";
 const pages = [
-  { id: "1d", href: "#play", label: "Play 2D" },
-  { id: "2d", href: "#play-2d", label: "Play 3D" },
+  { id: "1d", href: playHashes["1d"], label: "Play 2D" },
+  { id: "2d", href: playHashes["2d"], label: "Play 3D" },
   { id: "lab", href: "#lab", label: "Lab" },
   { id: "about", href: "#about", label: "About" },
 ] as const;
@@ -24,7 +24,7 @@ export function TopBar({ page, dark, onThemeChange, actionSlot }: {
   const currentPage = pages.find((item) => item.id === page)!;
   const links = pages.map((item) => <a key={item.id} href={item.href} aria-current={page === item.id ? "page" : undefined} onClick={() => menuRef.current?.hidePopover()}>{item.label}<span className="page-check" aria-hidden="true">{page === item.id ? "✓" : ""}</span></a>);
   return <header className="app-header">
-    <h1 className="app-brand"><a href="#play" aria-label="TPE Playground"><img src={`${import.meta.env.BASE_URL}favicon.svg`} width="28" height="28" alt="" /><span>TPE Playground</span></a></h1>
+    <h1 className="app-brand"><a href={playHashes["1d"]} aria-label="TPE Playground"><img src={`${import.meta.env.BASE_URL}favicon.svg`} width="28" height="28" alt="" /><span>TPE Playground</span></a></h1>
     <nav className="app-tabs" aria-label="Pages">{links}</nav>
     <button className="page-picker" popoverTarget="page-picker-menu" aria-label={`Pages: ${currentPage.label}`}><span>{currentPage.label}</span><span aria-hidden="true">⌄</span></button>
     <div id="page-picker-menu" className="page-picker-menu" popover="auto" ref={menuRef}><nav aria-label="Pages">{links}</nav></div>

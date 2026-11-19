@@ -2,11 +2,8 @@ import type { DensityMode } from "./model/types";
 import {
   bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrialCounts, weightOptions, type ModelSettings,
 } from "./searchSettings";
-import type { Page } from "./TopBar";
-
-// Keep the v1 route, field names, and preset IDs stable for existing links.
-const playHashes = { "1d": "#play", "2d": "#play-2d" } as const;
-type PlayPage = keyof typeof playHashes;
+export const playHashes = { "1d": "#play-2d", "2d": "#play-3d" } as const;
+export type Page = keyof typeof playHashes | "lab" | "about";
 export type ShareExperiment = { page: "1d"; preset: string } | { page: "2d"; preset: string; mode: DensityMode };
 
 export type SharedSearch<Preset extends string> = {
@@ -20,10 +17,16 @@ export type Route = { page: Page; share: URLSearchParams | null };
 export function readRoute(hash: string): Route {
   const separator = hash.indexOf("?");
   const path = separator === -1 ? hash : hash.slice(0, separator);
-  const page = path === "#lab" ? "lab" : path === "#about" ? "about" : path === playHashes["2d"] ? "2d" : "1d";
-  if (separator === -1 || (path !== playHashes["1d"] && path !== playHashes["2d"])) return { page, share: null };
-  const params = new URLSearchParams(hash.slice(separator + 1));
-  return { page, share: params.get("v") === "1" ? params : null };
+  const params = separator === -1 ? null : new URLSearchParams(hash.slice(separator + 1));
+  const version = params?.get("v");
+  // Version 1 used #play-2d for the two-variable explorer.
+  if (version === "1" && (path === "#play" || path === "#play-2d")) {
+    return { page: path === "#play" ? "1d" : "2d", share: params };
+  }
+  if (path === playHashes["1d"] || path === playHashes["2d"]) {
+    return { page: path === playHashes["1d"] ? "1d" : "2d", share: version === "2" ? params : null };
+  }
+  return { page: path === "#lab" ? "lab" : path === "#about" ? "about" : "1d", share: null };
 }
 
 // Consume a shared configuration once per opening. Ordinary tab navigation can
@@ -44,7 +47,7 @@ export function createShareUrl(documentUrl: string, experiment: ShareExperiment,
     startupTrials: String(settings.startupTrials),
     candidates: String(settings.candidates),
   } satisfies Required<Record<keyof ModelSettings, string>>;
-  const params = new URLSearchParams({ v: "1", seed: String(seed), preset: experiment.preset, ...model });
+  const params = new URLSearchParams({ v: "2", seed: String(seed), preset: experiment.preset, ...model });
   if (experiment.page === "2d") params.set("mode", experiment.mode);
   url.hash = `${playHashes[experiment.page]}?${params}`;
   return url.href;

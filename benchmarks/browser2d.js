@@ -1,11 +1,11 @@
-// Run in a foreground dev-server tab, on #play-2d. Uses only public DOM controls.
+// Run in a foreground dev-server tab, on #play-3d. Uses only public DOM controls.
 // await (await import('/tpe-playground/benchmarks/browser2d.js')).benchmark2D('rotate')
 export async function benchmark2D(scenario, count = 120, trackMutations = false, durationMs = 0) {
   if (!['idle', 'rotate', 'play', 'play-rotate', 'bandwidth', 'seek'].includes(scenario)) throw new Error('Unknown scenario.');
   const scene = document.querySelector('[aria-label="Interactive 3D landscape and KDE surfaces"]');
   const trial = document.querySelector('[aria-label="2D Trial progress"]');
   const bandwidth = document.querySelector('#bandwidth-2d');
-  if (!scene || !trial || !bandwidth) throw new Error('Open Play 2D first.');
+  if (!scene || !trial || !bandwidth) throw new Error('Open Play 3D first.');
   if (document.visibilityState !== 'visible') throw new Error('Keep the benchmark tab visible.');
   const frame = () => new Promise((resolve, reject) => {
     if (document.visibilityState !== "visible") return reject(new Error("Benchmark tab became hidden."));
