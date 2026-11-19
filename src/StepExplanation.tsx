@@ -13,7 +13,7 @@ import { LabAudio } from "./labAudio";
 import LabSoundControls from "./LabSoundControls";
 import { labLayout } from "./labLayout";
 import { usePlotSize } from "./usePlotSize";
-import { loadSeenHints, nextHint, saveSeenHints, type LabHintId } from "./labHints";
+import { clearSeenHints, loadSeenHints, nextHint, saveSeenHints, type LabHintId } from "./labHints";
 import LabHintBubble, { labHintElementId } from "./LabHintBubble";
 
 const stages = ["Unknown objective", "Observe", "Split", "Model inputs", "Kernels", "Density", "Sample", "Choose", "Evaluate"];
@@ -242,8 +242,8 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   function noteControlUsed(id: LabHintId) {
     if (activeHint === id && !usedHints.has(id)) setUsedHints((current) => new Set([...current, id]));
   }
-  function showHintsAgain() {
-    saveSeenHints(new Set());
+  function resetHints() {
+    clearSeenHints();
     setSeenHints(new Set());
     setUsedHints(new Set());
   }
@@ -397,6 +397,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   function restart() {
     audio.stop();
     preserveLessonFocus(true);
+    resetHints();
     setIntro(true); setRounds(0); setChosen([]); setAutoShown(0); setInitialComplete(false); setPlaced([]); setAllKernels(false); dispatchSampling({ type: "reset" });
     setHistory([...example.trials]); setSettings(explanationDefaults);
     setFocused(null); setInspected(null); jump(0); setStage(0); setReplay((v) => v + 1);
@@ -481,7 +482,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         "  D ← D ∪ {(x_next, f(x_next))}",
       ].map((line, index) => <li key={line} aria-current={index === (stage <= 1 ? 0 : stage === 2 ? 2 : stage <= 5 ? 3 : stage === 6 ? 4 : stage === 7 ? 5 : 6) ? "step" : undefined}>{line}</li>)}</ol>
       </aside>
-    </div><button type="button" className="algorithm-trigger lab-hints-trigger" onClick={showHintsAgain} aria-label="Show control hints again" title="Show control hints again">
+    </div><button type="button" className="algorithm-trigger lab-hints-trigger" onClick={resetHints} aria-label="Show control hints again" title="Show control hints again">
       <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M6 12.5h4M6.5 14.5h3M5.2 10.2A4.5 4.5 0 1 1 10.8 10.2c-.5.4-.8 1-.8 1.6V12H6v-.2c0-.6-.3-1.2-.8-1.6Z" /></svg><span>Hints</span>
     </button><LabSoundControls enabled={soundState === "on"} pending={soundState === "pending"}
       error={soundState === "error" && !showSoundPrompt} onToggle={() => void toggleSound()} /></>, algorithmContainer) : null}
