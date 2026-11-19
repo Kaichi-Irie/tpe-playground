@@ -1,7 +1,7 @@
 export type LabHintId = "gamma" | "bandwidth" | "prior" | "weights" | "candidates";
 
 export interface LabHint {
-  id: LabHintId;
+  label: string;
   /** First phase: what to touch and what visibly changes. */
   action: string;
   /** Second phase, after the control is used: what the parameter means. */
@@ -10,28 +10,28 @@ export interface LabHint {
 
 export const labHints: Record<LabHintId, LabHint> = {
   gamma: {
-    id: "gamma",
-    action: "Drag to move the Good/Bad line.",
+    label: "Good fraction",
+    action: "Drag the Good fraction slider to move the Good/Bad line.",
     meaning: "γ is the share of observations counted as Good. A smaller γ is pickier about what counts as good.",
   },
   bandwidth: {
-    id: "bandwidth",
-    action: "Drag to make each bump wider or narrower.",
+    label: "Bandwidth",
+    action: "Drag the Bandwidth slider to make the bumps wider or narrower.",
     meaning: "h sets how far one observation's influence spreads. Wide bumps blur the data; narrow ones trust each point.",
   },
   prior: {
-    id: "prior",
-    action: "Drag to thicken the pink prior layer.",
+    label: "Prior",
+    action: "Drag the Prior slider to change how much of the pink layer is mixed in.",
     meaning: "α mixes in a broad guess that good inputs could be anywhere, so the search keeps exploring.",
   },
   weights: {
-    id: "weights",
-    action: "Change to reshape the bump heights.",
+    label: "Weighting",
+    action: "Choose a Weighting option to change the height of the bumps.",
     meaning: "Weighting decides which observations count more: all equally, newer ones, or ones that improved more.",
   },
   candidates: {
-    id: "candidates",
-    action: "Drag to change how many candidates compete.",
+    label: "Candidates",
+    action: "Drag the Candidates slider to change how many candidates compete.",
     meaning: "M is how many candidates are drawn from ℓ. Only the one with the best ℓ/g is evaluated.",
   },
 };
@@ -56,6 +56,39 @@ export function hintsForStage({ stage, taskPending }: HintContext): LabHintId[] 
 
 export function nextHint(context: HintContext, seen: ReadonlySet<LabHintId>): LabHintId | null {
   return hintsForStage(context).find((id) => !seen.has(id)) ?? null;
+}
+
+export const taskGuides = {
+  observe: { action: "Tap or click three different positions along the highlighted x-axis.", announcement: "Hint available for choosing inputs." },
+  split: { action: "Tap or click a height on the grid to split the points into Good and Bad.", announcement: "Hint available for splitting the observations." },
+  kernels: { action: "Tap or click three observation dots to add their kernels. Start with the outlined dot or choose any other.", announcement: "Hint available for adding kernels." },
+  sample: { action: "Select Roll the dice to sample a candidate.", announcement: "Hint available for sampling candidates." },
+};
+
+export type LabTaskGuideId = keyof typeof taskGuides;
+
+interface GuideContext extends HintContext {
+  paused: boolean;
+  initialComplete: boolean;
+  chosenCount: number;
+  splitConfirmed: boolean;
+  placedCount: number;
+  drawnCount: number;
+  candidateCount: number;
+}
+
+export function nextLabGuide(context: GuideContext, seen: ReadonlySet<LabHintId>, dismissed: ReadonlySet<LabTaskGuideId>) {
+  if (context.paused) return null;
+  const { stage, initialComplete, chosenCount, splitConfirmed, taskPending, placedCount, drawnCount, candidateCount } = context;
+  let task: LabTaskGuideId | null = null;
+  if (stage === 1 && !initialComplete && chosenCount < 3) task = "observe";
+  if (stage === 1 && initialComplete && !splitConfirmed) task = "split";
+  if (stage === 4 && taskPending && placedCount < 3) task = "kernels";
+  if (stage === 6 && drawnCount < candidateCount) task = "sample";
+  if (task) return dismissed.has(task) ? null : { kind: "task", id: task } as const;
+
+  const control = nextHint(context, seen);
+  return control ? { kind: "control", id: control } as const : null;
 }
 
 const storageKey = "tpe-lab-hints-seen";
