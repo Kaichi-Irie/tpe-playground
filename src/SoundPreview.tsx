@@ -13,6 +13,9 @@ const byX = [...trials].sort((a, b) => a.x - b.x);
 function SoundPreview() {
   const [audio] = useState(() => new LabAudio());
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Bumped by every stop or manual edit, so a request still waiting for audio
+  // to resume cannot start playing after it.
+  const request = useRef(0);
   const [count, setCount] = useState(3);
   const [h, setH] = useState(0.55);
   const [prior, setPrior] = useState(4);
@@ -30,15 +33,17 @@ function SoundPreview() {
   }, [audio]);
 
   async function ready() {
+    const current = request.current;
     const enabled = await audio.enable();
     if (!enabled) setStatus("音を再生できません。もう一度試してください。");
-    return enabled;
+    return enabled && current === request.current;
   }
-  function cancelSequence() { timers.current.forEach(clearTimeout); timers.current = []; }
+  function cancelSequence() { request.current++; timers.current.forEach(clearTimeout); timers.current = []; }
   function stopAll() { cancelSequence(); audio.stop(); }
   async function sequence(steps: (() => void)[], interval: number) {
+    cancelSequence();
     if (!await ready()) return;
-    stopAll();
+    audio.stop();
     timers.current = steps.map((step, i) => setTimeout(step, i * interval));
   }
   // Manual edits take control back from a running sequence; the slider value
@@ -96,7 +101,7 @@ function SoundPreview() {
       <p>候補をサンプリングするときの「カ・コン」（ド → ミ）です。</p>
       <div className="lab-sound-controls">
         <button onClick={() => void sequence([() => { audio.play("sample"); setStatus("Dice"); }], 0)}>振る</button>
-        <button onClick={() => void sequence([-4.4, 0.3, 4.2].map((x) => () => audio.play("kernel", x)).concat([() => {}, () => audio.play("sample")]), 280)}>ドミソの後に振る</button>
+        <button onClick={() => void sequence([-4.4, -2, 0.3].map((x) => () => audio.play("kernel", x)).concat([() => {}, () => audio.play("sample")]), 280)}>ドミソの後に振る</button>
       </div>
     </section>
 

@@ -18,6 +18,8 @@ export class LabAudio {
   // pitch shows the direction. The caller passes where the divider was, so the
   // first click after enabling sound is directional too.
   adjustSplit(goodCount: number, previousCount: number) {
+    // An edit that leaves the count unchanged moves nothing; keep any pending step.
+    if (goodCount === previousCount) return;
     clearTimeout(this.splitTimer);
     this.splitTimer = undefined;
     const context = this.context;

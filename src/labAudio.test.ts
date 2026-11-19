@@ -167,7 +167,8 @@ it("does not repeat a split click for the same good count, however many observat
   await audio.enable();
   audio.adjustSplit(15, 14);
   context.currentTime += 0.1; audio.adjustSplit(16, 15);
-  context.currentTime += 0.1; audio.adjustSplit(16, 16);
+  context.currentTime += 0.5; audio.adjustSplit(16, 16);
+  // An edit that leaves the count unchanged is silent, even after a pause.
   expect(context.createBufferSource).toHaveBeenCalledTimes(2);
   // An explicit confirmation always strikes.
   audio.play("split", 16);
