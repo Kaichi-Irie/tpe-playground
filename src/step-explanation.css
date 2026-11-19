@@ -600,7 +600,7 @@
 
 /* Coach hints: a bubble above the control, plus a pulse on what it changes. */
 .journey .journey-controls { position: relative; }
-.lab-hint { position: absolute; z-index: 5; bottom: calc(100% + 12px); left: var(--hint-left); width: max-content; max-width: min(300px, calc(100% - 16px)); display: flex; align-items: center; gap: 10px; padding: 9px 10px 9px 14px; border: 1.5px solid var(--accent); border-radius: 12px; background: var(--surface); color: var(--text); box-shadow: 0 8px 24px var(--shadow); font-size: 13px; line-height: 1.4; text-align: left; animation: lab-hint-in 260ms ease both; }
+.lab-hint { position: absolute; z-index: 5; left: var(--hint-left); width: max-content; max-width: min(300px, calc(100% - 16px)); display: flex; align-items: center; gap: 10px; padding: 9px 10px 9px 14px; border: 1.5px solid var(--accent); border-radius: 12px; background: var(--surface); color: var(--text); box-shadow: 0 8px 24px var(--shadow); font-size: 13px; line-height: 1.4; text-align: left; animation: lab-hint-in 260ms ease both; }
 .lab-hint[data-placed="false"] { visibility: hidden; }
 .lab-hint::after { content: ""; position: absolute; top: 100%; left: var(--hint-arrow); width: 12px; height: 12px; margin: -6px 0 0 -6px; background: var(--surface); border: solid var(--accent); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
 .lab-hint p { margin: 0; flex: 1 1 auto; }
@@ -628,5 +628,5 @@
 @keyframes lab-hint-glow { 50% { filter: drop-shadow(0 0 4px var(--accent)); } }
 .lab-hints-trigger svg { stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 800px) {
-  .lab-hint { font-size: 12px; padding: 7px 8px 7px 12px; bottom: calc(100% + 10px); }
+  .lab-hint { font-size: 12px; padding: 7px 8px 7px 12px; }
 }

@@ -31,24 +31,26 @@ export const labHints: Record<LabHintId, LabHint> = {
   },
   candidates: {
     id: "candidates",
-    action: "Drag to roll more or fewer dice.",
+    action: "Drag to change how many candidates compete.",
     meaning: "M is how many candidates are drawn from ℓ. Only the one with the best ℓ/g is evaluated.",
   },
 };
 
 export interface HintContext {
   stage: number;
-  /** A guided task (tapping points, rolling dice) still needs the learner's attention. */
+  /** A guided task (tapping kernels) still needs the learner's attention. */
   taskPending: boolean;
 }
 
 /** Controls introduced in each stage, in the order their hints appear. */
 export function hintsForStage({ stage, taskPending }: HintContext): LabHintId[] {
   if (stage === 2) return ["gamma"];
-  // Kernel and dice tasks come first; a hint would compete with them.
+  // The kernel-tapping task comes first; a hint would compete with it.
   if (stage === 4) return taskPending ? [] : ["bandwidth"];
   if (stage === 5) return ["prior", "weights"];
-  if (stage === 6 || stage === 7) return taskPending ? [] : ["candidates"];
+  // Sample is about rolling the dice, and raising M there restarts that task.
+  // In Choose, M immediately changes which candidates compete and the winner.
+  if (stage === 7) return ["candidates"];
   return [];
 }
 

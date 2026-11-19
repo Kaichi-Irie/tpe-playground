@@ -3,6 +3,7 @@ import { labHints, type LabHintId } from "./labHints";
 
 export const labHintElementId = "lab-control-hint";
 const edge = 8;
+const gap = 12;
 
 /** Points at a control inside `container` (marked with data-hint-anchor). */
 export default function LabHintBubble({ id, phase, container, onDismiss }: {
@@ -12,7 +13,7 @@ export default function LabHintBubble({ id, phase, container, onDismiss }: {
   onDismiss: () => void;
 }) {
   const bubble = useRef<HTMLDivElement>(null);
-  const [place, setPlace] = useState<{ left: number; arrow: number } | null>(null);
+  const [place, setPlace] = useState<{ left: number; arrow: number; bottom: number } | null>(null);
   useLayoutEffect(() => {
     const host = container.current;
     if (!host) return;
@@ -25,7 +26,9 @@ export default function LabHintBubble({ id, phase, container, onDismiss }: {
       const center = anchorRect.left + anchorRect.width / 2 - hostRect.left;
       const width = box.offsetWidth;
       const left = Math.max(edge, Math.min(hostRect.width - width - edge, center - width / 2));
-      setPlace({ left, arrow: Math.max(16, Math.min(width - 16, center - left)) });
+      // Sit just above the control itself, even when the controls wrap onto several rows.
+      const bottom = hostRect.bottom - anchorRect.top + gap;
+      setPlace({ left, arrow: Math.max(16, Math.min(width - 16, center - left)), bottom });
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -35,7 +38,7 @@ export default function LabHintBubble({ id, phase, container, onDismiss }: {
   }, [container, id, phase]);
   const hint = labHints[id];
   return <div ref={bubble} id={labHintElementId} className={`lab-hint lab-hint-${phase}`} data-placed={place !== null}
-    style={{ "--hint-left": `${place?.left ?? 0}px`, "--hint-arrow": `${place?.arrow ?? 0}px` } as CSSProperties}
+    style={{ "--hint-left": `${place?.left ?? 0}px`, "--hint-arrow": `${place?.arrow ?? 0}px`, bottom: `${place?.bottom ?? 0}px` } as CSSProperties}
     role="status">
     {phase === "action"
       ? <p><span className="lab-hint-try" aria-hidden="true" />{hint.action}</p>

@@ -12,11 +12,11 @@ describe("lab hints", () => {
     expect(hintsForStage({ stage: 8, taskPending: false })).toEqual([]);
   });
 
-  it("waits for kernel and dice tasks before pointing at a control", () => {
+  it("waits for the kernel task and leaves the dice stage to its task", () => {
     expect(hintsForStage({ stage: 4, taskPending: true })).toEqual([]);
     expect(hintsForStage({ stage: 4, taskPending: false })).toEqual(["bandwidth"]);
     expect(hintsForStage({ stage: 6, taskPending: true })).toEqual([]);
-    expect(hintsForStage({ stage: 6, taskPending: false })).toEqual(["candidates"]);
+    expect(hintsForStage({ stage: 6, taskPending: false })).toEqual([]);
   });
 
   it("shows one unseen hint at a time, in order", () => {
