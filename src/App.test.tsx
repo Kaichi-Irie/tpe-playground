@@ -66,6 +66,21 @@ it("renders a synchronized comparison with no results before evaluation", () => 
   expect(html).toContain("How to read this plot");
 });
 
+it("renders About as a named article with five parallel section headings", () => {
+  const html = renderToStaticMarkup(<App initialRoute={{ page: "about", share: null }} />);
+  const article = html.match(/<article\b[^>]*class="about-page"[^>]*>[\s\S]*?<\/article>/)?.[0] ?? "";
+
+  expect(article).toMatch(/^<article\b[^>]* aria-label="About"/);
+  expect(article).not.toMatch(/<h3\b/);
+  expect(Array.from(article.matchAll(/<h2\b[^>]*>(.*?)<\/h2>/g), ([, heading]) => heading)).toEqual([
+    "What is TPE?",
+    "TPE in Optuna",
+    "Inside TPE",
+    "TPE and other optimizers",
+    "References",
+  ]);
+});
+
 it("starts a shared Play 2D search at trial zero with the linked settings", () => {
   const initialRoute = { page: "1d", share: new URLSearchParams("preset=quadratic&seed=0&startupTrials=2&gamma=0.15") } as const;
   const html = renderToStaticMarkup(<App initialRoute={initialRoute} />);
