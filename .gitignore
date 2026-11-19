@@ -3,11 +3,13 @@ dist/
 *.tsbuildinfo
 .DS_Store
 
-# Local agent guidance, installed skills, and editor settings.
-/AGENTS.md
+# Locally installed agent skills, agent state, and editor settings.
+# AGENTS.md, CLAUDE.md, and .claude/skills/ are shared; see docs/agent-workflow.md.
 /.agents/
 /.codex/
-/.claude/
+/.claude/*
+!/.claude/skills/
+/.worktrees/
 /.vscode/
 /skills-lock.json
 
