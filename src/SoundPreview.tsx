@@ -35,8 +35,10 @@ function SoundPreview() {
   async function ready() {
     const current = request.current;
     const enabled = await audio.enable();
+    // A canceled request neither plays nor reports.
+    if (current !== request.current) return false;
     if (!enabled) setStatus("音を再生できません。もう一度試してください。");
-    return enabled && current === request.current;
+    return enabled;
   }
   function cancelSequence() { request.current++; timers.current.forEach(clearTimeout); timers.current = []; }
   function stopAll() { cancelSequence(); audio.stop(); }
@@ -56,6 +58,11 @@ function SoundPreview() {
 
   const stepSplit = (next: number, previous: number) => { setCount(next); audio.adjustSplit(next, previous); setStatus(`Split · good ${previous} → ${next}`); };
   const playBandwidth = (value: number) => { setH(value); audio.play("bandwidth", value); setStatus(`Bandwidth · h = ${value.toFixed(2)}`); };
+  // Ending an α gesture also drops an edit still waiting for audio, so no
+  // chord starts after release.
+  const gesture = alphaGestureHandlers(audio);
+  const endGesture = <E,>(handler?: (event: E) => void) => (event: E) => { request.current++; handler?.(event); };
+  const alphaHandlers = { ...gesture, onPointerUp: endGesture(gesture.onPointerUp), onPointerCancel: endGesture(gesture.onPointerCancel), onLostPointerCapture: endGesture(gesture.onLostPointerCapture), onBlur: endGesture(gesture.onBlur) };
   const playAlpha = (value: number) => { setPrior(value); audio.play("alpha", value); setStatus(`Prior · α = ${value.toFixed(2)}`); };
   const bounce = [...Array.from({ length: trials.length - 1 }, (_, i) => i + 1), ...Array.from({ length: trials.length - 2 }, (_, i) => trials.length - 2 - i)];
 
@@ -109,7 +116,7 @@ function SoundPreview() {
       <h2 id="alpha-heading">Prior / α</h2>
       <p>α = 0 では低いド（C3）だけが鳴り、α を上げるとソ3・ド4・ミ4・ソ4 が順に重なります。スライダーは押している間だけ鳴り、離すとふわっと消えます。</p>
       <label>Prior α <output>{prior.toFixed(2)}</output>
-        <input {...alphaGestureHandlers(audio)} aria-label="Prior alpha" type="range" min="0" max="10" step="0.25" value={prior}
+        <input {...alphaHandlers} aria-label="Prior alpha" type="range" min="0" max="10" step="0.25" value={prior}
           onChange={(event) => manual(setPrior, Number(event.target.value), () => playAlpha(Number(event.target.value)))} /></label>
       <div className="lab-sound-controls">
         {[0, 5, 10].map((value) => <button key={value} onClick={() => void sequence([() => { setPrior(value); audio.auditionAlpha(value); setStatus(`Prior · α = ${value}`); }], 0)}>α = {value}</button>)}
