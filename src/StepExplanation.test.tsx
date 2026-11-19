@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import StepExplanation, { JourneyMath, kernelFormula } from "./StepExplanation";
+import StepExplanation, { JourneyMath, LabTutorialButton, Range, kernelFormula } from "./StepExplanation";
+import { labHints } from "./labHints";
 
 it("opens with an experiment and keeps the lesson hidden until requested", () => {
   const html = renderToStaticMarkup(<StepExplanation />);
@@ -12,6 +13,19 @@ it("opens with an experiment and keeps the lesson hidden until requested", () =>
   expect(html).toMatch(/<section hidden=""[^>]*aria-label="Interactive TPE walkthrough"/);
   expect(html).not.toContain("Starting automatically");
   expect(html).not.toContain("Run TPESampler");
+});
+
+it("offers a button to replay the Lab tutorial", () => {
+  const html = renderToStaticMarkup(<LabTutorialButton onReplay={() => {}} />);
+  expect(html).toMatch(/<button[^>]*aria-label="Replay the Lab tutorial"[^>]*title="Replay the Lab tutorial"[^>]*>.*?<span>Tutorial<\/span><\/button>/s);
+  expect(html).not.toContain("Show Lab hints again");
+});
+
+it("links the slider to its name and renders its hint meaning as reference info", () => {
+  const html = renderToStaticMarkup(<Range name="Good fraction" symbol="γ" hint="gamma" infoDisabled={false} value={0.2} min={0.1} max={0.9} step={0.1} onChange={() => {}} />);
+  expect(html).toMatch(/<label for="([^"]+)">Good fraction <i>γ<\/i><\/label>.*<input[^>]*id="\1"[^>]*type="range"/);
+  expect(html).toMatch(/<button[^>]*aria-label="About Good fraction"[^>]*>ⓘ<\/button>/);
+  expect(html.match(/role="tooltip"[^>]*>([^<]+)<\/span>/)?.[1]).toBe(labHints.gamma.meaning);
 });
 
 it("typesets fractions and scripts as KaTeX with accessible MathML", () => {
