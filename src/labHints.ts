@@ -36,6 +36,8 @@ export const labHints: Record<LabHintId, LabHint> = {
   },
 };
 
+export const labHintIds = Object.keys(labHints) as LabHintId[];
+
 export interface HintContext {
   stage: number;
   /** A guided task (tapping kernels) still needs the learner's attention. */
@@ -66,12 +68,13 @@ export const taskGuides = {
 };
 
 export type LabTaskGuideId = keyof typeof taskGuides;
+export const taskGuideIds = Object.keys(taskGuides) as LabTaskGuideId[];
 
 export function guidePlacement(region: "plot" | "control" | "task") {
   return region === "plot" ? "bottom" : "top";
 }
 
-interface GuideContext extends HintContext {
+export interface GuideContext extends HintContext {
   paused: boolean;
   initialComplete: boolean;
   chosenCount: number;
@@ -81,7 +84,16 @@ interface GuideContext extends HintContext {
   candidateCount: number;
 }
 
-export function nextLabGuide(context: GuideContext, seen: ReadonlySet<LabHintId>, dismissed: ReadonlySet<LabTaskGuideId>) {
+export function completedTaskGuides({ initialComplete, splitConfirmed, placedCount, stage, drawnCount, candidateCount }: GuideContext): LabTaskGuideId[] {
+  const completed: LabTaskGuideId[] = [];
+  if (initialComplete) completed.push("observe");
+  if (splitConfirmed) completed.push("split");
+  if (placedCount >= 3) completed.push("kernels");
+  if (stage === 6 && drawnCount >= candidateCount) completed.push("sample");
+  return completed;
+}
+
+export function nextLabGuide(context: GuideContext, seen: ReadonlySet<LabHintId>, doneTasks: ReadonlySet<LabTaskGuideId>) {
   if (context.paused) return null;
   const { stage, initialComplete, chosenCount, splitConfirmed, taskPending, placedCount, drawnCount, candidateCount } = context;
   let task: LabTaskGuideId | null = null;
@@ -89,7 +101,7 @@ export function nextLabGuide(context: GuideContext, seen: ReadonlySet<LabHintId>
   if (stage === 1 && initialComplete && !splitConfirmed) task = "split";
   if (stage === 4 && taskPending && placedCount < 3) task = "kernels";
   if (stage === 6 && drawnCount < candidateCount) task = "sample";
-  if (task) return dismissed.has(task) ? null : { kind: "task", id: task } as const;
+  if (task) return doneTasks.has(task) ? null : { kind: "task", id: task } as const;
 
   const control = nextHint(context, seen);
   return control ? { kind: "control", id: control } as const : null;

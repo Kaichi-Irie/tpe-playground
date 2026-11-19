@@ -13,7 +13,7 @@ import { LabAudio } from "./labAudio";
 import LabSoundControls from "./LabSoundControls";
 import { labLayout } from "./labLayout";
 import { usePlotSize } from "./usePlotSize";
-import { clearSeenHints, guidePlacement, labHints, loadSeenHints, nextLabGuide, saveSeenHints, taskGuides, type LabHintId, type LabTaskGuideId } from "./labHints";
+import { clearSeenHints, completedTaskGuides, guidePlacement, labHintIds, labHints, loadSeenHints, nextLabGuide, saveSeenHints, taskGuideIds, taskGuides, type LabHintId, type LabTaskGuideId } from "./labHints";
 import LabHintBubble, { labHintElementId } from "./LabHintBubble";
 import { Help } from "./Help";
 
@@ -148,7 +148,8 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   // Coach hints: point at a control, then explain it once the learner uses it.
   const [seenHints, setSeenHints] = useState<ReadonlySet<LabHintId>>(() => new Set());
   const [usedHints, setUsedHints] = useState<ReadonlySet<LabHintId>>(() => new Set());
-  const [dismissedTasks, setDismissedTasks] = useState<ReadonlySet<LabTaskGuideId>>(() => new Set());
+  const shownHints = useRef(new Set<LabHintId>());
+  const [doneTasks, setDoneTasks] = useState<ReadonlySet<LabTaskGuideId>>(() => new Set());
   const [compactLab, setCompactLab] = useState(() => typeof window !== "undefined" && window.matchMedia(compactLabQuery).matches);
   useEffect(() => {
     const query = window.matchMedia(compactLabQuery);
@@ -261,11 +262,12 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
 
   const taskPending = !intro && ((stage === 1 && !initialComplete) || (stage === 4 && !allKernels) || (stage === 6 && drawn < settings.candidates));
   const showSoundPrompt = !intro && stage === 1 && rounds === 0 && !soundPromptDismissed;
-  const eligibleGuide = nextLabGuide({
+  const guideContext = useMemo(() => ({
     stage, taskPending, initialComplete, splitConfirmed, chosenCount: chosen.length, placedCount: placed.length,
     drawnCount: visibleDrawn, candidateCount: settings.candidates,
     paused: !visible || intro,
-  }, seenHints, dismissedTasks);
+  }), [stage, taskPending, initialComplete, splitConfirmed, chosen.length, placed.length, visibleDrawn, settings.candidates, visible, intro]);
+  const eligibleGuide = nextLabGuide(guideContext, seenHints, doneTasks);
   const guide = animating || showSoundPrompt || algorithmOpen ? null : eligibleGuide;
   const activeHint = guide?.kind === "control" ? guide.id : null;
   const activeTask = guide?.kind === "task" ? guide.id : null;
@@ -303,6 +305,16 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     saveSeenHints(next);
     setSeenHints(next);
   }
+  const finishTasks = useCallback((ids: Iterable<LabTaskGuideId>) => {
+    setDoneTasks((current) => {
+      const next = new Set([...current, ...ids]);
+      return next.size === current.size ? current : next;
+    });
+  }, []);
+  useEffect(() => {
+    finishTasks(completedTaskGuides(guideContext));
+  }, [finishTasks, guideContext]);
+
   function dismissGuide(keyboard: boolean) {
     if (!guide) return;
     const section = sectionRef.current;
@@ -312,7 +324,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     const restoreTarget = keyboard || activeTask !== "kernels";
     (restoreTarget ? target ?? section : section)?.focus({ preventScroll: true });
     if (guide.kind === "control") markHintsSeen([guide.id]);
-    else setDismissedTasks((current) => new Set([...current, guide.id]));
+    else finishTasks([guide.id]);
   }
   function noteControlUsed(id: LabHintId) {
     if (activeHint === id && !usedHints.has(id)) setUsedHints((current) => new Set([...current, id]));
@@ -321,12 +333,17 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     clearSeenHints();
     setSeenHints(new Set());
     setUsedHints(new Set());
-    setDismissedTasks(new Set());
+    shownHints.current.clear();
+    setDoneTasks(new Set());
   }
-  // An explained hint is done once the learner leaves its stage.
+  // Retire the previous stage's hints before recording any hint at the new stage.
   useEffect(() => {
-    if (usedHints.size) markHintsSeen(usedHints);
+    markHintsSeen(shownHints.current);
+    shownHints.current.clear();
   }, [stage]);
+  useEffect(() => {
+    if (activeHint) shownHints.current.add(activeHint);
+  }, [activeHint, seenHints, stage]);
   function pickAt(clientX: number, clientY: number) {
     const matrix = canvas.ref.current?.getScreenCTM();
     if (!matrix) return;
@@ -452,6 +469,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   function move(direction: number) {
     if (stage === 1 && initialComplete && direction > 0) return;
     if (intro || (rounds === 0 && (animating || (direction > 0 && taskPending)))) return;
+    if (stage === 6 && direction > 0) finishTasks(["sample"]);
     if (rounds > 0 && direction > 0) {
       if (stage === 4) setAllKernels(true);
       if (stage === 6) dispatchSampling({ type: "resize", limit: settings.candidates, reveal: true });
@@ -463,6 +481,8 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     preserveLessonFocus();
     setInspected(null);
     if (stage === 8 && direction === 1) {
+      markHintsSeen(labHintIds);
+      finishTasks(taskGuideIds);
       setHistory((current) => [...current, nextTrial]);
       setRounds((current) => current + 1);
       setSplitConfirmed(false);
