@@ -67,6 +67,10 @@ export const taskGuides = {
 
 export type LabTaskGuideId = keyof typeof taskGuides;
 
+export function guidePlacement(region: "plot" | "control" | "task") {
+  return region === "plot" ? "bottom" : "top";
+}
+
 interface GuideContext extends HintContext {
   paused: boolean;
   initialComplete: boolean;

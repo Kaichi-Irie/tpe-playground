@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import StepExplanation, { JourneyMath, LabTutorialButton, Range, kernelFormula } from "./StepExplanation";
+import StepExplanation, { JourneyMath, LabTutorialButton, Range, kernelFormula, kernelFormulaCompact } from "./StepExplanation";
 import { labHints } from "./labHints";
 
 it("opens with an experiment and keeps the lesson hidden until requested", () => {
@@ -37,8 +37,16 @@ it("typesets fractions and scripts as KaTeX with accessible MathML", () => {
   expect(html).not.toContain("katex-error");
 });
 
-it("renders the kernel formula with its annotated bandwidth subscript", () => {
-  const html = renderToStaticMarkup(<JourneyMath tex={kernelFormula} />);
+it.each([kernelFormula, kernelFormulaCompact])("typesets the kernel formula with highlighted bandwidth (%s)", (tex) => {
+  const html = renderToStaticMarkup(<JourneyMath tex={tex} />);
   expect(html).toContain("<math");
   expect(html).toContain("journey-accent");
+  expect(html).not.toContain("katex-error");
+});
+
+it("keeps the wide kernel formula on one line and uses an inline exponent on phones", () => {
+  expect(kernelFormula).not.toContain(String.raw`\\`);
+  expect(kernelFormulaCompact).toContain(String.raw`\\`);
+  expect(kernelFormulaCompact).toContain("e^");
+  expect(kernelFormulaCompact).not.toContain(String.raw`\exp`);
 });

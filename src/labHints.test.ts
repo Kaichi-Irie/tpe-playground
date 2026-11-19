@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearSeenHints, hintsForStage, loadSeenHints, nextHint, nextLabGuide, saveSeenHints, type LabHintId, type LabTaskGuideId } from "./labHints";
+import { clearSeenHints, guidePlacement, hintsForStage, loadSeenHints, nextHint, nextLabGuide, saveSeenHints, type LabHintId, type LabTaskGuideId } from "./labHints";
 
 const storageKey = "tpe-lab-hints-seen";
 
@@ -98,6 +98,11 @@ describe("lab hints", () => {
 });
 
 describe("Lab guide priority and milestones", () => {
+  it.each([["plot", "bottom"], ["control", "top"], ["task", "top"]] as const)(
+    "places the bubble opposite the %s region",
+    (region, placement) => expect(guidePlacement(region)).toBe(placement),
+  );
+
   const initial = {
     stage: 1, taskPending: true, paused: false, initialComplete: false, splitConfirmed: false,
     chosenCount: 0, placedCount: 0, drawnCount: 0, candidateCount: 3,
