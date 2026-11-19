@@ -440,7 +440,8 @@
 .lab-log > div.lab-log-current, .lab-log-current b { color: #f2f2f2; }
 .lab-proposal-value { color: #e8b66a; white-space: nowrap; }
 .lab-proposal-source { color: #a9abb2; }
-.lab-proposal-log { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 0 6px; font-size: var(--type-lg); white-space: nowrap; }
+/* Source and value wrap as separate units, so narrow phones never clip the x value. */
+.lab-proposal-log { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; font-size: var(--type-lg); white-space: nowrap; }
 .lab-intro { --proposal-color: #996000; }
 [data-theme="dark"] .lab-intro { --proposal-color: #e8b66a; }
 

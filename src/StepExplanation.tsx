@@ -553,7 +553,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
                 <line x1={sx(x)} x2={sx(x)} y1="0" y2="4" />
                 <text x={sx(x)} y="23" textAnchor="middle">{x}</text>
               </g>)}
-              {kind === "bad" && <text className="journey-axis-title" x={right + 17} y="4">x</text>}
+              {kind === "bad" && <text className="journey-axis-title" x={W - 4 * screenScale} y="4" textAnchor="end">x</text>}
               <text x={left} y={mix(-H * 0.29, (kind === "good" ? lane + 50 : 50) - laneBase, scoring)} className={`journey-${kind}`} opacity={project}>{p < 4.5 ? (kind === "good" ? "Good" : "Bad") : kind === "good" ? "ℓ(x)" : "g(x)"}</text>
             </g>
             <g className={`journey-${kind}`} opacity={densityVisibility} aria-hidden={stage < 4 || stage === 8}>
@@ -616,7 +616,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         <text className="journey-acquisition-title" x={left} y={stage === 6 ? sampleBase - 40 : lane * 2 + 50}>{stage === 6 ? `Candidates zⱼ · M = ${settings.candidates}` : ratioPlot.logarithmic ? "Acquisition α(x) · log scale" : "Acquisition α(x)"}</text>
         </g>
         {[-5,-4,-3,-2,-1,0,1,2,3,4,5].map((x) => <g key={x}><line x1={sx(x)} x2={sx(x)} y1={sampleBase} y2={sampleBase + 6} /><text x={sx(x)} y={sampleBase + 23} textAnchor="middle">{x}</text></g>)}
-        <text x={right + 17} y={sampleBase + 5}>x</text>
+        <text x={W - 4 * screenScale} y={sampleBase + 5} textAnchor="end">x</text>
       </g>
       <g aria-hidden={stage < 6 || stage === 8} style={{ pointerEvents: stage === 6 || stage === 7 ? "auto" : "none" }}>
         {orderedCandidates.map(({ candidate, index: i }) => {
@@ -660,7 +660,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
       </g>}
       {shownObservation && <g className="journey-next-input">
         <circle cx={sx(shownObservation.x)} cy={bottom} r="4" />
-        <text x={sx(shownObservation.x)} y={bottom + 27 * ui} textAnchor="middle">x<tspan baselineShift="sub" fontSize="65%">{shownObservation.id}</tspan> = {shownObservation.x.toFixed(1)}</text>
+        <text x={Math.max(50 * ui, Math.min(W - 50 * ui, sx(shownObservation.x)))} y={bottom + 27 * ui} textAnchor="middle">x<tspan baselineShift="sub" fontSize="65%">{shownObservation.id}</tspan> = {shownObservation.x.toFixed(1)}</text>
       </g>}
       {!intro && ((stage === 1 && initialComplete) || stage === 2) && <g className="journey-split-target" role="button" tabIndex={0}
         aria-label="Split the observations here. Use up and down arrows to adjust the split, then Enter."
