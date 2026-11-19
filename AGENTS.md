@@ -29,7 +29,7 @@ Name colocated Vitest tests `*.test.ts` or `*.test.tsx`. Cover numerical edge ca
 
 ## Commit & Pull Request Guidelines
 
-Write concise, imperative commit subjects (for example "Add coach hints to TPE Lab controls"); do not use Conventional Commits prefixes. PRs are squash-merged, so the PR title becomes the commit subject on `main`. Fill in [the PR template](.github/pull_request_template.md): summary, deviations from the issue, validation, and `Closes #N`. Include screenshots for visual changes and benchmark evidence for performance claims. CI runs **TPE checks** on PRs; pushes to `main` deploy to GitHub Pages.
+Write concise, imperative commit subjects (for example "Add coach hints to TPE Lab controls"); do not use Conventional Commits prefixes. PRs are squash-merged, so the PR title becomes the commit subject on `main`. Fill in [the PR template](.github/pull_request_template.md): summary, deviations from the issue, validation, and `Closes #N`. Include screenshots for visual changes and benchmark evidence for performance claims. Attach screenshots to the PR with `gh pr create --attach`, `gh pr edit --attach`, or `gh pr comment --attach`. Keep the image files outside the repository (for example under `/tmp`); never commit them. CI runs **TPE checks** on PRs; pushes to `main` deploy to GitHub Pages.
 
 ## Security & Configuration
 
