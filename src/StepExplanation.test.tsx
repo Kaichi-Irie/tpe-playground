@@ -24,6 +24,7 @@ it("offers a button to replay the Lab tutorial", () => {
 it("links the slider to its name and renders its hint meaning as reference info", () => {
   const html = renderToStaticMarkup(<Range name="Good fraction" symbol="γ" hint="gamma" infoDisabled={false} value={0.2} min={0.1} max={0.9} step={0.1} onChange={() => {}} />);
   expect(html).toMatch(/<label for="([^"]+)">Good fraction <i>γ<\/i><\/label>.*<input[^>]*id="\1"[^>]*type="range"/);
+  expect(html).not.toMatch(/<input[^>]*aria-label/);
   expect(html).toMatch(/<button[^>]*aria-label="About Good fraction"[^>]*>ⓘ<\/button>/);
   expect(html.match(/role="tooltip"[^>]*>([^<]+)<\/span>/)?.[1]).toBe(labHints.gamma.meaning);
 });

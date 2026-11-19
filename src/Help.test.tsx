@@ -15,8 +15,9 @@ it("keeps a custom trigger and appends a custom root class", () => {
   expect(html).not.toContain("ⓘ");
 });
 
-it("disables the trigger and keeps it collapsed", () => {
+it("marks the trigger unavailable while keeping it focusable and collapsed", () => {
   const html = renderToStaticMarkup(<Help label="Bandwidth" disabled>Kernel width</Help>);
-  expect(html).toMatch(/<button[^>]*aria-expanded="false"[^>]*disabled=""[^>]*>ⓘ<\/button>/);
+  expect(html).toMatch(/<button[^>]*aria-expanded="false"[^>]*aria-disabled="true"[^>]*>ⓘ<\/button>/);
+  expect(html).not.toMatch(/\sdisabled=/);
   expect(html).toMatch(/role="tooltip"[^>]*hidden=""/);
 });

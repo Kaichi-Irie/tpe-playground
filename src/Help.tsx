@@ -5,8 +5,7 @@ export function Help({ label, children, trigger = "ⓘ", className, disabled = f
 }) {
   const id = useId();
   const container = useRef<HTMLSpanElement>(null);
-  const [requestedOpen, setOpen] = useState(false);
-  const open = requestedOpen && !disabled;
+  const [open, setOpen] = useState(false);
   useEffect(() => {
     if (disabled) setOpen(false);
   }, [disabled]);
@@ -20,7 +19,7 @@ export function Help({ label, children, trigger = "ⓘ", className, disabled = f
   }, [open]);
   const show = () => { if (!disabled) setOpen(true); };
   return <span ref={container} className={className ? `help ${className}` : "help"} onMouseEnter={show} onMouseLeave={() => setOpen(false)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }} onKeyDown={(event) => { if (event.key === "Escape") { setOpen(false); event.stopPropagation(); } }}>
-    <button type="button" className="help-trigger" aria-label={`About ${label}`} aria-expanded={open} aria-controls={id} aria-describedby={open ? id : undefined} disabled={disabled} onFocus={show} onClick={show}>{trigger}</button>
+    <button type="button" className="help-trigger" aria-label={`About ${label}`} aria-expanded={open} aria-controls={id} aria-describedby={open ? id : undefined} aria-disabled={disabled || undefined} onFocus={show} onClick={show}>{trigger}</button>
     <span id={id} role="tooltip" className="help-content" hidden={!open}>{children}</span>
   </span>;
 }

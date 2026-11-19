@@ -309,7 +309,7 @@
 .journey .journey-canvas { flex: 1 1 0; height: 0; min-height: 0; }
 .journey .journey-task { min-height: 44px; padding: 10px 16px; }
 .journey .journey-task:has(.journey-die), .journey .journey-task:has(.journey-first-roll) { min-height: 94px; }
-.journey .journey-controls fieldset { min-height: 48px; }
+.journey .journey-controls fieldset { position: relative; min-height: 48px; }
 .journey .journey-die { width: 72px; height: 72px; background: var(--surface-muted); font: inherit; cursor: pointer; }
 .journey-die-face { display: grid; animation: journey-dice-tumble 550ms ease-out; }
 .journey .journey-die:disabled { opacity: 1; cursor: default; }
@@ -353,20 +353,17 @@
 
 .journey .journey-roll-status { display: grid; gap: 2px; text-align: left; }
 .journey-roll-status small { display: block; font-size: var(--type-xs); }
+.journey .journey-info { position: static; }
 .journey-info .help-trigger { width: 24px; height: 24px; color: var(--muted); }
-.journey-info .help-trigger:disabled { opacity: .5; cursor: default; }
+.journey-info .help-trigger[aria-disabled="true"] { opacity: .5; cursor: default; }
 .journey-info .help-content {
   z-index: 10;
   top: auto;
   bottom: calc(100% + 8px);
-  left: auto;
-  right: 0;
-  width: min(360px, calc(100vw - 32px));
+  inset-inline: 0;
+  margin-inline: auto;
+  width: min(360px, 100%);
   white-space: normal;
-}
-@media (801px <= width <= 1500px) {
-  /* The first slider can sit too far left for a right-aligned popover. */
-  .journey-range:first-child .journey-info .help-content { left: 0; right: auto; }
 }
 .journey[data-stage="8"] .journey-score-axis text { fill: var(--muted); }
 .journey[data-stage="8"] .journey-score-axis line { stroke: var(--border); }
@@ -379,8 +376,6 @@
   .journey .journey-heading { padding-bottom: 2px; }
   .journey .journey-message { margin: 4px 0; }
   .journey .journey-controls fieldset:has(.journey-weight) { gap: 0 8px; }
-  .journey .journey-controls fieldset { position: relative; }
-  .journey .journey-info { position: static; }
   .journey-info .help-content { width: 100%; }
   .journey .journey-task { min-height: 0; padding: 4px 10px; }
   .journey .journey-task:has(.journey-die), .journey .journey-task:has(.journey-first-roll) { min-height: 76px; gap: 6px 10px; }

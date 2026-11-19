@@ -84,7 +84,7 @@ export function Range({ name, symbol, value, min, max, step, onChange, audio, hi
   const inputId = useId();
   return <div className={`journey-range ${symbol === "γ" ? "journey-gamma-control" : symbol === "h" ? "journey-h-control" : ""}`}>
     <span><label htmlFor={inputId}>{name} <i>{symbol}</i></label><LabInfo id={hint} disabled={infoDisabled} /></span>
-    <input {...(audio ? alphaGestureHandlers(audio) : {})} id={inputId} aria-label={name} data-guide-target={hinted || undefined} aria-describedby={hinted ? labHintElementId : undefined} type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    <input {...(audio ? alphaGestureHandlers(audio) : {})} id={inputId} data-guide-target={hinted || undefined} aria-describedby={hinted ? labHintElementId : undefined} type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
     <output>{Number(value.toFixed(2))}</output></div>;
 }
 
