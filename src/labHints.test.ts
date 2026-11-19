@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearSeenHints, hintsForStage, loadSeenHints, nextHint, saveSeenHints, type LabHintId } from "./labHints";
+import { clearSeenHints, hintsForStage, loadSeenHints, nextHint, nextLabGuide, saveSeenHints, type LabHintId, type LabTaskGuideId } from "./labHints";
 
 const storageKey = "tpe-lab-hints-seen";
 
@@ -94,5 +94,46 @@ describe("lab hints", () => {
     expect(loadSeenHints().size).toBe(0);
     expect(() => saveSeenHints(new Set<LabHintId>(["gamma"]))).not.toThrow();
     expect(() => clearSeenHints()).not.toThrow();
+  });
+});
+
+describe("Lab guide priority and milestones", () => {
+  const initial = {
+    stage: 1, taskPending: true, paused: false, initialComplete: false, splitConfirmed: false,
+    chosenCount: 0, placedCount: 0, drawnCount: 0, candidateCount: 3,
+  };
+
+  function guide(patch: Partial<typeof initial>, dismissed: LabTaskGuideId[] = [], seen: LabHintId[] = []) {
+    return nextLabGuide({ ...initial, ...patch }, new Set(seen), new Set(dismissed));
+  }
+
+  it("guides observation and then splitting, without resurfacing after a confirmed split", () => {
+    expect(guide({ chosenCount: 2 })).toEqual({ kind: "task", id: "observe" });
+    expect(guide({ chosenCount: 3 })).toBeNull();
+    expect(guide({ initialComplete: true, taskPending: false })).toEqual({ kind: "task", id: "split" });
+    expect(guide({ initialComplete: true, splitConfirmed: true, taskPending: false })).toBeNull();
+  });
+
+  it("waits for automatic kernel placement before introducing Bandwidth", () => {
+    expect(guide({ stage: 4, placedCount: 2 })).toEqual({ kind: "task", id: "kernels" });
+    expect(guide({ stage: 4, placedCount: 2 }, ["kernels"])).toBeNull();
+    expect(guide({ stage: 4, placedCount: 3 })).toBeNull();
+    expect(guide({ stage: 4, taskPending: false, placedCount: 3 }, ["kernels"])).toEqual({ kind: "control", id: "bandwidth" });
+  });
+
+  it("keeps one Sample cue through repeated rolls until all candidates are drawn", () => {
+    expect(guide({ stage: 6, drawnCount: 0, candidateCount: 1 })).toEqual({ kind: "task", id: "sample" });
+    expect(guide({ stage: 6, drawnCount: 1, candidateCount: 1 })).toBeNull();
+    expect(guide({ stage: 6, drawnCount: 1 })).toEqual({ kind: "task", id: "sample" });
+    expect(guide({ stage: 6, drawnCount: 2 }, ["sample"])).toBeNull();
+    expect(guide({ stage: 6, drawnCount: 3 })).toBeNull();
+  });
+
+  it("suspends task and control cues while keeping their dismissal and sequence", () => {
+    expect(guide({ stage: 6, paused: true })).toBeNull();
+    expect(guide({ stage: 5, paused: true }, [], ["prior"])).toBeNull();
+    expect(guide({ stage: 5 }, [], ["prior"])).toEqual({ kind: "control", id: "weights" });
+    expect(guide({ initialComplete: true }, ["split"])).toBeNull();
+    expect(guide({ initialComplete: true })).toEqual({ kind: "task", id: "split" });
   });
 });
