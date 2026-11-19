@@ -24,10 +24,10 @@ describe("browser route", () => {
   it.each([
     ["#play", "1d", "/tpe-playground/?tracking=123", null],
     ["#play-2d", "1d", "/tpe-playground/?tracking=123", null],
-    ["#play?v=1&seed=3", "1d", "/tpe-playground/?tracking=123", "3"],
-    ["#play-2d?v=2&seed=3", "1d", "/tpe-playground/?tracking=123", "3"],
-    ["#play-2d?v=1&seed=3", "2d", "#play-3d", "3"],
-    ["#play-3d?v=2&seed=3", "2d", "#play-3d", "3"],
+    ["#play?v=1&seed=3", "1d", null, "3"],
+    ["#play-2d?v=2&seed=3", "1d", null, "3"],
+    ["#play-2d?v=1&seed=3", "2d", null, "3"],
+    ["#play-3d?v=2&seed=3", "2d", null, "3"],
     ["#play-3d", "2d", null, null],
     ["", "1d", null, null],
   ])("handles the address bar and settings for %s", (hash, page, canonicalUrl, seed) => {
@@ -71,6 +71,21 @@ describe("share links", () => {
   it("writes the 2D route for new 2D share links", () => {
     const url = new URL(createShareUrl(pageUrl, { page: "1d", preset: defaults1D.preset }, defaults1D.seed, defaults1D.settings));
     expect(url.hash).toMatch(/^#play-2d\?v=2&/);
+  });
+
+  it("copies current settings when the address still contains an earlier experiment", () => {
+    const originalUrl = `https://kaichi-irie.github.io/tpe-playground/#play-2d?v=2&seed=3&preset=quadratic&gamma=0.15`;
+    const settings = { ...defaults1D.settings, gamma: 0.35 };
+    const newUrl = createShareUrl(originalUrl, { page: "1d", preset: "boundary" }, 7, settings);
+    const originalShare = readRoute(new URL(originalUrl).hash).share;
+    const newShare = readRoute(new URL(newUrl).hash).share;
+
+    expect(readSharedSearch(originalShare, defaults1D, objectivePresets, trialLimit, 10)).toEqual({
+      seed: 3, preset: "quadratic", settings: { ...defaults1D.settings, gamma: 0.15 },
+    });
+    expect(readSharedSearch(newShare, defaults1D, objectivePresets, trialLimit, 10)).toEqual({
+      seed: 7, preset: "boundary", settings,
+    });
   });
 
   it("preserves the base path and writes the 3D route and density mode without tracking parameters", () => {

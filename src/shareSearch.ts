@@ -33,13 +33,11 @@ export function readRoute(hash: string): Route {
 
 export function readBrowserRoute(): Route {
   const { hash, pathname, search } = window.location;
-  const route = readRoute(hash);
-  // Replace the current entry when consuming a share or opening an old bookmark.
-  if (route.share || hash === "#play" || hash === playShareHashes["1d"]) {
-    const canonicalUrl = route.page === "2d" ? playPageHrefs["2d"] : `${pathname}${search}`;
-    window.history.replaceState(window.history.state, "", canonicalUrl);
+  // Only bare bookmarks are aliases. Shared settings stay in the address bar.
+  if (hash === "#play" || hash === playShareHashes["1d"]) {
+    window.history.replaceState(window.history.state, "", `${pathname}${search}`);
   }
-  return route;
+  return readRoute(hash);
 }
 
 export function createShareUrl(documentUrl: string, experiment: ShareExperiment, seed: number, settings: ModelSettings) {
