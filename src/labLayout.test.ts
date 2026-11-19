@@ -1,7 +1,13 @@
 import { expect, it } from "vitest";
 import { labLayout } from "./labLayout";
 
-it.each([[1939, 300], [1440, 420], [900, 440], [390, 320], [844, 180]])(
+const phonePlotFloor = labLayout(375, 0).minimumPlotHeight;
+
+it("keeps the minimum plot height at 260 px on a small phone", () => {
+  expect(labLayout(375, 550).minimumPlotHeight).toBe(260);
+});
+
+it.each([[1939, 300], [1440, 420], [900, 440], [390, 320], [844, 180], [375, phonePlotFloor]])(
   "reserves room for all three scoring lanes at %i × %i",
   (width, height) => {
     const layout = labLayout(width, height);

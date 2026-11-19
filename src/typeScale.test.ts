@@ -25,6 +25,7 @@ const responsiveExceptions = new Map([
   // These Lab formulas have width-specific limits, and coach hints have a 1rem floor.
   ['.journey [data-heading-stage="1"] .journey-math', "clamp(0.8125rem, 3.65vw, var(--type-math))"],
   ['.journey [data-heading-stage="2"] .journey-math', "clamp(0.8125rem, 3.8vw, var(--type-math))"],
+  ['.journey [data-heading-stage="4"] .journey-math', "clamp(0.8125rem, 3.65vw, var(--type-math))"],
   ['.journey [data-heading-stage="5"] .journey-math', "clamp(0.8125rem, 3.65vw, var(--type-math))"],
   [".lab-hint", "max(1rem, var(--type-md))"],
 ]);

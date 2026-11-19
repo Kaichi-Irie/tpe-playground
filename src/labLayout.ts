@@ -6,7 +6,7 @@ const minHeight = 440;
 export function labLayout(measuredWidth: number, measuredHeight: number, bottomInset = 70) {
   const width = Math.max(minWidth, measuredWidth);
   const height = Math.max(minHeight, width * measuredHeight / Math.max(1, measuredWidth));
-  const minimumPlotHeight = Math.max(320, Math.min(minHeight, measuredWidth * minHeight / minWidth));
+  const minimumPlotHeight = Math.max(260, Math.min(minHeight, measuredWidth * minHeight / minWidth));
   // Reserve physical pixels for axis labels, or the scoring x_next annotation.
   const bottom = height - bottomInset * width / Math.max(1, measuredWidth);
   const lane = bottom / 3;

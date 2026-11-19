@@ -378,8 +378,10 @@
   .journey .journey-controls fieldset:has(.journey-weight) { gap: 0 8px; }
   .journey-info .help-content { width: 100%; }
   .journey .journey-task { min-height: 0; padding: 4px 10px; }
-  .journey .journey-task:has(.journey-die), .journey .journey-task:has(.journey-first-roll) { min-height: 76px; gap: 6px 10px; }
+  .journey .journey-task:has(.journey-die), .journey .journey-task:has(.journey-first-roll) { min-height: 69px; }
   .journey .journey-die { width: 60px; height: 60px; }
+  .journey .journey-first-roll { min-height: 60px; }
+  .journey[data-stage="6"] .journey-controls { padding-block: 1px; }
   .journey .journey-navigation { min-height: 48px; flex-basis: 48px; }
 }
 
@@ -400,7 +402,7 @@
 
 .lab-intro-plot { min-height: 0; padding: 22px 16px 14px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .lab-plot-caption { display: flex; justify-content: space-between; gap: 12px; padding: 0 12px; font-size: var(--type-sm); color: var(--muted); }
-.lab-intro-plot svg { width: 100%; display: block; margin-top: 4px; flex: 1; height: 0; min-height: 0; }
+.lab-intro-plot svg { width: 100%; display: block; margin-top: 4px; flex: 1; height: 0; min-height: 0; overflow: visible; }
 .lab-plot-explore { display: flex; flex: 0 0 auto; min-height: 44px; margin-top: 6px; align-items: center; justify-content: center; gap: 12px; color: var(--proposal-color); font-size: var(--type-xl); font-weight: 700; }
 .lab-axes line { stroke: var(--border); }
 .lab-axes text { fill: var(--muted); font-size: calc(16 * var(--chart-px)); }
@@ -459,8 +461,8 @@
 .lab-sound-controls button[aria-disabled="true"] { opacity: 0.5; cursor: wait; }
 .lab-sound-controls button:hover { background: #80808018; }
 .lab-sound-controls button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
-/* The plot reserves space for its three lanes. Short screens scroll the whole
-   lesson, while wide screens use pixel-sized coordinates instead of huge text. */
+/* Fill the space below the header. If the plot reaches its readable minimum,
+   let the lesson grow so the controls and navigation remain reachable. */
 .journey { height: auto; min-height: calc(100dvh - var(--app-header-height, 56px)); }
 .journey-plot { position: relative; flex: 1 0 auto; width: 100%; }
 .journey .journey-plot .journey-canvas { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; }
@@ -472,7 +474,9 @@
 .lab-terminal-actions button { display: inline-flex; align-items: center; gap: 6px; }
 .lab-terminal-actions svg { flex-shrink: 0; fill: currentColor; }
 .lab-terminal-title .lab-skip { border-color: transparent; font-size: var(--type-sm); }
-@media (max-width: 800px) { .journey { min-height: calc(100dvh - 48px); } }
+@media (max-width: 800px) {
+  .journey-plot { flex: 1 1 0; }
+}
 
 /* State the experiment's goal before the first observation. */
 .lab-intro-heading { flex-shrink: 0; text-align: center; }
@@ -569,30 +573,40 @@
   .journey .journey-heading { padding-inline: 6px; }
   .journey .journey-message { margin: 4px 0; }
   .journey .journey-heading .journey-formula { padding: 2px; }
-  .journey [data-heading-stage="1"] .journey-math { font-size: clamp(0.8125rem, 3.65vw, var(--type-math)); }
-  .journey [data-heading-stage="2"] .journey-math { font-size: clamp(0.8125rem, 3.8vw, var(--type-math)); }
+  .journey [data-heading-stage="1"] .journey-math,
+  .journey [data-heading-stage="4"] .journey-math,
   .journey [data-heading-stage="5"] .journey-math { font-size: clamp(0.8125rem, 3.65vw, var(--type-math)); }
+  .journey [data-heading-stage="2"] .journey-math { font-size: clamp(0.8125rem, 3.8vw, var(--type-math)); }
+  .journey :is([data-heading-stage="4"], [data-heading-stage="7"]) .katex-display { padding-block: 2px; }
+  .journey[data-stage="5"] .journey-controls { padding-inline: 12px; }
+  .journey[data-stage="5"] .journey-range {
+    flex: 1 1 132px;
+    max-inline-size: 240px;
+    grid-template-columns: auto minmax(48px, 1fr) 30px;
+    gap: 6px;
+  }
+  .journey .journey-weight { gap: 4px; }
+  .journey .journey-weight select { max-inline-size: 116px; }
   .journey .journey-controls fieldset:empty { display: none; }
   .lab-curve-caption { min-height: 0; }
+  .lab-sound-prompt { margin: 4px 8px 0; padding: 4px 8px; gap: 4px 12px; }
+  /* The Observe task and navigation also make room for the bottom coachmark. */
+  .journey[data-stage="1"] .journey-task { min-block-size: 36px; }
 }
 
-/* Reserve space for the guide so its dismissal cannot move a live target. */
-.lab-guide-slot {
-  display: grid;
-  place-items: center;
-  position: relative;
-  z-index: 5;
-  flex: 0 0 auto;
-  min-block-size: 116px;
-  padding: 8px 12px;
-}
 .lab-guide {
+  position: absolute;
+  z-index: 6;
+  inset-inline: 0;
+  margin-inline: auto;
   display: grid;
-  grid-template-columns: clamp(62px, 10vw, 108px) minmax(0, 1fr);
+  grid-template-columns: 70px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  width: min(100%, 570px);
+  width: min(calc(100% - 16px), 570px);
 }
+.lab-guide[data-placement="top"] { inset-block-start: 0; }
+.lab-guide[data-placement="bottom"] { inset-block-end: 4px; }
 .lab-guide-tippy { display: block; width: 100%; height: auto; }
 .lab-hint {
   position: relative;
@@ -640,20 +654,18 @@
 .lab-hint-dismiss:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 .journey[data-guide-region] { isolation: isolate; }
-.journey[data-guide-region]::after {
-  content: "";
+.lab-guide-scrim {
   position: absolute;
   inset: 0;
   z-index: 4;
-  background: rgb(0 0 0 / .13);
-  pointer-events: none;
+  background: rgb(0 0 0 / .55);
 }
-:root[data-theme="dark"] .journey[data-guide-region]::after { background: rgb(0 0 0 / .19); }
-.journey[data-guide-region="plot"] .journey-plot,
-.journey[data-guide-region="task"] .journey-task,
-.journey[data-guide-region] :is(.journey-navigation, .journey-controls, .journey-task, .journey-plot):has(:focus-visible) {
+.journey[data-guide-region] .journey-plot,
+.journey[data-guide-region] :is(.journey-navigation, .journey-controls, .journey-task):has(:focus-visible),
+.journey[data-guide-region="task"] .journey-task {
   position: relative;
   z-index: 5;
+  background: var(--background);
 }
 .journey-controls [data-guide-target] { scroll-margin-block-end: 8px; }
 .journey[data-guide-region="control"] :is(.journey-range, .journey-weight):has([data-guide-target]) {
@@ -687,13 +699,12 @@
 @keyframes lab-hint-glow { 50% { filter: drop-shadow(0 0 4px var(--accent)); } }
 .lab-hints-trigger svg { stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 480px) {
-  .lab-guide-slot { min-block-size: 112px; padding: 4px 8px; }
   .lab-guide { grid-template-columns: 54px minmax(0, 1fr); }
   .lab-hint { padding: 6px 2px 6px 10px; gap: 0; line-height: 1.35; }
   .journey .journey-roll-status { max-inline-size: 96px; }
 }
 @media (forced-colors: active) {
-  .journey[data-guide-region]::after { display: none; }
+  .lab-guide-scrim { background: transparent; }
   .journey-guide-ring, .journey-pick-axis[data-guide-target] rect { stroke: Highlight; }
 }
 
@@ -706,7 +717,7 @@
   .lab-intro-plot { padding-inline: 32px; }
   .lab-plot-explore { min-height: 52px; gap: 16px; }
   .lab-plot-explore .journey-primary { min-height: 52px; padding-inline: 20px; }
-  .lab-intro-plot svg { margin-top: 12px; overflow: visible; }
+  .lab-intro-plot svg { margin-top: 12px; }
   .lab-next line { stroke-width: 1.5; }
   .lab-next text { font-weight: 700; }
 }
