@@ -19,21 +19,6 @@ const iconGlyphs = new Set([
   ".visual-workspace .primary-playback > .play span",
 ]);
 
-// The About page retains its existing typography.
-const aboutOnly = new Set([
-  ".about-page > h2",
-  ".about-page > h3",
-  ".about-page > p",
-  ".algorithm-comparison > p",
-  ".algorithm-comparison h3",
-  ".algorithm-software",
-  ".algorithm-table",
-  ".explanation-steps",
-  ".references h2",
-  ".references li",
-  ".tpe-mascot figcaption",
-]);
-
 // The code-first list has its own scale to fit long lines at phone widths.
 const responsiveExceptions = new Map([
   [".journey-code-first .journey-algorithm ol", "clamp(0.6875rem, 1.7vw, 1.3125rem)"],
@@ -73,7 +58,7 @@ test("text sizing uses fluid values outside the documented exceptions", () => {
         const preventsFocusZoom = isFormControl && property === "font-size" && value === "16px";
         const setsChartBase = chartRoots.has(selector) && property === "font-size" && value === "var(--chart-base)";
         const isResponsiveException = property === "font-size" && value === responsiveExceptions.get(selector);
-        if (!preventsFocusZoom && !setsChartBase && !isResponsiveException && !iconGlyphs.has(selector) && !aboutOnly.has(selector)) {
+        if (!preventsFocusZoom && !setsChartBase && !isResponsiveException && !iconGlyphs.has(selector)) {
           violations.push(`${selector} { ${property}: ${value} }`);
         }
       }
