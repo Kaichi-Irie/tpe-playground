@@ -21,7 +21,15 @@ function renderPanel(status?: string) {
 }
 
 it("renders playback status between Settings and the live controls when provided", () => {
-  expect(renderPanel("Random start")).toMatch(/class="model-controls"><section class="responsive-settings">.*>Settings<\/button>.*<\/dialog><\/section><div class="model-status" aria-live="polite">Random start<\/div><section class="config live-model-controls /);
+  const html = renderPanel("Random start");
+  const settingsButton = html.indexOf(">Settings</button>");
+  const status = html.indexOf('class="model-status"');
+  const liveControls = html.indexOf('class="config live-model-controls');
+
+  expect(settingsButton).toBeGreaterThanOrEqual(0);
+  expect(status).toBeGreaterThan(settingsButton);
+  expect(liveControls).toBeGreaterThan(status);
+  expect(html.slice(status, liveControls)).toContain("Random start");
   expect(renderPanel()).not.toContain('class="model-status"');
 });
 

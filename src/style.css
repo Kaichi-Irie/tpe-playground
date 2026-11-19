@@ -674,7 +674,7 @@ header { height: 64px; padding: 10px 0; border: 0; }
 .visual-workspace .performance-monitor > summary span { margin: 0; }
 .visual-workspace .performance-monitor > summary > span:last-child { color: var(--muted); font-size: var(--type-sm); }
 .visual-workspace .performance-monitor[open] > summary span { transform: none; }
-.performance-caption strong { margin-left: 8px; color: var(--text); font-variant-numeric: tabular-nums; }
+.performance-caption strong { color: var(--text); font-variant-numeric: tabular-nums; }
 .visual-workspace .performance-monitor .comparison { top: calc(100% + 12px); bottom: auto; }
 .visual-workspace .experiment-settings { flex-shrink: 0; flex-direction: row; align-items: center; padding: 16px 24px; border-top: 1px solid var(--border); gap: 20px; }
 .visual-workspace .experiment-settings .advanced-controls { top: auto; bottom: calc(100% + 12px); }
@@ -811,7 +811,7 @@ header { height: 64px; padding: 10px 0; border: 0; }
   .visual-workspace > .performance-monitor .performance-caption { display: flex; gap: .25em; white-space: nowrap; }
   .visual-workspace > .performance-monitor .performance-caption strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .visual-workspace .canvas-controls { padding-right: calc(var(--performance-width) + 16px); }
-  .plot-inspection { position: absolute; left: 24px; bottom: 8px; max-width: calc(100% - 48px); pointer-events: none; font-size: var(--type-sm); background: var(--surface); border-radius: 4px; }
+  .plot-inspection { position: absolute; left: 24px; bottom: 0; max-width: calc(100% - 48px); pointer-events: none; font-size: var(--type-sm); background: var(--surface); border-radius: 4px; }
 }
 @media (min-width: 701px) and (max-width: 1200px) {
   .model-controls { flex-wrap: wrap; }
