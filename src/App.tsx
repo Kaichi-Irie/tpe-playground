@@ -78,7 +78,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
         }
       }
       setRoute((current) =>
-        current.page === "2d" && next.page === "2d" && !next.share
+        current.page === next.page && !next.share
           ? current
           : { ...next, visit: current.visit + 1 },
       );
