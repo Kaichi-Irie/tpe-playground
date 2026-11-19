@@ -61,7 +61,7 @@ export function nextHint(context: HintContext, seen: ReadonlySet<LabHintId>): La
 export const taskGuides = {
   observe: { action: "Tap or click three different positions along the highlighted x-axis.", announcement: "Hint available for choosing inputs." },
   split: { action: "Tap or click a height on the grid to split the points into Good and Bad.", announcement: "Hint available for splitting the observations." },
-  kernels: { action: "Tap or click three observation dots to add their kernels. Start with the outlined dot or choose any other.", announcement: "Hint available for adding kernels." },
+  kernels: { action: "Select any three dots to add their kernels. Try the outlined dot first.", announcement: "Hint available for adding kernels." },
   sample: { action: "Select Roll the dice to sample a candidate.", announcement: "Hint available for sampling candidates." },
 };
 

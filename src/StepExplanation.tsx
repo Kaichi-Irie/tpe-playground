@@ -139,7 +139,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   const [focused, setFocused] = useState<number | null>(null);
   const [inspected, setInspected] = useState<number | null>(null);
   const canvas = usePlotSize();
-  const { width: W, height: H, bottom, lane, minimumPlotHeight, curveHeight: laneCurveHeight } = labLayout(canvas.width, canvas.height, stage <= 5 ? 28 : 70);
+  const { width: W, height: H, bottom, lane, minimumPlotHeight, curveHeight: laneCurveHeight } = labLayout(canvas.width, canvas.height, (stage <= 5 ? 28 : 70) * Math.max(1, canvas.typeScale));
   const left = 40, right = W - 32;
   const scoring = clamp((p - 5) / 0.25) * (1 - clamp(p - 7));
   const project = clamp(p - 2) * (1 - clamp((p - 7) / 0.45));
@@ -147,6 +147,8 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   const badBase = mix(mix(bottom, H * 0.40, project), lane, scoring);
   const sampleBase = bottom;
   const screenScale = Math.max(1, W / canvas.width);
+  // Text-coupled geometry (label offsets, pills) follows the fluid chart type size.
+  const ui = screenScale * canvas.typeScale;
   const kernelPicking = !intro && stage === 4;
   const sx = (x: number) => left + (x + 5) / 10 * (right - left);
   const sy = (y: number) => bottom - y / 8 * (bottom - 35);
@@ -452,6 +454,8 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     const kernel = data.group[goodIds.has(trial.id) ? "good" : "bad"].kernels.find((k) => k.source.kind === "observation" && k.source.trialId === trial.id)!;
     const radius = mix(5.5, 3.5 + Math.sqrt(kernel.mixtureWeight) * 9, clamp(p - 4) * (1 - evaluation));
     const visibleRadius = kernelPicking ? Math.max(radius, 9 * screenScale) : radius;
+    // IDs sit right of the point unless that would overflow the plot edge.
+    const indexSide = x + 30 * ui > W ? -1 : 1;
     const guided = guidedTrial === trial.id;
     return <g key={trial.id} data-observation={trial.id} aria-hidden={observed === 0} style={{ ...pointStyle(x, y - base, color, observed === 0 ? 0 : !guided && focused !== null && focused !== trial.id ? 0.3 : 1), transition: "color 350ms ease, opacity 200ms ease", pointerEvents: observed === 0 ? "none" : undefined }}>
       <g className="journey-observation-control" data-guide-target={guided || undefined} aria-describedby={guided ? labHintElementId : undefined} tabIndex={observed === 0 ? -1 : 0} role="button" aria-label={`Observation at x ${trial.x.toFixed(1)}${p >= 1 ? `, f(x) ${trial.y.toFixed(1)}` : ""}`} onMouseEnter={() => setFocused(trial.id)} onMouseLeave={() => setFocused(null)} onFocus={() => setFocused(trial.id)} onBlur={() => setFocused(null)} onClick={(event) => kernelPicking && event.detail !== 0 ? pickKernel(event.clientX, event.clientY) : placeKernel(trial.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); placeKernel(trial.id); } }}>
@@ -459,7 +463,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         <circle r={visibleRadius} className="journey-observation" />
         <title>{p < 1 ? `x = ${trial.x.toFixed(1)}` : `x = ${trial.x.toFixed(1)}, f(x) = ${trial.y.toFixed(1)}`}</title>
       </g>
-      <text className="journey-point-index" x={kernelPicking ? visibleRadius + 5 * screenScale : 10} y={kernelPicking ? -visibleRadius - 4 * screenScale : -9}>{trial.id}</text>
+      <text className="journey-point-index" x={(kernelPicking ? visibleRadius + 5 * ui : 10 * ui) * indexSide} y={kernelPicking ? -visibleRadius - 4 * ui : -9 * ui} textAnchor={indexSide < 0 ? "end" : undefined}>{trial.id}</text>
       {guided && <circle className="journey-guide-ring" r={visibleRadius + 6 * screenScale} aria-hidden="true" />}
       {((p < 1 && observed > 0 && observed < 1) || (stage === 1 && focused === trial.id)) && <g className="journey-query-result">
         <line x1="0" x2="0" y1="0" y2={bottom - y} />
@@ -526,7 +530,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     }} onClick={(event) => {
       if (stage !== 1 || intro || initialComplete || (event.target as Element).closest("[role=button]")) return;
       pickAt(event.clientX, event.clientY);
-    }} className="journey-canvas" viewBox={`0 0 ${W} ${H}`} role="group" aria-label={`${stages[stage]}: ${stage === 0 ? 0 : !intro && !initialComplete ? chosen.length + autoShown : stage === 8 && !animating ? history.length + 1 : history.length} observations`}>
+    }} className="journey-canvas" style={{ "--chart-zoom": screenScale } as CSSProperties} viewBox={`0 0 ${W} ${H}`} role="group" aria-label={`${stages[stage]}: ${stage === 0 ? 0 : !intro && !initialComplete ? chosen.length + autoShown : stage === 8 && !animating ? history.length + 1 : history.length} observations`}>
       <defs><clipPath id="journey-density-clip"><rect x={left} y="0" width={right - left} height={H + 20} /></clipPath></defs>
       <g className="journey-grid" opacity={(1 - project) * 0.3} aria-hidden="true">
         {[-4,-3,-2,-1,0,1,2,3,4].map((x) => <line key={x} x1={sx(x)} x2={sx(x)} y1="35" y2={bottom} />)}
@@ -560,9 +564,9 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         <rect x={left} y={sy(data.partition.threshold)} width={right - left} height={Math.max(0, bottom - sy(data.partition.threshold))} fill="var(--good)" opacity="0.06" />
         <rect x={left} y="30" width={right - left} height={Math.max(0, sy(data.partition.threshold) - 30)} fill="var(--bad)" opacity="0.06" />
         <line x1={left} x2={mix(left, right, p - 1)} y1={sy(data.partition.threshold)} y2={sy(data.partition.threshold)} className="journey-threshold" />
-        <text className="journey-threshold-label" style={{ fontSize: 20 * screenScale }} x={left + 8} y={sy(data.partition.threshold) - 12 * screenScale}>y = y*</text>
-        <text x={right - 10} y={sy(data.partition.threshold) - 12 * screenScale} textAnchor="end" className="journey-group-bad" style={{ fontSize: 22 * screenScale }}>Bad</text>
-        <text x={right - 10} y={sy(data.partition.threshold) + 28 * screenScale} textAnchor="end" className="journey-group-good" style={{ fontSize: 22 * screenScale }}>Good</text>
+        <text className="journey-threshold-label" x={left + 8 * ui} y={sy(data.partition.threshold) - 12 * ui}>y = y*</text>
+        <text x={right - 10 * ui} y={sy(data.partition.threshold) - 12 * ui} textAnchor="end" className="journey-group-bad">Bad</text>
+        <text x={right - 10 * ui} y={sy(data.partition.threshold) + 28 * ui} textAnchor="end" className="journey-group-good">Good</text>
       </g>
       {/* A lane owns the translation of its axis, densities, and observations.
           Geometry inside the lane uses a zero baseline and no second motion clock. */}
@@ -583,7 +587,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
                 <line x1={sx(x)} x2={sx(x)} y1="0" y2="4" />
                 <text x={sx(x)} y="23" textAnchor="middle">{x}</text>
               </g>)}
-              {kind === "bad" && <text className="journey-axis-title" x={right + 17} y="4">x</text>}
+              {kind === "bad" && <text className="journey-axis-title" x={W - 4 * screenScale} y={-8 * ui} textAnchor="end">x</text>}
               <text x={left} y={mix(-H * 0.29, (kind === "good" ? lane + 50 : 50) - laneBase, scoring)} className={`journey-${kind}`} opacity={project}>{p < 4.5 ? (kind === "good" ? "Good" : "Bad") : kind === "good" ? "ℓ(x)" : "g(x)"}</text>
             </g>
             <g className={`journey-${kind}`} opacity={densityVisibility} aria-hidden={stage < 4 || stage === 8}>
@@ -616,7 +620,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
                 {id !== null && stage === 4 && id === (focused ?? growingKernel ?? history[0]?.id) && <g className="journey-bandwidth" opacity={growth}>
                   <line x1={sx(kernel.center.x)} x2={sx(Math.min(5, kernel.center.x + settings.bandwidth))} y1={base - 8 * screenScale} y2={base - 8 * screenScale} />
                   <path d={`M${sx(kernel.center.x)},${base - 11 * screenScale}v${6 * screenScale} M${sx(Math.min(5, kernel.center.x + settings.bandwidth))},${base - 11 * screenScale}v${6 * screenScale}`} />
-                  <text x={(sx(kernel.center.x) + sx(Math.min(5, kernel.center.x + settings.bandwidth))) / 2} y={base - 16 * screenScale} style={{ fontSize: 16 * screenScale }} textAnchor="middle">h</text>
+                  <text x={(sx(kernel.center.x) + sx(Math.min(5, kernel.center.x + settings.bandwidth))) / 2} y={base - 16 * ui} textAnchor="middle">h</text>
                 </g>}
                 <text className="journey-kernel-label" x={id === null ? right - 8 : Math.max(left + 65, Math.min(right - 65, sx(kernel.center.x)))} y={id === null ? base + 48 : Math.max(18 - laneBase, base - peak * densityScale * growth - 16 - lane * 16)} textAnchor={id === null ? "end" : "middle"} opacity={Number(labelVisible) * (1 - stacking)}>
                   {id === null ? `Prior` : `${weighting > 0 ? `w${indexLabel} ` : ""}k${indexLabel}`}
@@ -646,7 +650,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         <text className="journey-acquisition-title" x={left} y={stage === 6 ? sampleBase - 40 : lane * 2 + 50}>{stage === 6 ? `Candidates zⱼ · M = ${settings.candidates}` : ratioPlot.logarithmic ? "Acquisition α(x) · log scale" : "Acquisition α(x)"}</text>
         </g>
         {[-5,-4,-3,-2,-1,0,1,2,3,4,5].map((x) => <g key={x}><line x1={sx(x)} x2={sx(x)} y1={sampleBase} y2={sampleBase + 6} /><text x={sx(x)} y={sampleBase + 23} textAnchor="middle">{x}</text></g>)}
-        <text x={right + 17} y={sampleBase + 5}>x</text>
+        <text x={W - 4 * screenScale} y={sampleBase - 8 * ui} textAnchor="end">x</text>
       </g>
       <g aria-hidden={stage < 6 || stage === 8} style={{ pointerEvents: stage === 6 || stage === 7 ? "auto" : "none" }}>
         {orderedCandidates.map(({ candidate, index: i }) => {
@@ -667,9 +671,9 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
             {stage === 6 && ((sampled > 0 && sampled < 1) || inspected === i || (!intro && i === visibleDrawn - 1)) && <g className="journey-draw-source">
               <circle cx="0" cy={goodBase - Math.exp(candidate.logL) * densityScale - y} r="7" />
               <line x1="0" x2="0" y1={sampleBase - y} y2={goodBase - Math.exp(candidate.logL) * densityScale - y} />
-              <text x="10" y={goodBase - Math.exp(candidate.logL) * densityScale - y - 12}>z<tspan dy="4" fontSize="11">{i + 1}</tspan></text>
+              <text x="10" y={goodBase - Math.exp(candidate.logL) * densityScale - y - 12}>z<tspan dy="0.27em" fontSize="73%">{i + 1}</tspan></text>
             </g>}
-            {stage === 6 && inspected === i && <text className="journey-candidate-label" x="0" y="49" textAnchor="middle">z<tspan dy="4" fontSize="11">{i + 1}</tspan></text>}
+            {stage === 6 && inspected === i && <text className="journey-candidate-label" x="0" y="49" textAnchor="middle">z<tspan dy="0.27em" fontSize="73%">{i + 1}</tspan></text>}
             {isWinner && p >= 7 && <g className="journey-winner-halo" aria-hidden="true"><circle r="13" /><path d="M0,-24 L-5,-32 L5,-32 Z" /></g>}
             <circle style={{ "--draw-offset": `${goodBase - Math.exp(candidate.logL) * densityScale - sampleBase}px` } as CSSProperties} className={`journey-candidate ${!intro && stage === 6 ? "journey-roll-in" : ""} ${isWinner && p >= 7 ? "winner" : ""}`} r={isWinner && p >= 7 ? 8 : 5} tabIndex={(stage === 6 || stage === 7) && !animating ? 0 : -1} role="button" aria-label={`Candidate z${i + 1} at x ${candidate.params.x.toFixed(1)}${stage >= 7 ? `, acquisition ${Math.exp(candidate.score).toPrecision(4)}${isWinner ? ", selected" : ""}` : ""}`} onClick={() => setInspected(i)} onFocus={() => setInspected(i)} onMouseEnter={() => setInspected(i)} onMouseLeave={() => setInspected(null)} onBlur={() => setInspected(null)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setInspected(i); } }} />
           </g>;
@@ -679,18 +683,18 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         <line x1={sx(nextTrial.x)} x2={sx(nextTrial.x)} y1={bottom} y2={stage === 8 ? sy(nextTrial.y) : bottom - ratioPlot.candidates[data.selectedIndex] * ratioScale} opacity={stage === 8 ? clamp((evaluation - 0.65) / 0.35) : 0.5} />
         {stage === 8 && evaluation > 0.85 && <g opacity={clamp((evaluation - 0.85) / 0.15)}>
           <line x1={sx(nextTrial.x)} x2={mix(sx(nextTrial.x), left, (evaluation - 0.85) / 0.15)} y1={sy(nextTrial.y)} y2={sy(nextTrial.y)} />
-          <g className="journey-next-label journey-y-next-label" transform={`translate(${left + 8 * screenScale}, ${Math.max(40 * screenScale, sy(nextTrial.y))}) scale(${screenScale})`}>
-            <text x="0" y="-14">y<tspan baselineShift="sub" fontSize="14">next</tspan> = {nextTrial.y.toFixed(1)}</text>
+          <g className="journey-next-label journey-y-next-label" transform={`translate(${left + 8 * ui}, ${Math.max(40 * ui, sy(nextTrial.y))}) scale(${ui})`}>
+            <text x="0" y="-14">y<tspan baselineShift="sub" fontSize="58%">next</tspan> = {nextTrial.y.toFixed(1)}</text>
           </g>
         </g>}
         <circle cx={sx(nextTrial.x)} cy={bottom} r="5" />
-        <g className="journey-next-label" transform={`translate(${Math.max(left + 80 * screenScale, Math.min(right - 80 * screenScale, sx(nextTrial.x)))}, ${bottom}) scale(${screenScale})`}>
-          <text x="0" y="38" textAnchor="middle">x<tspan baselineShift="sub" fontSize="14">next</tspan> = {nextTrial.x.toFixed(1)}</text>
+        <g className="journey-next-label" transform={`translate(${Math.max(left + 80 * ui, Math.min(right - 80 * ui, sx(nextTrial.x)))}, ${bottom}) scale(${ui})`}>
+          <text x="0" y="38" textAnchor="middle">x<tspan baselineShift="sub" fontSize="58%">next</tspan> = {nextTrial.x.toFixed(1)}</text>
         </g>
       </g>}
       {shownObservation && <g className="journey-next-input">
         <circle cx={sx(shownObservation.x)} cy={bottom} r="4" />
-        <text x={sx(shownObservation.x)} y={bottom + 27} textAnchor="middle">x<tspan baselineShift="sub" fontSize="13">{shownObservation.id}</tspan> = {shownObservation.x.toFixed(1)}</text>
+        <text x={Math.max(50 * ui, Math.min(W - 50 * ui, sx(shownObservation.x)))} y={bottom + 27 * ui} textAnchor="middle">x<tspan baselineShift="sub" fontSize="65%">{shownObservation.id}</tspan> = {shownObservation.x.toFixed(1)}</text>
       </g>}
       {!intro && ((stage === 1 && initialComplete) || stage === 2) && <g className="journey-split-target" role="button" tabIndex={0}
         data-guide-target={activeTask === "split" || undefined} aria-describedby={activeTask === "split" ? labHintElementId : undefined}
