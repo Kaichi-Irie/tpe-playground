@@ -2,8 +2,10 @@ import type { DensityMode } from "./model/types";
 import {
   bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrialCounts, weightOptions, type ModelSettings,
 } from "./searchSettings";
-export const playHashes = { "1d": "#play-2d", "2d": "#play-3d" } as const;
-export type Page = keyof typeof playHashes | "lab" | "about";
+
+export const playPageHrefs = { "1d": import.meta.env.BASE_URL, "2d": "#play-3d" } as const;
+const playShareHashes = { "1d": "#play-2d", "2d": playPageHrefs["2d"] } as const;
+export type Page = keyof typeof playPageHrefs | "lab" | "about";
 export type ShareExperiment = { page: "1d"; preset: string } | { page: "2d"; preset: string; mode: DensityMode };
 
 export type SharedSearch<Preset extends string> = {
@@ -23,18 +25,19 @@ export function readRoute(hash: string): Route {
   if (version === "1" && (path === "#play" || path === "#play-2d")) {
     return { page: path === "#play" ? "1d" : "2d", share: params };
   }
-  if (path === playHashes["1d"] || path === playHashes["2d"]) {
-    return { page: path === playHashes["1d"] ? "1d" : "2d", share: version === "2" ? params : null };
+  if (path === playShareHashes["1d"] || path === playShareHashes["2d"]) {
+    return { page: path === playShareHashes["1d"] ? "1d" : "2d", share: version === "2" ? params : null };
   }
   return { page: path === "#lab" ? "lab" : path === "#about" ? "about" : "1d", share: null };
 }
 
 export function readBrowserRoute(): Route {
-  const { hash } = window.location;
+  const { hash, pathname, search } = window.location;
   const route = readRoute(hash);
-  // Replace the current entry when consuming a share or opening the old bookmark.
-  if ((route.page === "1d" || route.page === "2d") && (route.share || hash === "#play")) {
-    window.history.replaceState(window.history.state, "", playHashes[route.page]);
+  // Replace the current entry when consuming a share or opening an old bookmark.
+  if (route.share || hash === "#play" || hash === playShareHashes["1d"]) {
+    const canonicalUrl = route.page === "2d" ? playPageHrefs["2d"] : `${pathname}${search}`;
+    window.history.replaceState(window.history.state, "", canonicalUrl);
   }
   return route;
 }
@@ -53,7 +56,7 @@ export function createShareUrl(documentUrl: string, experiment: ShareExperiment,
   } satisfies Required<Record<keyof ModelSettings, string>>;
   const params = new URLSearchParams({ v: "2", seed: String(seed), preset: experiment.preset, ...model });
   if (experiment.page === "2d") params.set("mode", experiment.mode);
-  url.hash = `${playHashes[experiment.page]}?${params}`;
+  url.hash = `${playShareHashes[experiment.page]}?${params}`;
   return url.href;
 }
 

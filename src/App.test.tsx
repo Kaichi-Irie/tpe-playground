@@ -6,7 +6,8 @@ it("renders the density explorer with playback controls and an empty initial his
   const html = renderToStaticMarkup(<App />);
   expect(html).toContain("What is TPE?");
   expect(html).toContain('href="#lab"');
-  expect(html).toContain('href="#play-2d" aria-current="page">Play 2D');
+  expect(html).toContain(`href="${import.meta.env.BASE_URL}" aria-current="page">Play 2D`);
+  expect(html).toContain(`href="${import.meta.env.BASE_URL}" aria-label="TPE Playground"`);
   expect(html).toContain('href="#play-3d">Play 3D');
   expect(html).not.toContain('href="#explain"');
   expect(html).toContain("Minimize f(x)");
@@ -21,6 +22,8 @@ it("renders the density explorer with playback controls and an empty initial his
   expect(html).toContain("Vertical gray dashes: next evaluation");
   expect(html).not.toContain('class="point ');
   expect(html).toContain("KDEs appear after 2 observations.");
+  expect(html).not.toContain("Hover, tap, or focus a point to inspect a trial.");
+  expect(html).toContain('<div class="plot-inspection" data-selected="false" aria-live="polite"></div>');
   expect(html).toContain("Next trial");
   expect(html).not.toContain("Run to end");
   expect(html).toContain('aria-label="Trial progress"');
@@ -42,7 +45,10 @@ it("renders the density explorer with playback controls and an empty initial his
   expect(html).toContain("Algorithms for Hyper-Parameter Optimization");
   expect(html).toContain("https://arxiv.org/abs/2304.11127");
   expect(html).toContain("↻ New seed");
-  expect(html).toContain("Initial random exploration");
+  expect(html).toContain("<h3>Random start · 1 / 10</h3>");
+  expect(html).toMatch(/role="tooltip"[^>]*>Initial random exploration · 1 \/ 10\. Uniform random draw/);
+  expect(html).toMatch(/class="model-controls">.*class="model-status" aria-live="polite">.*class="stats"><span class="good-text"><strong>0<\/strong> good<\/span><span class="bad-text"><strong>0<\/strong> bad/);
+  expect(html).not.toContain('class="canvas-status"');
   expect(html).toContain("Next x =");
   expect(html).toContain("Uniform random draw until TPE starts at trial 11.");
   expect(html).toContain('<a href="https://github.com/Kaichi-Irie/tpe-playground">View the playground’s source code on GitHub</a>');
@@ -74,7 +80,7 @@ it("renders About as a named article with five parallel section headings", () =>
   const article = html.match(/<article\b[^>]*class="about-page"[^>]*>[\s\S]*?<\/article>/)?.[0] ?? "";
 
   expect(article).toMatch(/^<article\b[^>]* aria-label="About"/);
-  expect(article).toContain('<a href="#play-2d">Play 2D</a> or <a href="#play-3d">Play 3D</a>');
+  expect(article).toContain(`<a href="${import.meta.env.BASE_URL}">Play 2D</a> or <a href="#play-3d">Play 3D</a>`);
   expect(article).not.toMatch(/<h3\b/);
   expect(Array.from(article.matchAll(/<h2\b[^>]*>(.*?)<\/h2>/g), ([, heading]) => heading)).toEqual([
     "What is TPE?",
@@ -89,7 +95,8 @@ it("starts a shared Play 2D search at trial zero with the linked settings", () =
   const initialRoute = { page: "1d", share: new URLSearchParams("preset=quadratic&seed=0&startupTrials=2&gamma=0.15") } as const;
   const html = renderToStaticMarkup(<App initialRoute={initialRoute} />);
   expect(html).toContain("Trial 0 / 200");
-  expect(html).toContain("Initial random exploration · 1 / 2");
+  expect(html).toContain("<h3>Random start · 1 / 2</h3>");
+  expect(html).toMatch(/role="tooltip"[^>]*>Initial random exploration · 1 \/ 2\./);
   expect(html).toContain('value="quadratic" selected=""');
   expect(html).toContain('aria-label="Search seed">0</output>');
   expect(html).toContain('aria-valuetext="15 percent"');

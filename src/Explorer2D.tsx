@@ -283,6 +283,7 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     guide.retire("rotate");
     setView((v) => ({ ...v, zoom: clamp(v.zoom * factor, 0.55, 1.7) }));
   }
+  const bestValue = step ? Math.min(...playback.trials.map((trial) => trial.value)).toFixed(3) : "—";
   return <section className="visual-workspace explorer-2d" ref={guide.workspaceRef} onKeyDown={guide.onKeyDown} aria-labelledby="explorer-2d-heading">
     <div className="canvas-plot">
     <div className="canvas-controls">
@@ -321,14 +322,16 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     {guide.active && <LabHintBubble textId={guide.textId} message={playGuides[guide.active].action} phase="action" placement="bottom" onDismiss={guide.dismiss} />}
     </div>
 
-    <div className="canvas-status">
-      <span>{!proposal ? "Search complete" : proposal.method === "random" ? `Initial random exploration · ${step + 1} / ${settings.startupTrials}` : `TPE proposal · trial ${step + 1}`}</span>
-      <Help label="2D trial playback">
-        {!proposal ? `All ${settings2D.count} trials evaluated.` : proposal.method === "random" ? (settings.startupTrials === settings2D.count ? "Every trial in this search is random." : `Uniform random draw until TPE starts at trial ${settings.startupTrials + 1}.`) : `Drew ${settings.candidates} candidate${settings.candidates === 1 ? "" : "s"} from ℓ(x) and picked the largest ℓ(x)/g(x).`}{" "}
-        <span id="trial-seek-help-2d">Seeking back discards later trials.</span>
-      </Help>
-    </div>
-    <ModelSettingsPanel experiment={{ page: "2d", preset: objectivePreset, mode }} className="settings-2d" idSuffix="-2d" labelPrefix="2D " defaultSettings={defaultModelSettings2D} trialLimit={settings2D.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); restart(); }} >
+    <ModelSettingsPanel experiment={{ page: "2d", preset: objectivePreset, mode }} className="settings-2d" idSuffix="-2d" labelPrefix="2D " defaultSettings={defaultModelSettings2D} trialLimit={settings2D.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); restart(); }}
+      status={<div className="proposal">
+        <span>{!proposal ? "Search complete" : proposal.method === "random" ? `Random start · ${step + 1} / ${settings.startupTrials}` : `TPE · trial ${step + 1}`}</span>
+        <Help label="2D trial playback">
+          {!proposal ? `Search complete. All ${settings2D.count} trials evaluated.` : proposal.method === "random"
+            ? `Initial random exploration · ${step + 1} / ${settings.startupTrials}. ${settings.startupTrials === settings2D.count ? "Every trial in this search is random." : `Uniform random draw until TPE starts at trial ${settings.startupTrials + 1}.`}`
+            : `TPE proposal · trial ${step + 1}. Drew ${settings.candidates} candidate${settings.candidates === 1 ? "" : "s"} from ℓ(x) and picked the largest ℓ(x)/g(x).`}{" "}
+          <span id="trial-seek-help-2d">Seeking back discards later trials.</span>
+        </Help>
+      </div>}>
       <h2 id="explorer-2d-heading" className="sr-only">Explore two dimensions</h2>
       <div className="scene-toolbar-group">
         <div className="objective-picker parameter">
@@ -340,7 +343,7 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
         </div>
     </ModelSettingsPanel>
     <details className="performance-monitor" onToggle={(event) => setComparisonOpen(event.currentTarget.open)}>
-      <summary><span className="performance-caption">Best f(x) <strong>{step ? Math.min(...playback.trials.map((trial) => trial.value)).toFixed(3) : "—"}</strong></span><span>Performance <span aria-hidden="true">⌄</span></span></summary>
+      <summary><span className="performance-caption">Best f(x) <strong title={bestValue}>{bestValue}</strong></span><span>Performance <span aria-hidden="true">⌄</span></span></summary>
       {comparisonOpen && <ProgressComparison2D trials={playback.trials} seed={seed} objectivePreset={objectivePreset} />}
     </details>
   </section>;

@@ -8,15 +8,17 @@ describe("Play guide eligibility", () => {
     const context = { ...initial, page };
     const seen = new Set<PlayGuideId>();
     expect(nextPlayGuide(context, seen)).toBe("playback");
-    expect(nextPlayGuide({ ...context, step: 1 }, seen)).toBe(page === "2d" ? "rotate" : null);
+    expect(nextPlayGuide({ ...context, step: 1 }, seen)).toBeNull();
     expect(nextPlayGuide({ ...context, step: 2 }, seen)).toBe("gamma");
 
     seen.add("gamma");
     expect(nextPlayGuide(context, new Set([...seen, "playback"]))).toBeNull();
-    expect(nextPlayGuide({ ...context, step: 1 }, seen)).toBe(page === "2d" ? "rotate" : null);
+    expect(nextPlayGuide({ ...context, step: 2 }, seen)).toBe("bandwidth");
     expect(nextPlayGuide({ ...context, step: 10 }, seen)).toBe("bandwidth");
 
     seen.add("bandwidth");
+    expect(nextPlayGuide({ ...context, step: 1 }, seen)).toBeNull();
+    expect(nextPlayGuide({ ...context, step: 2 }, seen)).toBe(page === "2d" ? "rotate" : null);
     expect(nextPlayGuide({ ...context, step: 9 }, seen)).toBe(page === "2d" ? "rotate" : null);
     expect(nextPlayGuide({ ...context, step: 10 }, seen)).toBe(page === "2d" ? "rotate" : "acquisition");
 

@@ -40,7 +40,7 @@ export function nextPlayGuide(
   if (step === 0 && !seen.has("playback")) return "playback";
   if (step >= 2 && !seen.has("gamma")) return "gamma";
   if (step >= 2 && !seen.has("bandwidth")) return "bandwidth";
-  if (page === "2d" && step >= 1 && !seen.has("rotate")) return "rotate";
+  if (page === "2d" && step >= 2 && !seen.has("rotate")) return "rotate";
   if (step >= startupTrials && !acquisitionVisible && !seen.has("acquisition")) return "acquisition";
   return null;
 }

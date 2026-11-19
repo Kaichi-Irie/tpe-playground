@@ -6,8 +6,8 @@ import { playGuides } from "./playGuides";
 import { usePlayGuide } from "./usePlayGuide";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { weightOptions } from "./searchSettings";
-import { playHashes, readBrowserRoute, readSharedSearch, type Route, type SharedSearch } from "./shareSearch";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { playPageHrefs, readBrowserRoute, readSharedSearch, type Route, type SharedSearch } from "./shareSearch";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { trialLimit, buildView1D, prior, searchDefaults, defaults, domain, proposeTrial, proposal1DFromTrace, type Trial } from "./tpe";
 
 import { getObjective, objectivePresets, type ObjectivePreset } from "./objectives";
@@ -75,25 +75,34 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
   const [labVisited, setLabVisited] = useState(page === "lab");
   useEffect(() => { if (page === "lab") setLabVisited(true); }, [page]);
   const [algorithmContainer, setAlgorithmContainer] = useState<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const onHashChange = () => {
-      const next = readBrowserRoute();
-      setPlaying(false);
-      if (next.share && next.page === "1d") {
-        searchGeneration.current += 1;
-        setSearch(readSharedSearch(next.share, defaultSearch, objectivePresets, trialLimit, domainWidth));
-        setPlayback(emptyPlayback());
-        setSelected(null);
-      }
-      setRoute((current) =>
-        current.page === next.page && !next.share
-          ? current
-          : { ...next, visit: current.visit + 1 },
-      );
-    };
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
+  const syncRoute = useCallback(() => {
+    const next = readBrowserRoute();
+    setPlaying(false);
+    if (next.share && next.page === "1d") {
+      searchGeneration.current += 1;
+      setSearch(readSharedSearch(next.share, defaultSearch, objectivePresets, trialLimit, domainWidth));
+      setPlayback(emptyPlayback());
+      setSelected(null);
+    }
+    setRoute((current) =>
+      current.page === next.page && !next.share
+        ? current
+        : { ...next, visit: current.visit + 1 },
+    );
   }, []);
+  useEffect(() => {
+    window.addEventListener("hashchange", syncRoute);
+    return () => window.removeEventListener("hashchange", syncRoute);
+  }, [syncRoute]);
+  function openPlay2D(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const { pathname, search, hash } = window.location;
+    if (event.currentTarget.pathname !== pathname) return;
+    event.preventDefault();
+    if (!hash) return;
+    window.history.pushState(null, "", `${pathname}${search}`);
+    syncRoute();
+  }
   const [dark, setDark] = useState(initialTheme);
   const weightOption = weightOptions.find((option) => option.value === weights)!;
   useEffect(() => {
@@ -126,6 +135,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
   const trials = useMemo(() => playback.trials.slice(0, step), [playback.trials, step]);
   const model = useMemo(() => buildView1D(trials, grid, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }), [trials, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
   const proposal = useMemo(() => step === trialLimit ? undefined : playback.proposals[step] ?? (model.fitted && step >= startupTrials ? proposal1DFromTrace(model.fitted.propose(seed)) : proposeTrial(trials, seed, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset })), [step, playback.proposals, model.fitted, trials, seed, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
+  const bestValue = trials.length ? Math.min(...trials.map((trial) => trial.y)).toFixed(3) : "—";
   const acquisitionLow = Math.min(0, ...model.acquisition);
   const acquisitionHigh = Math.max(1, ...model.acquisition);
   const acquisitionPadding = (acquisitionHigh - acquisitionLow) * 0.12;
@@ -144,7 +154,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
   const goodPath = path(model.goodDensity, sd), badPath = path(model.badDensity, sd);
   return (
     <main className={`page-${page}`}>
-      <TopBar page={page} dark={dark} onThemeChange={() => {
+      <TopBar page={page} dark={dark} onPlay2D={openPlay2D} onThemeChange={() => {
         const next = !dark;
         setDark(next);
         try { localStorage.setItem("tpe-theme", next ? "dark" : "light"); } catch { /* Theme still works without storage. */ }
@@ -165,7 +175,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
         <div className="legend" aria-label="Plot layers">{([['objective', 'Objective f(x)'], ['good', 'Good KDE ℓ(x)'], ['bad', 'Bad KDE g(x)'], ['observations', 'Observations'], ['acquisition', 'Acquisition']] as const).map(([key, label]) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} data-guide-target={key === "acquisition" && guideAcquisition || undefined} aria-describedby={key === "acquisition" && guideAcquisition ? guide.textId : undefined} onClick={() => setVisible((current) => ({ ...current, [key]: !current[key] }))}><span className="swatch" /><span className="layer-label">{label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : "Acquisition"}</span></button>)}</div>
         <div className="plot-guide"><Help label="how to read this plot"><strong>How to read this plot</strong>
         <span className="line-key"><span><i className="split-key" /> Horizontal gray dashes: good/bad split</span><span><i className="next-key" /> Vertical gray dashes: next evaluation</span><span>Gray ticks: sampled candidates</span></span>
-        <span className="plot-guide-description">{compactChart ? "Objective: left axis. Good and bad KDEs share one scale. Acquisition uses its own scale, higher is better. Density and acquisition tick labels are omitted to leave more space for the plot." : "Objective: left axis · KDEs: right axis · acquisition log[ℓ(x)/g(x)]: far-right axis, higher is better."} {step < startupTrials ? "Acquisition is a preview during initial random exploration." : `The selected point is best among ${candidates} sampled candidate${candidates === 1 ? "" : "s"}, not necessarily the curve’s global maximum.`}</span></Help></div>
+        <span className="plot-guide-description">{compactChart ? "Objective: left axis. Good and bad KDEs share one scale. Acquisition uses its own scale, higher is better. Density and acquisition tick labels are omitted to leave more space for the plot." : "Objective: left axis · KDEs: right axis · acquisition log[ℓ(x)/g(x)]: far-right axis, higher is better."} KDEs appear after 2 observations. {step < startupTrials ? "Acquisition is a preview during initial random exploration." : `The selected point is best among ${candidates} sampled candidate${candidates === 1 ? "" : "s"}, not necessarily the curve’s global maximum.`}</span></Help></div>
         </div>
         <div className="chart-scroll"><svg ref={chartRef} viewBox={`0 0 ${W} ${H}`} aria-labelledby="chart-title chart-description" role="img">
           <title id="chart-title">Objective function, {step} observations, good and bad KDEs, and acquisition</title><desc id="chart-description">Search parameter x from -5 to 5. {compactChart ? "Left axis: objective value. Density and acquisition tick labels are omitted in this compact view. Good and bad densities share one scale; the log density ratio uses a separate scale, higher is better." : "Left axis: objective value. Right axis: probability density. Far-right axis: log density ratio, higher is better."} Horizontal gray dashes mark the split; vertical gray dashes mark the next evaluation. Select an observation to inspect it.</desc>
@@ -202,16 +212,9 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
           <text x={(box.left + box.right) / 2} y={H - 6 * typeScale} textAnchor="middle" className="axis-title">Search parameter · x</text>
         </svg></div>
 
-        <div className="plot-foot"><span className="inspection" data-selected={selected !== null} aria-live="polite">{selected ? `Trial ${selected.id} · x = ${selected.x.toFixed(3)} · f(x) = ${selected.y.toFixed(3)} · ${groupName(selected)}` : "Hover, tap, or focus a point to inspect a trial."}</span><span>{model.threshold === null ? "KDEs appear after 2 observations." : `Horizontal gray dashes: split at f(x) = ${model.threshold.toFixed(3)}`}</span></div>
+        <div className="plot-inspection" data-selected={selected !== null} aria-live="polite">{selected ? `Trial ${selected.id} · x = ${selected.x.toFixed(3)} · f(x) = ${selected.y.toFixed(3)} · ${groupName(selected)}` : null}</div>
         {guide.active && <LabHintBubble textId={guide.textId} message={playGuides[guide.active].action} phase="action" placement="bottom" onDismiss={guide.dismiss} />}
       </section>
-      <div className="canvas-status">        <div className="proposal" aria-live="polite">
-          <h3>{!proposal ? "Search complete" : proposal.method === "random" ? `Initial random exploration · ${step + 1} / ${startupTrials}` : `TPE proposal · trial ${step + 1}`}</h3>
-          <Help label="trial selection">{!proposal ? `All ${trialLimit} trials evaluated. Replay to inspect each decision.` : proposal.method === "random" ? (startupTrials === trialLimit ? "Every trial in this search is random." : `Uniform random draw until TPE starts at trial ${startupTrials + 1}.`) : `Drew ${candidates} candidate${candidates === 1 ? "" : "s"} from ℓ(x) and picked the largest ℓ(x)/g(x). Gray ticks show candidates; the dashed line marks the pick.`}</Help>
-          {proposal && <p><strong>Next x = {proposal.x.toFixed(3)}</strong>{proposal.method === "tpe" && ` · log ℓ/g = ${Math.max(...proposal.candidates.map((candidate) => candidate.logRatio)).toFixed(3)}`}</p>}
-        </div>
-        <div className="stats"><span className="good-text"><strong>{model.good.length}</strong> good</span><span className="bad-text"><strong>{model.bad.length}</strong> bad</span><span>Objective: <strong>Minimize f(x)</strong><Help label="objective function">Lower is better, over −5 ≤ x ≤ 5.</Help></span></div>
-      </div>
       <ModelSettingsPanel key={page === "1d" ? route.visit : "hidden"}
         experiment={{ page: "1d", preset: objectivePreset }} settings={settings}
         defaultSettings={defaultSearch.settings} guide={guide.settingsGuide}
@@ -222,7 +225,19 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
           editModel();
         }}
         seed={seed} onNewSeed={() => { setSearch({ ...search, seed: Math.floor(Math.random() * 100) }); setPlayback(emptyPlayback()); setPlaying(false); setSelected(null); }}
-        trialLimit={trialLimit} widths={goodWidth === undefined ? [] : [{ label: "x", value: goodWidth }]} domainWidth={domainWidth} >
+        trialLimit={trialLimit} widths={goodWidth === undefined ? [] : [{ label: "x", value: goodWidth }]} domainWidth={domainWidth}
+        status={<>
+          <div className="proposal">
+            <h3>{!proposal ? "Search complete" : proposal.method === "random" ? `Random start · ${step + 1} / ${startupTrials}` : `TPE · trial ${step + 1}`}</h3>
+            <Help label="trial selection">
+              {!proposal ? `Search complete. All ${trialLimit} trials evaluated. Replay to inspect each decision.` : proposal.method === "random"
+                ? `Initial random exploration · ${step + 1} / ${startupTrials}. ${startupTrials === trialLimit ? "Every trial in this search is random." : `Uniform random draw until TPE starts at trial ${startupTrials + 1}.`}`
+                : `TPE proposal · trial ${step + 1}. Drew ${candidates} candidate${candidates === 1 ? "" : "s"} from ℓ(x) and picked the largest ℓ(x)/g(x). Gray ticks show candidates; the dashed line marks the pick.`}
+            </Help>
+            {proposal && <p><strong>Next x = {proposal.x.toFixed(3)}</strong>{proposal.method === "tpe" && ` · log ℓ/g = ${Math.max(...proposal.candidates.map((candidate) => candidate.logRatio)).toFixed(3)}`}</p>}
+          </div>
+          <div className="stats"><span className="good-text"><strong>{model.good.length}</strong> good</span><span className="bad-text"><strong>{model.bad.length}</strong> bad</span></div>
+        </>}>
       <section className="search-toolbar" aria-label="Search controls">
         <div className="plot-header">
           <div className="objective-picker parameter">
@@ -234,7 +249,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
       </section>
       </ModelSettingsPanel>
     <details className="performance-monitor">
-        <summary><span className="performance-caption">Best f(x) <strong>{trials.length ? Math.min(...trials.map((trial) => trial.y)).toFixed(3) : "—"}</strong></span><span>Performance <span aria-hidden="true">⌄</span></span></summary>
+        <summary><span className="performance-caption">Best f(x) <strong title={bestValue}>{bestValue}</strong></span><span>Performance <span aria-hidden="true">⌄</span></span></summary>
         <ProgressComparison trials={trials} seed={seed} objectivePreset={objectivePreset} />
       </details>
       </div>
@@ -256,7 +271,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
           <li><strong>Model.</strong> Fit densities ℓ(x) and g(x) to the two groups using kernel density estimation (KDE).</li>
           <li><strong>Sample.</strong> Draw candidates from ℓ(x), evaluate the one with the highest ℓ(x)/g(x), and repeat.</li>
         </ol>
-        <p>Explore the steps in <a href={playHashes["1d"]}>Play 2D</a> or <a href={playHashes["2d"]}>Play 3D</a>. For bandwidths, weights, and other design choices, see <a href="https://arxiv.org/abs/2304.11127">Watanabe’s TPE tutorial</a>.</p>
+        <p>Explore the steps in <a href={playPageHrefs["1d"]} onClick={openPlay2D}>Play 2D</a> or <a href={playPageHrefs["2d"]}>Play 3D</a>. For bandwidths, weights, and other design choices, see <a href="https://arxiv.org/abs/2304.11127">Watanabe’s TPE tutorial</a>.</p>
         <p>TPE Playground uses a simplified educational implementation. <a href="https://github.com/Kaichi-Irie/tpe-playground">View the playground’s source code on GitHub</a>.</p>
         <section className="algorithm-comparison" aria-labelledby="comparison-heading">
           <h2 id="comparison-heading">TPE and other optimizers</h2>
