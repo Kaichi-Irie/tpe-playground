@@ -3,8 +3,8 @@ import { usePlotSize } from "./usePlotSize";
 import { PlaybackControls } from "./PlaybackControls";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { weightOptions } from "./searchSettings";
-import { playHashes, readBrowserRoute, readSharedSearch, type Route, type SharedSearch } from "./shareSearch";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { playPageHrefs, readBrowserRoute, readSharedSearch, type Route, type SharedSearch } from "./shareSearch";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { trialLimit, buildView1D, prior, searchDefaults, defaults, domain, proposeTrial, proposal1DFromTrace, type Trial } from "./tpe";
 
 import { getObjective, objectivePresets, type ObjectivePreset } from "./objectives";
@@ -72,25 +72,34 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
   const [labVisited, setLabVisited] = useState(page === "lab");
   useEffect(() => { if (page === "lab") setLabVisited(true); }, [page]);
   const [algorithmContainer, setAlgorithmContainer] = useState<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const onHashChange = () => {
-      const next = readBrowserRoute();
-      setPlaying(false);
-      if (next.share && next.page === "1d") {
-        searchGeneration.current += 1;
-        setSearch(readSharedSearch(next.share, defaultSearch, objectivePresets, trialLimit, domainWidth));
-        setPlayback(emptyPlayback());
-        setSelected(null);
-      }
-      setRoute((current) =>
-        current.page === next.page && !next.share
-          ? current
-          : { ...next, visit: current.visit + 1 },
-      );
-    };
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
+  const syncRoute = useCallback(() => {
+    const next = readBrowserRoute();
+    setPlaying(false);
+    if (next.share && next.page === "1d") {
+      searchGeneration.current += 1;
+      setSearch(readSharedSearch(next.share, defaultSearch, objectivePresets, trialLimit, domainWidth));
+      setPlayback(emptyPlayback());
+      setSelected(null);
+    }
+    setRoute((current) =>
+      current.page === next.page && !next.share
+        ? current
+        : { ...next, visit: current.visit + 1 },
+    );
   }, []);
+  useEffect(() => {
+    window.addEventListener("hashchange", syncRoute);
+    return () => window.removeEventListener("hashchange", syncRoute);
+  }, [syncRoute]);
+  function openPlay2D(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const { pathname, search, hash } = window.location;
+    if (event.currentTarget.pathname !== pathname) return;
+    event.preventDefault();
+    if (!hash) return;
+    window.history.pushState(null, "", `${pathname}${search}`);
+    syncRoute();
+  }
   const [dark, setDark] = useState(initialTheme);
   const weightOption = weightOptions.find((option) => option.value === weights)!;
   useEffect(() => {
@@ -140,7 +149,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
   const goodPath = path(model.goodDensity, sd), badPath = path(model.badDensity, sd);
   return (
     <main className={`page-${page}`}>
-      <TopBar page={page} dark={dark} onThemeChange={() => {
+      <TopBar page={page} dark={dark} onPlay2D={openPlay2D} onThemeChange={() => {
         const next = !dark;
         setDark(next);
         try { localStorage.setItem("tpe-theme", next ? "dark" : "light"); } catch { /* Theme still works without storage. */ }
@@ -251,7 +260,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
           <li><strong>Model.</strong> Fit densities ℓ(x) and g(x) to the two groups using kernel density estimation (KDE).</li>
           <li><strong>Sample.</strong> Draw candidates from ℓ(x), evaluate the one with the highest ℓ(x)/g(x), and repeat.</li>
         </ol>
-        <p>Explore the steps in <a href={playHashes["1d"]}>Play 2D</a> or <a href={playHashes["2d"]}>Play 3D</a>. For bandwidths, weights, and other design choices, see <a href="https://arxiv.org/abs/2304.11127">Watanabe’s TPE tutorial</a>.</p>
+        <p>Explore the steps in <a href={playPageHrefs["1d"]} onClick={openPlay2D}>Play 2D</a> or <a href={playPageHrefs["2d"]}>Play 3D</a>. For bandwidths, weights, and other design choices, see <a href="https://arxiv.org/abs/2304.11127">Watanabe’s TPE tutorial</a>.</p>
         <p>TPE Playground uses a simplified educational implementation. <a href="https://github.com/Kaichi-Irie/tpe-playground">View the playground’s source code on GitHub</a>.</p>
         <section className="algorithm-comparison" aria-labelledby="comparison-heading">
           <h2 id="comparison-heading">TPE and other optimizers</h2>

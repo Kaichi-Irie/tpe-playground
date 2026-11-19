@@ -22,21 +22,27 @@ describe("browser route", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it.each([
-    ["#play", "#play-2d", null],
-    ["#play?v=1&seed=3", "#play-2d", "3"],
-    ["#play-2d?v=1&seed=3", "#play-3d", "3"],
-    ["#play-2d", null, null],
-    ["", null, null],
-  ])("handles the address bar and settings for %s", (hash, canonicalHash, seed) => {
+    ["#play", "1d", "/tpe-playground/?tracking=123", null],
+    ["#play-2d", "1d", "/tpe-playground/?tracking=123", null],
+    ["#play?v=1&seed=3", "1d", "/tpe-playground/?tracking=123", "3"],
+    ["#play-2d?v=2&seed=3", "1d", "/tpe-playground/?tracking=123", "3"],
+    ["#play-2d?v=1&seed=3", "2d", "#play-3d", "3"],
+    ["#play-3d?v=2&seed=3", "2d", "#play-3d", "3"],
+    ["#play-3d", "2d", null, null],
+    ["", "1d", null, null],
+  ])("handles the address bar and settings for %s", (hash, page, canonicalUrl, seed) => {
     const state = { navigation: 1 };
     const replaceState = vi.fn();
-    vi.stubGlobal("window", { location: { hash }, history: { state, replaceState } });
+    vi.stubGlobal("window", {
+      location: { hash, pathname: "/tpe-playground/", search: "?tracking=123" },
+      history: { state, replaceState },
+    });
 
     const route = readBrowserRoute();
-    expect(route.page).toBe(canonicalHash === "#play-3d" ? "2d" : "1d");
+    expect(route.page).toBe(page);
     expect(route.share?.get("seed") ?? null).toBe(seed);
-    if (canonicalHash) {
-      expect(replaceState).toHaveBeenCalledExactlyOnceWith(state, "", canonicalHash);
+    if (canonicalUrl) {
+      expect(replaceState).toHaveBeenCalledExactlyOnceWith(state, "", canonicalUrl);
     } else {
       expect(replaceState).not.toHaveBeenCalled();
     }
