@@ -53,6 +53,9 @@ export default function App() {
   const [playback, setPlayback] = useState(emptyPlayback);
   const { step } = playback;
   const [page, setPage] = useState(pageFromHash);
+  // Keep the Lab mounted after the first visit so its stage, progress, and settings survive tab switches.
+  const [labVisited, setLabVisited] = useState(page === "lab");
+  useEffect(() => { if (page === "lab") setLabVisited(true); }, [page]);
   const [algorithmContainer, setAlgorithmContainer] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
     const onHashChange = () => { setPage(pageFromHash()); setPlaying(false); };
@@ -116,7 +119,7 @@ export default function App() {
         setDark(next);
         try { localStorage.setItem("tpe-theme", next ? "dark" : "light"); } catch { /* Theme still works without storage. */ }
       }} actionSlot={<div className="lab-header-actions" ref={setAlgorithmContainer} />} />
-      {page === "lab" && <Suspense fallback={<p>Loading explanation…</p>}><StepExplanation algorithmContainer={algorithmContainer} /></Suspense>}
+      {(labVisited || page === "lab") && <div hidden={page !== "lab"} className="lab-page"><Suspense fallback={<p>Loading explanation…</p>}><StepExplanation visible={page === "lab"} algorithmContainer={page === "lab" ? algorithmContainer : null} /></Suspense></div>}
       <div hidden={page === "about" || page === "lab"} className="play-page">
       {page === "2d" ? <Suspense fallback={<p>Loading 3D explorer…</p>}><Explorer2D /></Suspense> : null}
       <div hidden={page !== "1d"} className="visual-workspace explorer-1d">

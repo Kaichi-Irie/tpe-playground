@@ -117,6 +117,16 @@ export class LabAudio {
     this.lastBandwidthTime = -Infinity;
   }
 
+  // Release the audio thread while the Lab is hidden; keep the user's sound choice.
+  suspend() {
+    this.stop();
+    if (this.context?.state === "running") void this.context.suspend().catch(() => {});
+  }
+
+  resume() {
+    if (this.enabled && this.context?.state === "suspended") void this.context.resume().catch(() => {});
+  }
+
   disable() {
     ++this.generation;
     this.enabled = false;
