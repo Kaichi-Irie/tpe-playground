@@ -298,6 +298,7 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
       <div className="view-controls"><label className="objective-height-control">Objective height <select aria-label="Objective height scale" value={heightScale} onChange={(event) => setHeightScale(event.target.value as ObjectiveHeightScale)}><option value="linear">Linear</option><option value="log">Log1p</option></select></label><span id="view-help" className="sr-only">Drag to rotate · arrow keys rotate · + / − zoom</span><div><button onClick={() => zoom(1.15)} aria-label="Zoom in">+</button><button onClick={() => zoom(1 / 1.15)} aria-label="Zoom out">−</button><button onClick={() => setView(initialView)}>Reset view</button></div></div>
     </div>
     <details className="scaling-2d"><summary aria-label="How to read this view">?</summary><div className="scaling-content">
+      <h3>How to read this view</h3>
       <p>Drag or use arrow keys to rotate; + / − to zoom. Hover the surface or focus an observation to read its values.</p>
       <p>The faint surface is the objective; the diamond marks its optimum (estimated for Multimodal). The hollow marker is the next evaluation. KDEs appear after 2 observations.</p>
       <p>Heights are rescaled to share one view: Linear keeps relative heights; Log1p expands the valley floor. Scaling never changes the optimizer, and hover shows original values.</p>
@@ -308,7 +309,7 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     <div className="canvas-status">
       <span>{!proposal ? "Search complete" : proposal.method === "random" ? `Initial random exploration · ${step + 1} / ${settings.startupTrials}` : `TPE proposal · trial ${step + 1}`}</span>
       <Help label="2D trial playback">
-        {!proposal ? `All ${settings2D.count} trials evaluated.` : proposal.method === "random" ? `Uniform random draw until TPE starts at trial ${settings.startupTrials + 1}.` : `Drew ${settings.candidates} candidate${settings.candidates === 1 ? "" : "s"} from ℓ(x) and picked the largest ℓ(x)/g(x).`}{" "}
+        {!proposal ? `All ${settings2D.count} trials evaluated.` : proposal.method === "random" ? (settings.startupTrials === settings2D.count ? "Every trial in this search is random." : `Uniform random draw until TPE starts at trial ${settings.startupTrials + 1}.`) : `Drew ${settings.candidates} candidate${settings.candidates === 1 ? "" : "s"} from ℓ(x) and picked the largest ℓ(x)/g(x).`}{" "}
         <span id="trial-seek-help-2d">Seeking back discards later trials.</span>
       </Help>
     </div>

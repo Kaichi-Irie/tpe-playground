@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import Explorer2D from "./Explorer2D";
+import { settings2D } from "./tpe2d";
 
 it("starts a sequential 2D search with no observations and a preview of its first proposal", () => {
   const html = renderToStaticMarkup(<Explorer2D />);
@@ -8,6 +9,7 @@ it("starts a sequential 2D search with no observations and a preview of its firs
   expect(html).toContain("Initial random exploration · 1 / 10");
   expect(html).toContain("Uniform random draw until TPE starts at trial 11.");
   expect(html).toContain("Next evaluation ·");
+  expect(html).toContain('class="scaling-content"><h3>How to read this view</h3>');
   expect(html).toContain("KDEs appear after 2 observations.");
   expect(html).toContain("Next trial");
   expect(html).toContain("Previous trial");
@@ -27,6 +29,13 @@ it("starts a sequential 2D search with no observations and a preview of its firs
   expect(html).toContain('id="trial-seek-help-2d">Seeking back discards later trials.</span>');
   expect(html).toContain('aria-describedby="trial-seek-help-2d"');
   expect(html).not.toContain('class="observation-target-2d');
+});
+
+it("describes random-only playback without a TPE start trial", () => {
+  const sharedSettings = new URLSearchParams({ startupTrials: String(settings2D.count) });
+  const html = renderToStaticMarkup(<Explorer2D sharedSettings={sharedSettings} />);
+  expect(html).toContain("Every trial in this search is random.");
+  expect(html).not.toContain("Uniform random draw until TPE starts");
 });
 
 it("does not build the closed comparison panel", () => {
