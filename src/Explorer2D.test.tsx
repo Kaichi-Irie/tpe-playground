@@ -43,5 +43,5 @@ it("starts a shared Play 3D search at trial zero with the linked density mode an
   expect(html).toContain('value="univariate" selected=""');
   expect(html).toContain('aria-label="2D Search seed">7</output>');
   expect(html).toContain('aria-valuetext="50 percent"');
-  expect(html).toContain("Copy share link");
+  expect(html).toContain("Share link");
 });

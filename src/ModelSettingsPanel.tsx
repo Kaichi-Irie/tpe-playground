@@ -38,8 +38,19 @@ export function ModelSettingsPanel({ children, experiment, settings, defaultSett
     : displayedWidth?.toFixed(2) ?? "—";
   return (
     <div className="model-controls">
-    <ResponsiveSettings action={<button className="settings-reset" disabled={isDefault} onClick={() => onChange(defaultSettings)} aria-label="Reset model defaults">Reset defaults</button>}><div className="settings-form">
-      <fieldset className="settings-fields"><legend>Experiment</legend>{children}<ShareSearchLink experiment={experiment} seed={seed} settings={settings} /></fieldset>
+    <ResponsiveSettings footer={<>
+      <button type="button" className="settings-reset" disabled={isDefault} onClick={() => onChange(defaultSettings)} aria-label="Reset model defaults">Reset defaults</button>
+      <ShareSearchLink experiment={experiment} seed={seed} settings={settings} />
+    </>}><div className="settings-form">
+      <fieldset className="settings-fields"><legend>Experiment</legend>
+        {children}
+        <div className="parameter seed-settings">
+          <div className="parameter-label"><span>Seed</span>
+            <output aria-label={`${labelPrefix}Search seed`}>{seed}</output>
+          </div>
+          <button type="button" className="resample" title="Restart the search with a random seed from 0 to 99" onClick={onNewSeed}>↻ New seed</button>
+        </div>
+      </fieldset>
       <fieldset className="settings-fields"><legend>Model</legend>
             <div className="parameter"><label htmlFor={id("bandwidth-rule")}>Bandwidth rule</label>
           <select id={id("bandwidth-rule")} aria-label={`${labelPrefix}Bandwidth rule`} value={bandwidthRule} onChange={(event) => change({ bandwidthRule: event.target.value as BandwidthRule })}><option value="constant">Constant</option><option value="scott">Scott</option><option value="silverman">Silverman</option></select>
@@ -73,12 +84,6 @@ export function ModelSettingsPanel({ children, experiment, settings, defaultSett
                 </div>
               </div>
               <select id={id("candidates")} value={candidates} onChange={(event) => change({ candidates: Number(event.target.value) })}>{candidateCounts.map((count) => <option key={count} value={count}>{count}</option>)}</select>
-            </div>
-            <div className="parameter seed-settings">
-              <div className="parameter-label"><span>Seed</span>
-                <output aria-label={`${labelPrefix}Search seed`}>{seed}</output>
-              </div>
-              <button type="button" className="resample" title="Restart the search with a random seed from 0 to 99" onClick={onNewSeed}>↻ New seed</button>
             </div>
       </fieldset>
     </div></ResponsiveSettings>
