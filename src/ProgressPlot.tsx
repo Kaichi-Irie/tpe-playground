@@ -4,13 +4,13 @@ import { useChartTypeScale } from "./usePlotSize";
 
 type Series = readonly (number | null)[];
 
-export function ProgressPlot({ title, definition, tpe, random, third, currentLabel = "TPE" }: {
+export function ProgressPlot({ title, definition, tpe, random, third, currentLabel }: {
   title: string;
   definition: string;
   tpe: Series;
   random: Series;
   third?: { label: string; values: Series };
-  currentLabel?: string;
+  currentLabel: string;
 }) {
   const id = useId();
   const chartRef = useRef<HTMLDivElement>(null);
@@ -32,8 +32,9 @@ export function ProgressPlot({ title, definition, tpe, random, third, currentLab
   const step = tpe.length;
   const trialAxis = comparisonTrialAxis(step);
   const trialX = (trial: number) => plot.left + (trial - 1) / (trialAxis.upper - 1) * (plot.right - plot.left);
+  const randomLabel = third ? "Random" : "Random search";
   const series = [
-    { name: "random", label: third ? "Random" : "Random search", values: random, radius: 5 },
+    { name: "random", label: randomLabel, values: random, radius: 5 },
     ...(third ? [{ name: "third", ...third, radius: 4 }] : []),
     { name: "tpe", label: currentLabel, values: tpe, radius: 3 },
   ];
@@ -69,8 +70,8 @@ export function ProgressPlot({ title, definition, tpe, random, third, currentLab
       {!third && <span className="comparison-direction">Lower is better ↓</span>}
     </div>
     <div className="comparison-chart" ref={chartRef}><svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={`${id}-title ${id}-description`}>
-      <title id={`${id}-title`}>{`${title}: ${third ? [currentLabel, third.label, "Random"].join(", ") : "TPE versus Random search"}`}</title>
-      <desc id={`${id}-description`}>{definition} Shown through trial {step} on a logarithmic vertical axis. {hasInfeasiblePrefix ? "∞ marks trials before each run found its first feasible point. " : ""}The horizontal axis spans trials 1 to {trialAxis.upper} and adjusts in blocks of 10. {third ? `${currentLabel} is solid blue. ${third.label} is dotted purple. Random is dashed orange.` : "TPE is solid blue; Random search is dashed orange."}</desc>
+      <title id={`${id}-title`}>{`${title}: ${third ? [currentLabel, third.label, randomLabel].join(", ") : `${currentLabel} versus ${randomLabel}`}`}</title>
+      <desc id={`${id}-description`}>{definition} Shown through trial {step} on a logarithmic vertical axis. {hasInfeasiblePrefix ? "∞ marks trials before each run found its first feasible point. " : ""}The horizontal axis spans trials 1 to {trialAxis.upper} and adjusts in blocks of 10. {currentLabel} is solid blue. {third && `${third.label} is dotted purple. `}{randomLabel} is dashed orange.</desc>
       {yTicks.map(({ value, label }) => <g key={label}>
         <line className="grid" x1={plot.left} x2={plot.right} y1={scaleY(value)} y2={scaleY(value)} />
         <text x={plot.left - 10 * typeScale} y={scaleY(value) + 4 * typeScale} textAnchor="end">{label}</text>

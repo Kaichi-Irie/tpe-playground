@@ -30,6 +30,19 @@ describe("Sequential two-parameter search", () => {
     expect(model.goodIds.size).toBe(1);
   });
 
+  it("leaves observations unpartitioned when there are no feasible trials, filling, or prior", () => {
+    const settings = { constraintPreset: "disk", startupTrials: 2, priorWeight: 0, infeasibleFilling: false } as const;
+    const { trials } = moveTwoParamPlayback(emptyTwoParamPlayback(), 2, 50, "multivariate", settings);
+    const model = buildTwoParamView(trials, "multivariate", settings);
+    expect(model.feasibleIds.size).toBe(0);
+    expect(model.fitted).toBeNull();
+    expect(model.hasPartition).toBe(false);
+    expect(model.hasDensities).toBe(false);
+    expect(proposeTwoParamTrial(trials, 50, "multivariate", settings).trace).toMatchObject({
+      method: "random", reason: "no-feasible-good",
+    });
+  });
+
   it("uses earlier observations to choose the highest scoring joint candidate", () => {
     const initial = moveTwoParamPlayback(emptyTwoParamPlayback(), twoParamSettings.startupTrials);
     expect(proposeTwoParamTrial(initial.trials.slice(0, -1)).method).toBe("random");
