@@ -1,17 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildDemo2D, constrainSettings2D, createJointKDE, defaultModelSettings2D, generateTrials2D, emptyPlayback2D, movePlayback2D, proposeTrial2D, settings2D, objective2D, getObjective2D, objectivePresets2D } from "./tpe2d";
+import { buildDemo2D, createJointKDE, generateTrials2D, emptyPlayback2D, movePlayback2D, proposeTrial2D, settings2D, objective2D, getObjective2D, objectivePresets2D } from "./tpe2d";
 
 const sample = (x1: number, x2: number) => ({ id: 1, x1, x2, value: 0, constraints: [], violation: 0 });
-
-describe("constrainSettings2D", () => {
-  it.each([
-    ["ei", "uniform"], ["uniform", "uniform"], ["recency", "recency"],
-  ] as const)("maps %s weights to %s and preserves other settings", (weights, expected) => {
-    const settings = { ...defaultModelSettings2D, weights, infeasibleFilling: false };
-    expect(constrainSettings2D(settings)).toStrictEqual({ ...settings, weights: expected });
-    expect(settings.weights).toBe(weights);
-  });
-});
 
 describe("joint 2D KDE", () => {
   it("normalizes on the plane, including kernels centered at the viewing boundary", () => {

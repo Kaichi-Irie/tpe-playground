@@ -1,9 +1,8 @@
 import { constraintPresets2D, type ConstraintPreset2D } from "./constraints2D";
 import type { DensityMode } from "./model/types";
 import {
-  bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrialCounts, weightOptions, type ModelSettings,
+  bandwidthRange, candidateCounts, constrainSettings, gammaRange, priorWeights, startupTrialCounts, weightOptions, type ModelSettings,
 } from "./searchSettings";
-import { constrainSettings2D, type ModelSettings2D } from "./tpe2d";
 
 export const playPageHrefs = { "1d": import.meta.env.BASE_URL, "2d": "#play-3d" } as const;
 const playShareHashes = { "1d": "#play-2d", "2d": playPageHrefs["2d"] } as const;
@@ -106,12 +105,12 @@ export function readSharedSearch3D<Preset extends string>(
   presets: Record<Preset, unknown>,
   trialLimit: number,
   domainWidth: number,
-): Omit<SharedSearch<Preset>, "settings"> & { settings: ModelSettings2D; mode: DensityMode; constraint: ConstraintPreset2D } {
+): Omit<SharedSearch<Preset>, "settings"> & { settings: ModelSettings; mode: DensityMode; constraint: ConstraintPreset2D } {
   const search = readSharedSearch(params, defaults, presets, trialLimit, domainWidth);
   const mode = params?.get("mode") === "univariate" ? "univariate" : "multivariate";
   const value = params?.get("constraint");
   const constraint = value && Object.hasOwn(constraintPresets2D, value) ? value as ConstraintPreset2D : "none";
-  const settings = constraint === "none" ? search.settings : constrainSettings2D({
+  const settings = constraint === "none" ? search.settings : constrainSettings({
     ...search.settings,
     infeasibleFilling: params?.get("infeasibleFilling") !== "false",
   });

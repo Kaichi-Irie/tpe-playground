@@ -13,9 +13,10 @@ import { playGuides } from "./playGuides";
 import { usePlayGuide } from "./usePlayGuide";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { Help } from "./Help";
+import { constrainSettings } from "./searchSettings";
 import { readSharedSearch3D, type SharedSearch } from "./shareSearch";
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
-import { buildDemo2D, constrainSettings2D, defaultModelSettings2D, getObjective2D, objectivePresets2D, emptyPlayback2D, movePlayback2D, proposeTrial2D, proposal2DFromTrace, settings2D, type DensityMode, type ObjectivePreset2D, type ModelSettings2D } from "./tpe2d";
+import { buildDemo2D, defaultModelSettings2D, getObjective2D, objectivePresets2D, emptyPlayback2D, movePlayback2D, proposeTrial2D, proposal2DFromTrace, settings2D, type DensityMode, type ObjectivePreset2D, type ModelSettings2D } from "./tpe2d";
 
 type Surface = "objective" | "good" | "bad" | "acquisition";
 type Layer = Surface | "observations";
@@ -65,7 +66,7 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     setConstraintPreset(preset);
     if (preset === "none") setConstraintHint(false);
     else {
-      setSettings(constrainSettings2D);
+      setSettings(constrainSettings);
       if (!constraintHintSeen) {
         setConstraintHintSeen(true);
         setConstraintHint(true);
