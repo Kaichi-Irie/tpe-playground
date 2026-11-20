@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createShareUrl, readBrowserRoute, readRoute, readSharedSearch, type SharedSearch } from "./shareSearch";
+import { createShareUrl, readBrowserRoute, readRoute, readSharedConstraint, readSharedSearch, type SharedSearch } from "./shareSearch";
 import { bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrialCounts, weightOptions } from "./searchSettings";
 import { objectivePresets, type ObjectivePreset } from "./objectives";
 import { defaults, prior, runSearch, searchDefaults, trialLimit } from "./tpe";
@@ -89,7 +89,7 @@ describe("share links", () => {
   });
 
   it("preserves the base path and writes the 3D route and density mode without tracking parameters", () => {
-    const url = new URL(createShareUrl(pageUrl, { page: "2d", preset: "rosenbrock", mode: "univariate" }, 99, defaults2D.settings));
+    const url = new URL(createShareUrl(pageUrl, { page: "2d", preset: "rosenbrock", mode: "univariate", constraint: "none" }, 99, defaults2D.settings));
     const route = readRoute(url.hash);
     expect(url.pathname).toBe("/tpe-playground/");
     expect(url.search).toBe("");
@@ -100,9 +100,36 @@ describe("share links", () => {
     expect(route.share?.get("preset")).toBe("rosenbrock");
   });
 
+  it("writes the constraint and infeasible filling only for constrained 3D links", () => {
+    const experiment = { page: "2d", preset: "rosenbrock", mode: "univariate", constraint: "none" } as const;
+    const shareUrl = (infeasibleFilling: boolean | undefined) =>
+      createShareUrl(pageUrl, { ...experiment, constraint: "disk" }, 99, { ...defaults2D.settings, infeasibleFilling });
+    const unconstrained = createShareUrl(pageUrl, experiment, 99, { ...defaults2D.settings, infeasibleFilling: false });
+
+    expect(unconstrained).not.toMatch(/constraint=|infeasibleFilling=/);
+    expect(shareUrl(undefined)).toBe(`${unconstrained}&constraint=disk&infeasibleFilling=true`);
+    expect(shareUrl(true)).toBe(`${unconstrained}&constraint=disk&infeasibleFilling=true`);
+    expect(shareUrl(false)).toBe(`${unconstrained}&constraint=disk&infeasibleFilling=false`);
+    const play2D = createShareUrl(pageUrl, { page: "1d", preset: defaults1D.preset }, 99, { ...defaults1D.settings, infeasibleFilling: false });
+    expect(play2D).not.toMatch(/constraint=|infeasibleFilling=/);
+  });
+
+  it("reads the shared constraint with unconstrained fallbacks", () => {
+    const unconstrained = { constraint: "none", infeasibleFilling: undefined };
+    expect(readSharedConstraint(null)).toEqual(unconstrained);
+    for (const query of ["infeasibleFilling=false", "constraint=none", "constraint=unknown", "constraint=__proto__"]) {
+      expect(readSharedConstraint(new URLSearchParams(query))).toEqual(unconstrained);
+    }
+    for (const query of ["constraint=disk", "constraint=disk&infeasibleFilling=true", "constraint=disk&infeasibleFilling=invalid"]) {
+      expect(readSharedConstraint(new URLSearchParams(query))).toEqual({ constraint: "disk", infeasibleFilling: true });
+    }
+    expect(readSharedConstraint(new URLSearchParams("constraint=disk&infeasibleFilling=false")))
+      .toEqual({ constraint: "disk", infeasibleFilling: false });
+  });
+
   it("round-trips explorer defaults, preset IDs, and every model control value", () => {
     expect(roundTrip1D(defaults1D)).toEqual(defaults1D);
-    const url = new URL(createShareUrl(pageUrl, { page: "2d", preset: defaults2D.preset, mode: "multivariate" }, defaults2D.seed, defaults2D.settings));
+    const url = new URL(createShareUrl(pageUrl, { page: "2d", preset: defaults2D.preset, mode: "multivariate", constraint: "none" }, defaults2D.seed, defaults2D.settings));
     const decode2D = (hash: string) => readSharedSearch(readRoute(hash).share, defaults2D, objectivePresets2D, settings2D.count, 10);
     expect(decode2D(url.hash)).toEqual(defaults2D);
     for (const preset of ["multimodal", "quadratic", "narrow", "boundary"] as const) {
@@ -149,11 +176,30 @@ describe("share links", () => {
     expect(runSearch(one.seed, 12, one.settings.priorWeight, { ...one.settings, objectivePreset: one.preset }))
       .toEqual(runSearch(seed, 12, settings.priorWeight, { ...settings, objectivePreset: "boundary" }));
 
-    const fragment = new URL(createShareUrl(pageUrl, { page: "2d", preset: "rosenbrock", mode: "univariate" }, seed, settings)).hash;
+    const fragment = new URL(createShareUrl(pageUrl, { page: "2d", preset: "rosenbrock", mode: "univariate", constraint: "none" }, seed, settings)).hash;
     const { share } = readRoute(fragment);
     const two = readSharedSearch(share, defaults2D, objectivePresets2D, settings2D.count, 10);
     const mode = share?.get("mode") === "univariate" ? "univariate" : "multivariate";
     expect(movePlayback2D(emptyPlayback2D(), 12, two.seed, mode, { ...two.settings, objectivePreset: two.preset }))
       .toEqual(movePlayback2D(emptyPlayback2D(), 12, seed, "univariate", { ...settings, objectivePreset: "rosenbrock" }));
+  });
+
+  it("round-trips a constrained Play 3D search and reproduces its trial sequence", () => {
+    const seed = 17;
+    const mode = "univariate";
+    const objectivePreset = "quadratic";
+    const constraintPreset = "band";
+    const settings = { ...defaults2D.settings, startupTrials: 2, infeasibleFilling: false };
+    const url = createShareUrl(pageUrl, { page: "2d", preset: objectivePreset, mode, constraint: constraintPreset }, seed, settings);
+    const route = readRoute(new URL(url).hash);
+    const shared = readSharedSearch(route.share, defaults2D, objectivePresets2D, settings2D.count, 10);
+    const { constraint, infeasibleFilling } = readSharedConstraint(route.share);
+
+    expect(route.page).toBe("2d");
+    expect({ constraint, infeasibleFilling }).toEqual({ constraint: constraintPreset, infeasibleFilling: false });
+    const sharedMode = route.share?.get("mode") === "univariate" ? "univariate" : "multivariate";
+    expect(movePlayback2D(emptyPlayback2D(), 12, shared.seed, sharedMode, {
+      ...shared.settings, objectivePreset: shared.preset, constraintPreset: constraint, infeasibleFilling,
+    })).toEqual(movePlayback2D(emptyPlayback2D(), 12, seed, mode, { ...settings, objectivePreset, constraintPreset }));
   });
 });

@@ -92,7 +92,7 @@ it("renders About as a named article with five parallel section headings", () =>
 });
 
 it("starts a shared Play 2D search at trial zero with the linked settings", () => {
-  const initialRoute = { page: "1d", share: new URLSearchParams("preset=quadratic&seed=0&startupTrials=2&gamma=0.15") } as const;
+  const initialRoute = { page: "1d", share: new URLSearchParams("preset=quadratic&seed=0&startupTrials=2&gamma=0.15&constraint=disk") } as const;
   const html = renderToStaticMarkup(<App initialRoute={initialRoute} />);
   expect(html).toContain("Trial 0 / 200");
   expect(html).toContain("<h3>Random start · 1 / 2</h3>");
@@ -101,4 +101,5 @@ it("starts a shared Play 2D search at trial zero with the linked settings", () =
   expect(html).toContain('aria-label="Search seed">0</output>');
   expect(html).toContain('aria-valuetext="15 percent"');
   expect(html).toContain("Share link");
+  expect(html).not.toContain("Infeasible filling");
 });

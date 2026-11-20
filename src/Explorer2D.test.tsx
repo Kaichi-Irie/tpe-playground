@@ -75,3 +75,19 @@ it("shows the constraint selector with filling available only for an active pres
   expect(active).toContain('Infeasible filling');
   expect(active).toContain('1.5%');
 });
+
+it("starts a shared constrained Play 3D search with the linked constraint and filling", () => {
+  const sharedSettings = new URLSearchParams("constraint=band&infeasibleFilling=false");
+  const html = renderToStaticMarkup(<Explorer2D sharedSettings={sharedSettings} />);
+  expect(html).toContain("Trial 0 / 200");
+  expect(html).toContain('<option value="band" selected="">Thin band</option>');
+  expect(html).toContain('<input type="checkbox"/> Infeasible filling');
+  expect(html).not.toContain('id="constraint-hint-text-2d"');
+});
+
+it("replaces EI weights when a shared link turns a constraint on", () => {
+  const sharedSettings = new URLSearchParams("constraint=disk&weights=ei");
+  const html = renderToStaticMarkup(<Explorer2D sharedSettings={sharedSettings} />);
+  expect(html).toContain('<option value="uniform" selected="">Uniform</option>');
+  expect(html).toContain('<option value="ei" disabled="">');
+});

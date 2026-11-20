@@ -6,7 +6,7 @@ import { defaultModelSettings2D, settings2D } from "./tpe2d";
 function renderPanel(status?: string, props: Partial<React.ComponentProps<typeof ModelSettingsPanel>> = {}) {
   return renderToStaticMarkup(
     <ModelSettingsPanel
-      experiment={{ page: "2d", preset: "quadratic", mode: "multivariate" }}
+      experiment={{ page: "2d", preset: "quadratic", mode: "multivariate", constraint: "none" }}
       settings={defaultModelSettings2D}
       defaultSettings={defaultModelSettings2D}
       onChange={() => {}}
@@ -73,7 +73,7 @@ it("keeps dialog actions in the footer and the seed in Experiment", () => {
 it("marks only the guided slider as the coachmark target", () => {
   const html = renderToStaticMarkup(
     <ModelSettingsPanel
-      experiment={{ page: "2d", preset: "quadratic", mode: "multivariate" }}
+      experiment={{ page: "2d", preset: "quadratic", mode: "multivariate", constraint: "none" }}
       settings={defaultModelSettings2D}
       defaultSettings={defaultModelSettings2D}
       onChange={() => {}}
