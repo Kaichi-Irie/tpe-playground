@@ -91,3 +91,15 @@ it("marks only the guided slider as the coachmark target", () => {
   expect(bandwidth).toBeDefined();
   expect(bandwidth).not.toMatch(/data-guide-target|aria-describedby/);
 });
+
+it("explains candidate sampling and Good for constrained univariate searches", () => {
+  const html = renderPanel(undefined, {
+    experiment: { page: "play-3d", preset: "quadratic", mode: "univariate", constraint: "disk" },
+  });
+  expect(html).toContain("Draws this many candidates per coordinate from ℓ and picks the highest ℓ/g for each.");
+  expect(html).toContain("The prior can be the only Good kernel.");
+  expect(html).toContain("Sets the target size of Good. Feasible trials rank first by objective. Infeasible filling uses the least-violating trials to fill empty slots.");
+  const unconstrained = renderPanel();
+  expect(unconstrained).toContain("Draws this many candidates from ℓ per trial and picks the highest ℓ/g.");
+  expect(unconstrained).toContain("rounded up, and leaves at least one trial in Bad.");
+});

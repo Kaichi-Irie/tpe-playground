@@ -19,7 +19,9 @@ position in playback links it to the same position in the proposal array. A
 proposal's input IDs refer only to earlier observations. Moving backward truncates
 both arrays; a setting change retains past observations and traces and affects
 future proposals. This is a linear branch, not a persistent branch tree. Reloading
-the page starts a fresh run; no browser persistence/export UI is added here.
+the page starts a fresh run. In either Play view, Settings → Share link copies a
+URL with the seed, objective, model settings, and any applicable density mode
+and constraint. The link opens at trial zero. Playback history stays in memory.
 
 History keys include coordinates and objective/constraint values, not just IDs.
 They are deterministic cache/provenance identifiers, not cryptographic digests.
@@ -43,7 +45,8 @@ engine (for example after a JSON round trip), copying it before constructing the
 runtime. It is not an untrusted file parser or schema migration service.
 
 The current policy supports a single objective (minimize or maximize), fixed
-continuous box domains, fixed bandwidth, uniform/recency/EI weighting, and an
+continuous box domains, Constant/Scott/Silverman bandwidth rules,
+uniform/recency/EI weighting, and an
 optional broad prior. Observations retain their original objective values.
 The unconstrained split threshold uses minimization-oriented values.
 
@@ -84,8 +87,9 @@ candidate-selection code. The RNG traverses groups in declared parameter order.
 
 Kernels distinguish observation and prior sources, raw observation-equivalent
 weights, and normalized mixture weights. Prior weights are applied per group.
-Kernels have one bandwidth per coordinate even though the current configuration
-uses a single common observation bandwidth.
+Kernels have one bandwidth per coordinate. Constant uses the configured width
+for every observation kernel. Scott and Silverman resolve widths separately for
+each density and coordinate within a parameter group. Prior widths remain fixed.
 
 To preserve the existing educational model, density values integrate to one over
 the whole real space. Sampling rejects the entire mixture draw outside the box,
