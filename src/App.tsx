@@ -148,8 +148,7 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
   const acquisitionMax = acquisitionHigh + acquisitionPadding;
   const sa = (value: number) => box.bottom - (value - acquisitionMin) / (acquisitionMax - acquisitionMin) * (box.bottom - box.top);
   const group = model.fitted?.snapshot.groups[0];
-  const goodWidth = group?.good.kernels.find((kernel) => kernel.source.kind === "observation")?.bandwidths.x;
-  const badWidth = group?.bad.kernels.find((kernel) => kernel.source.kind === "observation")?.bandwidths.x;
+  const goodWidths = group?.good.kernels.filter((kernel) => kernel.source.kind === "observation").map((kernel) => kernel.bandwidths.x) ?? [];
   const peak = useMemo(() => {
     if (!group) return Math.exp(logTruncatedNormalPeak(prior.mean, bandwidth, ...domain));
     return Math.max(...[...group.good.kernels, ...group.bad.kernels].map((kernel) =>
@@ -235,7 +234,7 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
           editModel();
         }}
         seed={seed} onNewSeed={() => { setSearch({ ...search, seed: Math.floor(Math.random() * 100) }); setPlayback(emptyPlayback()); setPlaying(false); setSelected(null); }}
-        trialLimit={trialLimit} widths={goodWidth === undefined ? [] : [{ label: "x", value: goodWidth }]} domainWidth={domainWidth}
+        trialLimit={trialLimit} widths={[{ label: "x", values: goodWidths }]} domainWidth={domainWidth}
         status={<>
           <div className="proposal">
             <h3>{!proposal ? "Search complete" : proposal.method === "random" ? `Random start · ${step + 1} / ${startupTrials}` : `TPE · trial ${step + 1}`}</h3>

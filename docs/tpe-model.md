@@ -45,9 +45,8 @@ engine (for example after a JSON round trip), copying it before constructing the
 runtime. It is not an untrusted file parser or schema migration service.
 
 The current policy supports a single objective (minimize or maximize), fixed
-continuous box domains, Constant/Scott/Silverman bandwidth rules,
-uniform/recency/EI weighting, and an
-optional broad prior. Observations retain their original objective values.
+continuous box domains, Constant, Scott, Silverman and Neighbor bandwidth rules,
+uniform, recency, EI and Optuna weighting, and an optional broad prior. Observations retain their original objective values.
 The unconstrained split threshold uses minimization-oriented values.
 
 A constrained problem declares the number of finite constraint values per
@@ -60,7 +59,7 @@ highest total violation, with the same tie-break. With filling disabled, Good
 can fall below its target size. All remaining trials go to Bad.
 
 The constrained partition records the target size, feasible IDs, total
-violations, and filled IDs. Its weights can be uniform or recency-based. EI
+violations, and filled IDs. Its weights can be uniform, recency-based or Optuna weights. EI
 requires an objective threshold, so the engine rejects EI for constrained
 problems. When Good is empty, a positive prior weight supplies the only Good
 kernel. Without a prior, proposing falls back to a uniform draw with
@@ -89,7 +88,8 @@ Kernels distinguish observation and prior sources, raw observation-equivalent
 weights, and normalized mixture weights. Prior weights are applied per group.
 Kernels have one bandwidth per coordinate. Constant uses the configured width
 for every observation kernel. Scott and Silverman resolve widths separately for
-each density and coordinate within a parameter group. Prior widths remain fixed.
+each density and coordinate within a parameter group. Neighbor resolves a width
+for each observation kernel and coordinate. Prior widths remain fixed.
 
 Each observation and prior kernel is a product of per-coordinate truncated
 Gaussians. For each coordinate, the Gaussian is divided by its probability mass
@@ -102,7 +102,33 @@ preserve the mixture weights.
 Sampling chooses a component by weight once, then uses bounded Box–Muller
 rejection for each coordinate of that component. The snapshot records
 `normalization: "truncated-box"` and `sampling: "truncated-components"`.
-Optuna parity remains a separate goal because bandwidths and weights still differ.
+
+## Optuna parity
+
+The opt-in preset uses Optuna 5.1.0's split, neighboring-center bandwidths,
+observation weights and broad prior for completed trials in single-objective
+continuous box problems. For 2 ≤ n ≤ 250, the playground’s Good fraction of 0.10
+gives the same count as Optuna’s `min(ceil(0.1 n), 25)`. Optuna defaults to
+multivariate TPE for a single objective. Play 3D’s univariate mode corresponds
+to `multivariate=False`.
+
+The fixture compares Good and Bad trial IDs, every kernel's center, per-coordinate
+width and normalized mixture weight, and log ℓ and log g at 50 box points per
+case. The playground sorts coincident centers stably in trial order under the
+preset. Optuna calls NumPy’s default `argsort`, which can assign unequal
+neighbor widths to different trials when centers coincide. Startup and candidate
+draws use different random number generators and sampling algorithms, so the
+preset can produce different trajectories from the same seed.
+
+Regenerate the fixture from the repository root with Python and uv.
+
+```sh
+uv run --with optuna==5.1.0 python scripts/optuna_parity_fixtures.py
+```
+
+`npm run check` compares against the committed fixture without running Python.
+See the versioned [Optuna sampler](https://github.com/optuna/optuna/blob/v5.1.0/optuna/samplers/_tpe/sampler.py)
+and [Parzen estimator](https://github.com/optuna/optuna/blob/v5.1.0/optuna/samplers/_tpe/parzen_estimator.py).
 
 ## Visualization
 

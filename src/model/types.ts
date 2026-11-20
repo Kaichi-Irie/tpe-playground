@@ -2,7 +2,7 @@ import type { BandwidthRule } from "./bandwidth";
 
 export type Point = Readonly<Record<string, number>>;
 export type DensityMode = "univariate" | "multivariate";
-export type WeightStrategy = "uniform" | "recency" | "ei";
+export type WeightStrategy = "uniform" | "recency" | "ei" | "optuna";
 export interface Parameter { readonly id: string; readonly low: number; readonly high: number }
 export interface Problem {
   readonly id: string;

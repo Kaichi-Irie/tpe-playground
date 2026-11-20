@@ -868,6 +868,7 @@ header { height: 64px; padding: 10px 0; border: 0; }
 .settings-dialog .settings-form label { grid-column: 1; grid-row: 1; color: var(--text); font-size: var(--type-md); font-weight: 500; }
 .settings-dialog .settings-form label.sr-only { position: static; width: auto; height: auto; clip-path: none; margin: 0; overflow: visible; white-space: normal; }
 .settings-dialog .settings-form select { width: min(11rem, 45vw); max-width: none; min-height: 44px; margin: 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--control); color: var(--text); font-size: 16px; font-weight: 400; }
+.settings-dialog .settings-form .bandwidth-rule-select { width: min(11.75rem, 50vw); padding-inline: 8px; }
 .settings-dialog .settings-form select,
 .settings-dialog .settings-form .resample { grid-column: 3; grid-row: 1; justify-self: end; }
 .settings-dialog .settings-form .parameter-label,
@@ -910,9 +911,13 @@ header { height: 64px; padding: 10px 0; border: 0; }
 .settings-dialog .settings-form .resample,
 .settings-dialog-footer button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); }
 .settings-dialog-footer .settings-reset { margin-inline-start: -12px; border-color: transparent; color: var(--muted); }
-.settings-dialog-footer .settings-reset:disabled { opacity: .5; cursor: default; }
+.settings-dialog-footer button:disabled { opacity: .5; cursor: default; }
 .settings-dialog-footer button:hover:not(:disabled),
 .settings-dialog .settings-form .resample:hover { background: var(--hover); }
+.settings-preset-action { display: inline-flex; align-items: center; gap: 4px; }
+.settings-dialog-footer .settings-preset-action .help { position: static; }
+.settings-dialog-footer .settings-preset-action .help-trigger { width: 44px; height: 44px; padding: 0; border-color: transparent; }
+.settings-preset-action .help-content { top: auto; bottom: 100%; left: 16px; right: 16px; width: auto; }
 .share-search-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .share-search-status, .share-search-url { order: -1; flex: 0 0 100%; }
 .share-search-status { color: var(--muted); font-size: var(--type-md); }
@@ -925,6 +930,10 @@ header { height: 64px; padding: 10px 0; border: 0; }
   .settings-toggle { border: 0; border-radius: 0; }
   .settings-dialog { max-height: calc(100dvh - 24px); }
   .settings-dialog-heading, .settings-dialog-content, .settings-dialog-footer { padding-inline: 16px; }
+}
+
+@media (max-width: 360px) {
+  .settings-dialog .settings-form .bandwidth-rule-select { grid-column: 1 / -1; grid-row: 2; width: 100%; }
 }
 
 /* Size live controls independently of the retired settings toolbar grid. */

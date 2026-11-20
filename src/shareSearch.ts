@@ -1,7 +1,8 @@
 import { twoParamConstraintPresets, type TwoParamConstraintPreset } from "./twoParamConstraints";
+import { isBandwidthRule } from "./model/bandwidth";
 import type { DensityMode } from "./model/types";
 import {
-  bandwidthRange, candidateCounts, constrainSettings, gammaRange, priorWeights, startupTrialCounts, weightOptions, type ModelSettings,
+  applyOptunaPreset, bandwidthRange, candidateCounts, constrainSettings, gammaRange, matchesOptunaPreset, priorWeights, startupTrialCounts, weightOptions, type ModelSettings,
 } from "./searchSettings";
 
 export const playPageHrefs = { "play-2d": import.meta.env.BASE_URL, "play-3d": "#play-3d" } as const;
@@ -14,7 +15,7 @@ export type ShareExperiment =
 export type SharedSearch<Preset extends string> = {
   seed: number;
   preset: Preset;
-  settings: Required<Omit<ModelSettings, "infeasibleFilling">>;
+  settings: Required<Omit<ModelSettings, "infeasibleFilling">> & Pick<ModelSettings, "infeasibleFilling">;
 };
 
 export type Route = { page: Page; share: URLSearchParams | null };
@@ -40,13 +41,16 @@ export function createShareUrl(documentUrl: string, experiment: ShareExperiment,
     priorWeight: String(settings.priorWeight),
     startupTrials: String(settings.startupTrials),
     candidates: String(settings.candidates),
-  } satisfies Record<keyof SharedSearch<string>["settings"], string>;
-  const params = new URLSearchParams({ seed: String(seed), preset: experiment.preset, ...model });
+  } satisfies Record<keyof Omit<ModelSettings, "infeasibleFilling">, string>;
+  const optuna = matchesOptunaPreset(settings);
+  const params = new URLSearchParams({
+    seed: String(seed), preset: experiment.preset, ...(optuna ? { tpe: "optuna" } : model),
+  });
   if (experiment.page === "play-3d") {
     params.set("mode", experiment.mode);
     if (experiment.constraint !== "none") {
       params.set("constraint", experiment.constraint);
-      params.set("infeasibleFilling", String(settings.infeasibleFilling ?? true));
+      if (!optuna) params.set("infeasibleFilling", String(settings.infeasibleFilling ?? true));
     }
   }
   url.hash = `${playShareHashes[experiment.page]}?${params}`;
@@ -86,11 +90,10 @@ export function readSharedSearch<Preset extends string>(
   return {
     seed: Number.isInteger(seed) && seed >= 0 && seed <= 99 ? seed : defaults.seed,
     preset: preset !== null && Object.hasOwn(presets, preset) ? preset as Preset : defaults.preset,
-    settings: {
+    settings: params.get("tpe") === "optuna" ? applyOptunaPreset(defaults.settings) : {
       gamma: onStep(gamma, gammaRange.min, gammaRange.max, gammaRange.step) ? gamma : defaults.settings.gamma,
       bandwidth: onStep(bandwidth, bandwidthRange.min, domainWidth, bandwidthRange.step) ? bandwidth : defaults.settings.bandwidth,
-      bandwidthRule: bandwidthRule === "constant" || bandwidthRule === "scott" || bandwidthRule === "silverman"
-        ? bandwidthRule : defaults.settings.bandwidthRule,
+      bandwidthRule: isBandwidthRule(bandwidthRule) ? bandwidthRule : defaults.settings.bandwidthRule,
       weights: weights ?? defaults.settings.weights,
       priorWeight: readOption("priorWeight", priorWeights),
       startupTrials: readOption("startupTrials", startupTrialCounts(trialLimit)),
@@ -112,7 +115,7 @@ export function readPlay3DSharedSearch<Preset extends string>(
   const constraint = value && Object.hasOwn(twoParamConstraintPresets, value) ? value as TwoParamConstraintPreset : "none";
   const settings = constraint === "none" ? search.settings : constrainSettings({
     ...search.settings,
-    infeasibleFilling: params?.get("infeasibleFilling") !== "false",
+    infeasibleFilling: search.settings.infeasibleFilling ?? (params?.get("infeasibleFilling") !== "false"),
   });
   return { ...search, settings, mode, constraint };
 }

@@ -13,7 +13,7 @@ export interface ExplanationSettings {
   gamma: number;
   bandwidth: number;
   priorWeight: number;
-  weights: WeightStrategy;
+  weights: Exclude<WeightStrategy, "optuna">;
   candidates: number;
   seed: number;
 }

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { resolveBandwidth, type BandwidthRule } from "./bandwidth";
+import { neighborBandwidths, resolveBandwidth, type BandwidthRule } from "./bandwidth";
 import { fitOneParamModel, runSearch, defaults } from "../oneParamTpe";
 import { logDensity } from "./density";
 
@@ -93,4 +93,23 @@ it("fits coordinate-wise adaptive widths in both two-parameter density modes, pr
       expect(Object.values(proposal.selected).every((value) => value >= -5 && value <= 5)).toBe(true);
     }
   }
+});
+
+it("uses box gaps for singletons and only the mutual gap for two observations", () => {
+  expect(neighborBandwidths([], -5, 5, true)).toEqual([]);
+  expect(neighborBandwidths([2], -5, 5, false)).toEqual([7]);
+  expect(neighborBandwidths([-5], -5, 5, true)).toEqual([10]);
+  expect(neighborBandwidths([1, -3], -5, 5, true)).toEqual([4, 4]);
+  expect(neighborBandwidths([5, -5], -5, 5, true)).toEqual([10, 10]);
+});
+
+it("returns clipped neighbor widths in input order, with and without the prior", () => {
+  const centers = [2, -1, 0, 0.5, 1];
+  expect(neighborBandwidths(centers, -5, 5, true)).toEqual([10 / 7, 10 / 7, 10 / 7, 10 / 7, 10 / 7]);
+  expect(neighborBandwidths(centers, -5, 5, false)).toEqual(Array(5).fill(10 / 6));
+  expect(neighborBandwidths([1, -5, 5, 0], -5, 5, true)).toEqual([4, 5, 4, 5]);
+  expect(neighborBandwidths([0, 0], -5, 5, true)).toEqual([2.5, 2.5]);
+  expect(neighborBandwidths([0, 0], -5, 5, false)).toEqual([10 / 3, 10 / 3]);
+  expect(neighborBandwidths([0, -4, 0, 5], -5, 5, true)).toEqual([4, 4, 5, 5]);
+  expect(neighborBandwidths(Array(200).fill(0), -5, 5, true)).toEqual(Array(200).fill(0.1));
 });

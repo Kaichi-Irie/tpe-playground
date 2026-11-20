@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createShareUrl, readRoute, readSharedSearch, readPlay3DSharedSearch, type SharedSearch } from "./shareSearch";
-import { bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrialCounts, weightOptions } from "./searchSettings";
+import { applyOptunaPreset, bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrialCounts, weightOptions } from "./searchSettings";
 import { objectivePresets, type ObjectivePreset } from "./objectives";
 import { defaults, prior, runSearch, searchDefaults, trialLimit } from "./oneParamTpe";
 import { twoParamDefaultModelSettings, emptyTwoParamPlayback, moveTwoParamPlayback, twoParamObjectivePresets, twoParamSettings, type TwoParamObjectivePreset } from "./twoParamTpe";
@@ -172,7 +172,7 @@ describe("share links", () => {
       Array.from({ length: Math.round((max - min) / step) + 1 }, (_, i) => Math.round((min + i * step) * 100) / 100);
     checkSetting("gamma", hundredths(gammaRange.min, gammaRange.max, gammaRange.step));
     checkSetting("bandwidth", hundredths(bandwidthRange.min, 10, bandwidthRange.step));
-    checkSetting("bandwidthRule", ["constant", "scott", "silverman"]);
+    checkSetting("bandwidthRule", ["constant", "scott", "silverman", "neighbor"]);
     checkSetting("weights", weightOptions.map(({ value }) => value));
     checkSetting("priorWeight", priorWeights);
     checkSetting("startupTrials", startupTrialCounts(trialLimit));
@@ -221,5 +221,47 @@ describe("share links", () => {
     expect(moveTwoParamPlayback(emptyTwoParamPlayback(), 12, shared.seed, shared.mode, {
       ...shared.settings, objectivePreset: shared.preset, constraintPreset: shared.constraint,
     })).toEqual(moveTwoParamPlayback(emptyTwoParamPlayback(), 12, seed, mode, { ...settings, objectivePreset, constraintPreset }));
+  });
+});
+
+describe("Optuna share alias", () => {
+  it("overrides model parameters with the preset over each page's defaults", () => {
+    const params = new URLSearchParams("seed=17&preset=quadratic&tpe=optuna&mode=univariate&constraint=band&infeasibleFilling=false&gamma=0.3&bandwidth=0.73&bandwidthRule=constant&weights=ei&priorWeight=0&startupTrials=2&candidates=4");
+    const preset = {
+      gamma: 0.1, bandwidthRule: "neighbor", weights: "optuna", priorWeight: 1,
+      startupTrials: 10, candidates: 24, infeasibleFilling: true,
+    };
+    expect(decodePlay3D(params)).toEqual({
+      seed: 17, preset: "quadratic", mode: "univariate", constraint: "band",
+      settings: { ...preset, bandwidth: play3DDefaults.settings.bandwidth },
+    });
+    expect(readSharedSearch(params, play2DDefaults, objectivePresets, trialLimit, 10)).toEqual({
+      seed: 17, preset: "quadratic", settings: { ...preset, bandwidth: play2DDefaults.settings.bandwidth },
+    });
+  });
+
+  it("ignores unknown aliases and accepts standalone Neighbor and Optuna weights", () => {
+    const params = new URLSearchParams("mode=univariate&tpe=unknown&gamma=0.35&bandwidthRule=neighbor&weights=optuna");
+    expect(decodePlay3D(params)).toEqual({
+      ...play3DDefaults, mode: "univariate", constraint: "none",
+      settings: { ...play3DDefaults.settings, gamma: 0.35, bandwidthRule: "neighbor", weights: "optuna" },
+    });
+  });
+
+  it("writes only the alias when all preset values match, ignoring the Constant width", () => {
+    const settings = { ...applyOptunaPreset(play3DDefaults.settings), bandwidth: 0.73 };
+    const experiment = { page: "play-3d", preset: "rosenbrock", mode: "univariate", constraint: "disk" } as const;
+    const url = createShareUrl(pageUrl, experiment, 17, settings);
+    expect(new URL(url).hash).toBe("#play-3d?seed=17&preset=rosenbrock&tpe=optuna&mode=univariate&constraint=disk");
+    expect(createShareUrl(pageUrl, { page: "play-2d", preset: "boundary" }, 17, settings))
+      .toContain("#play-2d?seed=17&preset=boundary&tpe=optuna");
+    for (const change of [
+      { gamma: 0.2 }, { bandwidthRule: "constant" }, { weights: "uniform" }, { priorWeight: 0 },
+      { startupTrials: 2 }, { candidates: 8 }, { infeasibleFilling: false },
+    ] as const) {
+      const individual = createShareUrl(pageUrl, experiment, 17, { ...settings, ...change });
+      expect(individual).not.toContain("tpe=");
+      expect(individual).toContain("bandwidth=0.73");
+    }
   });
 });

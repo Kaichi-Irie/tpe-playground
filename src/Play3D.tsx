@@ -105,8 +105,11 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
   const sceneInput = useDeferredValue(liveSceneInput);
   const model = useMemo(() => measurePlay3D("model", () => buildTwoParamView(sceneInput.trials, sceneInput.mode, sceneInput.settings)), [sceneInput]);
   const goodWidths = model.fitted?.snapshot.groups.flatMap((group) => {
-    const kernel = group.good.kernels.find((item) => item.source.kind === "observation");
-    return kernel ? group.parameterIds.map((id) => ({ label: id === "x1" ? "x₁" : "x₂", value: kernel.bandwidths[id] })) : [];
+    const kernels = group.good.kernels.filter((kernel) => kernel.source.kind === "observation");
+    return group.parameterIds.map((id) => ({
+      label: id === "x1" ? "x₁" : "x₂",
+      values: kernels.map((kernel) => kernel.bandwidths[id]),
+    }));
   }) ?? [];
   const proposal = useMemo(() => {
     const { trials, mode, settings } = sceneInput;
