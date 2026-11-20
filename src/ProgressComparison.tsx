@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from "react";
-import { comparisonFloor, averageRegret, relativeBestSoFar, bestSoFar, bestFeasibleSoFar } from "./comparison";
+import { averageRegret, relativeBestSoFar, bestSoFar, bestFeasibleSoFar } from "./comparison";
 import { findObjectiveMinimum, type ObjectivePreset } from "./objectives";
 import { PanelClose } from "./PanelClose";
 import { Help } from "./Help";
@@ -29,18 +29,10 @@ export function ComparisonPanel({ trials, randomTrials, minimum, relative = true
   const bestGap = (samples: readonly MetricTrial[]) => constrained ? feasibleGap(samples) : relative
     ? relativeBestSoFar(samples, minimum)
     : bestSoFar(samples).map((value) => Math.max(0, value - minimum));
-  const tpeRegret = constrained ? [] : averageRegret(trials, minimum);
-  const randomRegret = constrained ? [] : averageRegret(random, minimum);
-  // Average regret can rise or fall. Bound it using only observed values.
-  const positiveRegrets = [...tpeRegret, ...randomRegret].filter((value) => value > 0);
-  const regretFloor = positiveRegrets.length
-    ? Math.max(comparisonFloor, 10 ** Math.floor(Math.log10(Math.min(...positiveRegrets))))
-    : comparisonFloor;
   const title = metric === "best" ? "Best so far" : "Average regret";
   const definition = constrained ? "Minimum f(xᵢ) − f(x*) over feasible trials through trial t." : metric === "best"
     ? relative ? "minᵢ≤ₜ [f(xᵢ) − f(x*)] / f(x*)" : "minᵢ≤ₜ [f(xᵢ) − f(x*)]"
     : "(1/t) Σᵢ₌₁ᵗ [f(xᵢ) − f(x*)]";
-  const floor = metric === "best" ? comparisonFloor : regretFloor;
   return <section className="workspace comparison" aria-label="Search performance">
     <div className="section-heading"><h2>Performance</h2>{constrained && <span>{constrained.feasibleCount}</span>}<PanelClose label="performance panel" /></div>
     <div className="comparison-toolbar">
@@ -50,15 +42,16 @@ export function ComparisonPanel({ trials, randomTrials, minimum, relative = true
       </div>
       <Help key={metric} label={title}>
         <strong>{title}</strong><br />
-        {constrained ? "Each line starts at its first feasible trial. The reference is the constrained optimum." : metric === "best" ? relative ? "The smallest gap to the optimum found so far, relative to the optimum." : "The smallest gap to the optimum found so far." : "The average gap to the optimum across all evaluations so far."}<br />
+        {constrained ? "∞ means no feasible trial has been found in that run. The reference is the constrained optimum." : metric === "best" ? relative ? "The smallest gap to the optimum found so far, relative to the optimum." : "The smallest gap to the optimum found so far." : "The average gap to the optimum across all evaluations so far."}<br />
         {definition}<br />
         {approximate && <>The optimum reference is numerically estimated.<br /></>}
-        The vertical axis uses a logarithmic scale. Values ≤ {floor.toExponential(0)} are drawn at the bottom.
+        The logarithmic scale adjusts to the displayed history. Values below its lower bound are drawn at the bottom.
       </Help>
     </div>
     <ProgressPlot title={title} definition={definition}
-      tpe={metric === "best" ? bestGap(trials) : tpeRegret} random={metric === "best" ? bestGap(random) : randomRegret}
+      tpe={metric === "best" ? bestGap(trials) : averageRegret(trials, minimum)}
+      random={metric === "best" ? bestGap(random) : averageRegret(random, minimum)}
       third={constrained && { label: constrained.flippedLabel, values: feasibleGap(constrained.flippedTrials.slice(0, trials.length)) }}
-      currentLabel={constrained?.currentLabel} floor={floor} />
+      currentLabel={constrained?.currentLabel} />
   </section>;
 }

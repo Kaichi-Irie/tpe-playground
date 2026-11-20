@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { ProgressComparison2D } from "./ProgressComparison2D";
+import { ProgressPlot } from "./ProgressPlot";
 import { defaultModelSettings2D, emptyPlayback2D, findObjectiveMinimum2D, movePlayback2D, objectivePresets2D, settings2D } from "./tpe2d";
 
 it("uses a reproducible random baseline sharing startup observations for every 2D objective", () => {
@@ -22,7 +23,7 @@ it("uses a reproducible random baseline sharing startup observations for every 2
   }
 });
 
-it("compares three constrained runs and omits lines before their first feasible trial", () => {
+it("shows each constrained run at infinity until its first feasible trial", () => {
   const constraintPreset = "disk";
   const settings = { ...defaultModelSettings2D, priorWeight: 0 };
   const run = (count: number) => movePlayback2D(emptyPlayback2D(), count, 42, "multivariate", { ...settings, constraintPreset }).trials;
@@ -32,10 +33,33 @@ it("compares three constrained runs and omits lines before their first feasible 
   expect(html).toContain('<i aria-hidden="true"></i>Random');
   expect(html).toContain('/ 17 feasible');
   expect(html).not.toContain("Average regret");
-  expect(html).toContain("tpe-progress-line");
-  expect(html).not.toContain("third-progress-line");
-  expect(html).not.toContain("random-progress-line");
-  const completeHtml = renderToStaticMarkup(<ProgressComparison2D trials={run(200)} seed={42} objectivePreset="multimodal" constraintPreset={constraintPreset} settings={settings} />);
-  expect(completeHtml).toContain("third-progress-line");
-  expect(completeHtml).toContain("random-progress-line");
+  expect(html).toContain(">∞</text>");
+  const infinityY = html.match(/<line class="grid"[^>]* y1="([^"]+)"/)?.[1];
+  expect(infinityY).toBeDefined();
+  for (const name of ["tpe", "third", "random"]) {
+    expect(html).toContain(`${name}-progress-line`);
+  }
+  expect(html).toContain(`cy="${infinityY}" r="4" class="third-progress-point"`);
+  expect(html).toContain(`cy="${infinityY}" r="5" class="random-progress-point"`);
+  expect(html).not.toContain(`cy="${infinityY}" r="3" class="tpe-progress-point"`);
+
+  const firstTrialHtml = renderToStaticMarkup(<ProgressComparison2D trials={run(1)} seed={42} objectivePreset="multimodal" constraintPreset={constraintPreset} settings={settings} />);
+  expect(firstTrialHtml).toContain(">∞</text>");
+  expect(firstTrialHtml).not.toMatch(/>[^<]*1e[+-]\d+<\/text>/);
+  expect(firstTrialHtml).toContain("tpe-progress-point");
+});
+
+it("fits the log axis to the displayed series and expands it when smaller values appear", () => {
+  const plot = (tpe: number[], random: number[]) => renderToStaticMarkup(
+    <ProgressPlot title="Best so far" definition="" tpe={tpe} random={random} />,
+  );
+  const early = plot([0.4, 0.2], [3, 2]);
+  expect(early).toContain(">1e-1</text>");
+  expect(early).toContain(">1e+1</text>");
+  expect(early).not.toContain("1e-12");
+  const later = plot([0.4, 0.2, 0.0003], [3, 2, 1]);
+  expect(later).toContain(">1e-4</text>");
+  const zero = plot([0.4, 0], [3, 2]);
+  expect(zero).toContain(">≤ 1e-2</text>");
+  expect(zero).not.toMatch(/NaN|Infinity/);
 });

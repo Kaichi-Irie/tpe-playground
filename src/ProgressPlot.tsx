@@ -4,14 +4,13 @@ import { useChartTypeScale } from "./usePlotSize";
 
 type Series = readonly (number | null)[];
 
-export function ProgressPlot({ title, definition, tpe, random, third, currentLabel = "TPE", floor = comparisonFloor }: {
+export function ProgressPlot({ title, definition, tpe, random, third, currentLabel = "TPE" }: {
   title: string;
   definition: string;
   tpe: Series;
   random: Series;
   third?: { label: string; values: Series };
   currentLabel?: string;
-  floor?: number;
 }) {
   const id = useId();
   const chartRef = useRef<HTMLDivElement>(null);
@@ -38,12 +37,31 @@ export function ProgressPlot({ title, definition, tpe, random, third, currentLab
     ...(third ? [{ name: "third", ...third, radius: 4 }] : []),
     { name: "tpe", label: currentLabel, values: tpe, radius: 3 },
   ];
-  const axis = comparisonAxis(Math.max(floor, ...series.flatMap(({ values }) => values.map((value) => value ?? 0))), floor);
-  const scaleY = (value: number) => plot.bottom - axis.normalize(value) * (plot.bottom - plot.top);
-  const staircase = (values: Series) => values.flatMap((value, index) => {
-    if (value === null) return [];
+  const displayedValues = series.flatMap(({ values }) => values);
+  const hasInfeasiblePrefix = displayedValues.includes(null);
+  const finiteValues = displayedValues.filter((value) => value !== null);
+  const smallestPositive = Math.min(...finiteValues.filter((value) => value > 0));
+  const lowerExponent = Math.floor(Math.log10(smallestPositive));
+  // Reserve a lower decade for zero when there is room above the log floor.
+  const floor = Number.isFinite(smallestPositive)
+    ? Math.max(comparisonFloor, 10 ** (lowerExponent - Number(finiteValues.includes(0))))
+    : comparisonFloor;
+  const axis = comparisonAxis(Math.max(floor, ...finiteValues), floor);
+  const finiteTop = plot.top + (hasInfeasiblePrefix ? 22 * typeScale : 0);
+  const scaleY = (value: number | null) => value === null
+    ? plot.top
+    : plot.bottom - axis.normalize(value) * (plot.bottom - finiteTop);
+  const clipsLowValues = finiteValues.some((value) => value < floor);
+  const yTicks = [
+    ...(hasInfeasiblePrefix ? [{ value: null, label: "∞" }] : []),
+    ...(hasInfeasiblePrefix && !finiteValues.length ? [] : axis.ticks.map((value, index) => ({
+      value,
+      label: `${index === 0 && clipsLowValues ? "≤ " : ""}${value.toExponential(0)}`,
+    }))),
+  ];
+  const staircase = (values: Series) => values.map((value, index) => {
     const x = trialX(index + 1).toFixed(2), y = scaleY(value).toFixed(2);
-    return [index === 0 || values[index - 1] === null ? `M${x},${y}` : `H${x} V${y}`];
+    return index === 0 ? `M${x},${y}` : `H${x} V${y}`;
   }).join(" ");
   return <section className="progress-panel" aria-label={title}>
     <div className={third ? "comparison-values constrained-values" : "comparison-values"}>
@@ -52,19 +70,19 @@ export function ProgressPlot({ title, definition, tpe, random, third, currentLab
     </div>
     <div className="comparison-chart" ref={chartRef}><svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={`${id}-title ${id}-description`}>
       <title id={`${id}-title`}>{`${title}: ${third ? [currentLabel, third.label, "Random"].join(", ") : "TPE versus Random search"}`}</title>
-      <desc id={`${id}-description`}>{definition} Shown through trial {step} on a logarithmic vertical axis. The horizontal axis spans trials 1 to {trialAxis.upper} and adjusts in blocks of 10. {third ? `${currentLabel} is solid blue. ${third.label} is dotted purple. Random is dashed orange.` : "TPE is solid blue; Random search is dashed orange."}</desc>
-      {axis.ticks.map((value, index) => <g key={index}>
+      <desc id={`${id}-description`}>{definition} Shown through trial {step} on a logarithmic vertical axis. {hasInfeasiblePrefix ? "∞ marks trials before each run found its first feasible point. " : ""}The horizontal axis spans trials 1 to {trialAxis.upper} and adjusts in blocks of 10. {third ? `${currentLabel} is solid blue. ${third.label} is dotted purple. Random is dashed orange.` : "TPE is solid blue; Random search is dashed orange."}</desc>
+      {yTicks.map(({ value, label }) => <g key={label}>
         <line className="grid" x1={plot.left} x2={plot.right} y1={scaleY(value)} y2={scaleY(value)} />
-        <text x={plot.left - 10 * typeScale} y={scaleY(value) + 4 * typeScale} textAnchor="end">{`${index === 0 ? "≤ " : ""}${value.toExponential(0)}`}</text>
+        <text x={plot.left - 10 * typeScale} y={scaleY(value) + 4 * typeScale} textAnchor="end">{label}</text>
       </g>)}
       {trialAxis.ticks.map((trial) => <text key={trial} x={trialX(trial)} y={height - 30 * typeScale} textAnchor="middle">{trial}</text>)}
       <text x={centerX} y={height - 8 * typeScale} textAnchor="middle" className="axis-title">Evaluations</text>
       {step === 0 ? <text x={centerX} y={(plot.top + plot.bottom) / 2} textAnchor="middle"><tspan x={centerX}>Play or step forward</tspan><tspan x={centerX} dy={18 * typeScale}>to compare progress.</tspan></text> : <>
         <line className="comparison-cursor" x1={trialX(step)} x2={trialX(step)} y1={plot.top} y2={plot.bottom} />
-        {series.map(({ name, values }) => values[step - 1] != null && <path key={name} d={staircase(values)} className={`${name}-progress-line`} />)}
+        {series.map(({ name, values }) => values.length > 0 && <path key={name} d={staircase(values)} className={`${name}-progress-line`} />)}
         {series.map(({ name, values, radius }) => {
           const value = values[step - 1];
-          return value == null ? null : <circle key={name} cx={trialX(step)} cy={scaleY(value)} r={radius} className={`${name}-progress-point`} />;
+          return value === undefined ? null : <circle key={name} cx={trialX(step)} cy={scaleY(value)} r={radius} className={`${name}-progress-point`} />;
         })}
       </>}
     </svg></div>
