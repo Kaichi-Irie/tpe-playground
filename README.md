@@ -2,7 +2,7 @@
 
 [**Open TPE Playground →**](https://kaichi-irie.github.io/tpe-playground/)
 
-<img src="src/assets/fuwatane.webp" width="150" align="right" alt="tippy, the TPE Playground mascot holding red and blue crayons">
+[![TPE Playground banner with the mascot tippy beside blue and orange density surfaces and a contour plot](public/social-card.png)](https://kaichi-irie.github.io/tpe-playground/)
 
 An interactive playground for understanding the Tree-structured Parzen Estimator (TPE), the default sampler in [Optuna](https://optuna.org/).
 Watch TPE split past trials into good and bad groups, model each group with a density, and choose the next point where good is most likely relative to bad.
