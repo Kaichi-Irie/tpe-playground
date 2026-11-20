@@ -75,17 +75,22 @@ it("renders a synchronized comparison with no results before evaluation", () => 
   expect(html).toContain("How to read this plot");
 });
 
-it("renders About as a named article with five parallel section headings", () => {
+it("renders About as a named article with parallel section headings", () => {
   const html = renderToStaticMarkup(<App initialRoute={{ page: "about", share: null }} />);
   const article = html.match(/<article\b[^>]*class="about-page"[^>]*>[\s\S]*?<\/article>/)?.[0] ?? "";
 
   expect(article).toMatch(/^<article\b[^>]* aria-label="About"/);
-  expect(article).toContain(`<a href="${import.meta.env.BASE_URL}">Play 2D</a> or <a href="#play-3d">Play 3D</a>`);
+  expect(article).toContain('<a href="#lab">Lab</a>');
+  expect(article).toContain(`<a href="${import.meta.env.BASE_URL}">Play 2D</a>`);
+  expect(article).toContain('<a href="#play-3d">Play 3D</a>');
+  expect(article).toContain("<strong>joint</strong>");
   expect(article).not.toMatch(/<h3\b/);
   expect(Array.from(article.matchAll(/<h2\b[^>]*>(.*?)<\/h2>/g), ([, heading]) => heading)).toEqual([
     "What is TPE?",
     "TPE in Optuna",
     "Inside TPE",
+    "Explore the playground",
+    "Constrained TPE",
     "TPE and other optimizers",
     "References",
   ]);
@@ -101,5 +106,5 @@ it("starts a shared Play 2D search at trial zero with the linked settings", () =
   expect(html).toContain('aria-label="Search seed">0</output>');
   expect(html).toContain('aria-valuetext="15 percent"');
   expect(html).toContain("Share link");
-  expect(html).not.toContain("Infeasible filling");
+  expect(html.replace(/<article\b[^>]*class="about-page"[\s\S]*?<\/article>/, "")).not.toContain("Infeasible filling");
 });
