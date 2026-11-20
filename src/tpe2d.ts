@@ -75,6 +75,10 @@ export const observations2D = (trials: readonly Trial2D[]): Observation[] => tri
 export type ModelSettings2D = Omit<TpeConfig, "mode">;
 export type SearchSettings2D = Partial<ModelSettings2D> & { objectivePreset?: ObjectivePreset2D; constraintPreset?: ConstraintPreset2D };
 export const defaultModelSettings2D: ModelSettings2D = { bandwidthRule: "constant", bandwidth: settings2D.bandwidth, gamma: settings2D.gamma, weights: "uniform", priorWeight: 1, startupTrials: settings2D.startupTrials, candidates: settings2D.candidates };
+export function constrainSettings2D(settings: ModelSettings2D): ModelSettings2D {
+  return settings.weights === "ei" ? { ...settings, weights: "uniform" } : settings;
+}
+
 export const config2D = (mode: DensityMode = "multivariate", settings: SearchSettings2D = {}): TpeConfig => {
   const { objectivePreset: _objectivePreset, constraintPreset, ...modelSettings } = settings;
   const { infeasibleFilling, ...config } = { ...defaultModelSettings2D, ...modelSettings, mode };

@@ -3,6 +3,7 @@ import type { DensityMode } from "./model/types";
 import {
   bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrialCounts, weightOptions, type ModelSettings,
 } from "./searchSettings";
+import { constrainSettings2D, type ModelSettings2D } from "./tpe2d";
 
 export const playPageHrefs = { "1d": import.meta.env.BASE_URL, "2d": "#play-3d" } as const;
 const playShareHashes = { "1d": "#play-2d", "2d": playPageHrefs["2d"] } as const;
@@ -23,24 +24,10 @@ export function readRoute(hash: string): Route {
   const separator = hash.indexOf("?");
   const path = separator === -1 ? hash : hash.slice(0, separator);
   const params = separator === -1 ? null : new URLSearchParams(hash.slice(separator + 1));
-  const version = params?.get("v");
-  // Version 1 used #play-2d for the two-variable explorer.
-  if (version === "1" && (path === "#play" || path === "#play-2d")) {
-    return { page: path === "#play" ? "1d" : "2d", share: params };
-  }
   if (path === playShareHashes["1d"] || path === playShareHashes["2d"]) {
-    return { page: path === playShareHashes["1d"] ? "1d" : "2d", share: version === "2" ? params : null };
+    return { page: path === playShareHashes["1d"] ? "1d" : "2d", share: params };
   }
   return { page: path === "#lab" ? "lab" : path === "#about" ? "about" : "1d", share: null };
-}
-
-export function readBrowserRoute(): Route {
-  const { hash, pathname, search } = window.location;
-  // Only bare bookmarks are aliases. Shared settings stay in the address bar.
-  if (hash === "#play" || hash === playShareHashes["1d"]) {
-    window.history.replaceState(window.history.state, "", `${pathname}${search}`);
-  }
-  return readRoute(hash);
 }
 
 export function createShareUrl(documentUrl: string, experiment: ShareExperiment, seed: number, settings: ModelSettings) {
@@ -55,7 +42,7 @@ export function createShareUrl(documentUrl: string, experiment: ShareExperiment,
     startupTrials: String(settings.startupTrials),
     candidates: String(settings.candidates),
   } satisfies Record<keyof SharedSearch<string>["settings"], string>;
-  const params = new URLSearchParams({ v: "2", seed: String(seed), preset: experiment.preset, ...model });
+  const params = new URLSearchParams({ seed: String(seed), preset: experiment.preset, ...model });
   if (experiment.page === "2d") {
     params.set("mode", experiment.mode);
     if (experiment.constraint !== "none") {
@@ -65,18 +52,6 @@ export function createShareUrl(documentUrl: string, experiment: ShareExperiment,
   }
   url.hash = `${playShareHashes[experiment.page]}?${params}`;
   return url.href;
-}
-
-export function readSharedConstraint(params: URLSearchParams | null): {
-  constraint: ConstraintPreset2D;
-  infeasibleFilling: boolean | undefined;
-} {
-  const value = params?.get("constraint");
-  const constraint = value && Object.hasOwn(constraintPresets2D, value) ? value as ConstraintPreset2D : "none";
-  return {
-    constraint,
-    infeasibleFilling: constraint === "none" ? undefined : params?.get("infeasibleFilling") !== "false",
-  };
 }
 
 function decimal(value: string | null): number {
@@ -123,4 +98,22 @@ export function readSharedSearch<Preset extends string>(
       candidates: readOption("candidates", candidateCounts),
     },
   };
+}
+
+export function readSharedSearch3D<Preset extends string>(
+  params: URLSearchParams | null,
+  defaults: SharedSearch<Preset>,
+  presets: Record<Preset, unknown>,
+  trialLimit: number,
+  domainWidth: number,
+): Omit<SharedSearch<Preset>, "settings"> & { settings: ModelSettings2D; mode: DensityMode; constraint: ConstraintPreset2D } {
+  const search = readSharedSearch(params, defaults, presets, trialLimit, domainWidth);
+  const mode = params?.get("mode") === "univariate" ? "univariate" : "multivariate";
+  const value = params?.get("constraint");
+  const constraint = value && Object.hasOwn(constraintPresets2D, value) ? value as ConstraintPreset2D : "none";
+  const settings = constraint === "none" ? search.settings : constrainSettings2D({
+    ...search.settings,
+    infeasibleFilling: params?.get("infeasibleFilling") !== "false",
+  });
+  return { ...search, settings, mode, constraint };
 }

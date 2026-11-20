@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { createShareUrl, readBrowserRoute, readRoute, readSharedConstraint, readSharedSearch, type SharedSearch } from "./shareSearch";
+import { describe, expect, it } from "vitest";
+import { createShareUrl, readRoute, readSharedSearch, readSharedSearch3D, type SharedSearch } from "./shareSearch";
 import { bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrialCounts, weightOptions } from "./searchSettings";
 import { objectivePresets, type ObjectivePreset } from "./objectives";
 import { defaults, prior, runSearch, searchDefaults, trialLimit } from "./tpe";
@@ -18,63 +18,39 @@ function roundTrip1D(search: SharedSearch<ObjectivePreset>) {
   return readSharedSearch(readRoute(new URL(url).hash).share, defaults1D, objectivePresets, trialLimit, 10);
 }
 
-describe("browser route", () => {
-  afterEach(() => vi.unstubAllGlobals());
-
-  it.each([
-    ["#play", "1d", "/tpe-playground/?tracking=123", null],
-    ["#play-2d", "1d", "/tpe-playground/?tracking=123", null],
-    ["#play?v=1&seed=3", "1d", null, "3"],
-    ["#play-2d?v=2&seed=3", "1d", null, "3"],
-    ["#play-2d?v=1&seed=3", "2d", null, "3"],
-    ["#play-3d?v=2&seed=3", "2d", null, "3"],
-    ["#play-3d", "2d", null, null],
-    ["", "1d", null, null],
-  ])("handles the address bar and settings for %s", (hash, page, canonicalUrl, seed) => {
-    const state = { navigation: 1 };
-    const replaceState = vi.fn();
-    vi.stubGlobal("window", {
-      location: { hash, pathname: "/tpe-playground/", search: "?tracking=123" },
-      history: { state, replaceState },
-    });
-
-    const route = readBrowserRoute();
-    expect(route.page).toBe(page);
-    expect(route.share?.get("seed") ?? null).toBe(seed);
-    if (canonicalUrl) {
-      expect(replaceState).toHaveBeenCalledExactlyOnceWith(state, "", canonicalUrl);
-    } else {
-      expect(replaceState).not.toHaveBeenCalled();
-    }
-  });
-});
+function decode3D(params: URLSearchParams | null) {
+  return readSharedSearch3D(params, defaults2D, objectivePresets2D, settings2D.count, 10);
+}
 
 describe("share links", () => {
   it.each([
-    ["", "1d"], ["#play", "1d"], ["#play-2d", "1d"], ["#play-3d", "2d"], ["#about", "about"],
-    ["#lab?seed=3", "lab"], ["#about?v=1", "about"], ["#invalid?v=1&seed=3", "1d"],
-    ["#play?seed=3", "1d"], ["#play?v=2&seed=3", "1d"],
-    ["#play-2d?v=3&seed=3", "1d"], ["#play-3d?v=3&seed=3", "2d"],
+    ["", "1d"], ["#play", "1d"], ["#play-2d", "1d"], ["#play-3d", "2d"], ["#lab", "lab"], ["#about", "about"],
+    ["#lab?seed=3", "lab"], ["#about?seed=3", "about"], ["#invalid?seed=3", "1d"], ["#play?seed=3", "1d"],
   ])("opens %s as %s without a settings payload", (hash, page) => {
     expect(readRoute(hash)).toEqual({ page, share: null });
   });
 
   it.each([
-    ["#play?v=1&seed=3", "1d"], ["#play-2d?v=1&seed=3", "2d"],
-    ["#play-2d?v=2&seed=3", "1d"], ["#play-3d?v=2&seed=3", "2d"],
-  ])("opens shared settings from %s in %s", (hash, page) => {
-    const route = readRoute(hash);
-    expect(route.page).toBe(page);
-    expect(route.share?.get("seed")).toBe("3");
+    ["#play-2d", "1d"], ["#play-3d", "2d"],
+  ])("opens shared settings from %s in %s regardless of the version parameter", (hash, page) => {
+    for (const version of [undefined, "1", "2", "unknown"]) {
+      const params = new URLSearchParams();
+      if (version !== undefined) params.set("v", version);
+      params.set("seed", "3");
+      const route = readRoute(`${hash}?${params}`);
+      expect(route.page).toBe(page);
+      expect(route.share?.get("seed")).toBe("3");
+    }
   });
 
   it("writes the 2D route for new 2D share links", () => {
     const url = new URL(createShareUrl(pageUrl, { page: "1d", preset: defaults1D.preset }, defaults1D.seed, defaults1D.settings));
-    expect(url.hash).toMatch(/^#play-2d\?v=2&/);
+    expect(url.hash).toMatch(/^#play-2d\?seed=/);
+    expect(readRoute(url.hash).share?.has("v")).toBe(false);
   });
 
   it("copies current settings when the address still contains an earlier experiment", () => {
-    const originalUrl = `https://kaichi-irie.github.io/tpe-playground/#play-2d?v=2&seed=3&preset=quadratic&gamma=0.15`;
+    const originalUrl = "https://kaichi-irie.github.io/tpe-playground/#play-2d?seed=3&preset=quadratic&gamma=0.15";
     const settings = { ...defaults1D.settings, gamma: 0.35 };
     const newUrl = createShareUrl(originalUrl, { page: "1d", preset: "boundary" }, 7, settings);
     const originalShare = readRoute(new URL(originalUrl).hash).share;
@@ -93,9 +69,10 @@ describe("share links", () => {
     const route = readRoute(url.hash);
     expect(url.pathname).toBe("/tpe-playground/");
     expect(url.search).toBe("");
-    expect(url.hash).toMatch(/^#play-3d\?v=2&/);
+    expect(url.hash).toMatch(/^#play-3d\?seed=/);
+    expect(route.share?.has("v")).toBe(false);
     expect(route.page).toBe("2d");
-    expect(route.share?.get("mode")).toBe("univariate");
+    expect(decode3D(route.share).mode).toBe("univariate");
     expect(route.share?.get("seed")).toBe("99");
     expect(route.share?.get("preset")).toBe("rosenbrock");
   });
@@ -114,29 +91,37 @@ describe("share links", () => {
     expect(play2D).not.toMatch(/constraint=|infeasibleFilling=/);
   });
 
-  it("reads the shared constraint with unconstrained fallbacks", () => {
-    const unconstrained = { constraint: "none", infeasibleFilling: undefined };
-    expect(readSharedConstraint(null)).toEqual(unconstrained);
+  it("decodes Play 3D defaults and falls back to an unconstrained search", () => {
+    const unconstrained = { ...defaults2D, mode: "multivariate", constraint: "none" };
+    expect(decode3D(null)).toStrictEqual(unconstrained);
     for (const query of ["infeasibleFilling=false", "constraint=none", "constraint=unknown", "constraint=__proto__"]) {
-      expect(readSharedConstraint(new URLSearchParams(query))).toEqual(unconstrained);
+      expect(decode3D(new URLSearchParams(query))).toStrictEqual(unconstrained);
     }
+    expect(decode3D(new URLSearchParams("mode=unknown&weights=ei"))).toStrictEqual({
+      ...unconstrained, settings: { ...defaults2D.settings, weights: "ei" },
+    });
+  });
+
+  it("decodes the constraint and infeasible filling for a constrained Play 3D search", () => {
     for (const query of ["constraint=disk", "constraint=disk&infeasibleFilling=true", "constraint=disk&infeasibleFilling=invalid"]) {
-      expect(readSharedConstraint(new URLSearchParams(query))).toEqual({ constraint: "disk", infeasibleFilling: true });
+      expect(decode3D(new URLSearchParams(query))).toEqual({
+        ...defaults2D, mode: "multivariate", constraint: "disk", settings: { ...defaults2D.settings, infeasibleFilling: true },
+      });
     }
-    expect(readSharedConstraint(new URLSearchParams("constraint=disk&infeasibleFilling=false")))
-      .toEqual({ constraint: "disk", infeasibleFilling: false });
+    expect(decode3D(new URLSearchParams("constraint=disk&infeasibleFilling=false&weights=ei"))).toEqual({
+      ...defaults2D, mode: "multivariate", constraint: "disk", settings: { ...defaults2D.settings, weights: "uniform", infeasibleFilling: false },
+    });
   });
 
   it("round-trips explorer defaults, preset IDs, and every model control value", () => {
     expect(roundTrip1D(defaults1D)).toEqual(defaults1D);
     const url = new URL(createShareUrl(pageUrl, { page: "2d", preset: defaults2D.preset, mode: "multivariate", constraint: "none" }, defaults2D.seed, defaults2D.settings));
-    const decode2D = (hash: string) => readSharedSearch(readRoute(hash).share, defaults2D, objectivePresets2D, settings2D.count, 10);
-    expect(decode2D(url.hash)).toEqual(defaults2D);
+    expect(decode3D(readRoute(url.hash).share)).toEqual({ ...defaults2D, mode: "multivariate", constraint: "none" });
     for (const preset of ["multimodal", "quadratic", "narrow", "boundary"] as const) {
       expect(roundTrip1D({ ...defaults1D, preset }).preset).toBe(preset);
     }
     for (const preset of ["multimodal", "quadratic", "rosenbrock"] as const) {
-      expect(decode2D(`#play-2d?v=1&preset=${preset}`).preset).toBe(preset);
+      expect(decode3D(readRoute(`#play-3d?preset=${preset}`).share).preset).toBe(preset);
     }
     function checkSetting<Key extends keyof typeof defaults1D.settings>(key: Key, values: readonly (typeof defaults1D.settings)[Key][]) {
       for (const value of values) {
@@ -156,13 +141,13 @@ describe("share links", () => {
   });
 
   it("uses dimension defaults for invalid fields while preserving valid fields including zero", () => {
-    const { share } = readRoute("#play?v=1&seed=0&preset=__proto__&gamma=0.14&bandwidth=0xff&bandwidthRule=adaptive&weights=bad&priorWeight=0&startupTrials=500&candidates=1e2");
+    const { share } = readRoute("#play-2d?seed=0&preset=__proto__&gamma=0.14&bandwidth=0xff&bandwidthRule=adaptive&weights=bad&priorWeight=0&startupTrials=500&candidates=1e2");
     expect(readSharedSearch(share, defaults1D, objectivePresets, trialLimit, 10)).toEqual({
       ...defaults1D, seed: 0, settings: { ...defaults1D.settings, priorWeight: 0 },
     });
-    const params = readRoute("#play-2d?v=1&seed=100&preset=boundary&gamma=Infinity&bandwidth=0&priorWeight=2&startupTrials=2").share;
-    expect(readSharedSearch(params, defaults2D, objectivePresets2D, settings2D.count, 10)).toEqual({
-      ...defaults2D, settings: { ...defaults2D.settings, priorWeight: 2, startupTrials: 2 },
+    const params = readRoute("#play-3d?seed=100&preset=boundary&gamma=Infinity&bandwidth=0&priorWeight=2&startupTrials=2").share;
+    expect(decode3D(params)).toEqual({
+      ...defaults2D, mode: "multivariate", constraint: "none", settings: { ...defaults2D.settings, priorWeight: 2, startupTrials: 2 },
     });
   });
 
@@ -177,10 +162,8 @@ describe("share links", () => {
       .toEqual(runSearch(seed, 12, settings.priorWeight, { ...settings, objectivePreset: "boundary" }));
 
     const fragment = new URL(createShareUrl(pageUrl, { page: "2d", preset: "rosenbrock", mode: "univariate", constraint: "none" }, seed, settings)).hash;
-    const { share } = readRoute(fragment);
-    const two = readSharedSearch(share, defaults2D, objectivePresets2D, settings2D.count, 10);
-    const mode = share?.get("mode") === "univariate" ? "univariate" : "multivariate";
-    expect(movePlayback2D(emptyPlayback2D(), 12, two.seed, mode, { ...two.settings, objectivePreset: two.preset }))
+    const two = decode3D(readRoute(fragment).share);
+    expect(movePlayback2D(emptyPlayback2D(), 12, two.seed, two.mode, { ...two.settings, objectivePreset: two.preset }))
       .toEqual(movePlayback2D(emptyPlayback2D(), 12, seed, "univariate", { ...settings, objectivePreset: "rosenbrock" }));
   });
 
@@ -192,14 +175,12 @@ describe("share links", () => {
     const settings = { ...defaults2D.settings, startupTrials: 2, infeasibleFilling: false };
     const url = createShareUrl(pageUrl, { page: "2d", preset: objectivePreset, mode, constraint: constraintPreset }, seed, settings);
     const route = readRoute(new URL(url).hash);
-    const shared = readSharedSearch(route.share, defaults2D, objectivePresets2D, settings2D.count, 10);
-    const { constraint, infeasibleFilling } = readSharedConstraint(route.share);
+    const shared = decode3D(route.share);
 
     expect(route.page).toBe("2d");
-    expect({ constraint, infeasibleFilling }).toEqual({ constraint: constraintPreset, infeasibleFilling: false });
-    const sharedMode = route.share?.get("mode") === "univariate" ? "univariate" : "multivariate";
-    expect(movePlayback2D(emptyPlayback2D(), 12, shared.seed, sharedMode, {
-      ...shared.settings, objectivePreset: shared.preset, constraintPreset: constraint, infeasibleFilling,
+    expect(shared).toEqual({ seed, preset: objectivePreset, settings, mode, constraint: constraintPreset });
+    expect(movePlayback2D(emptyPlayback2D(), 12, shared.seed, shared.mode, {
+      ...shared.settings, objectivePreset: shared.preset, constraintPreset: shared.constraint,
     })).toEqual(movePlayback2D(emptyPlayback2D(), 12, seed, mode, { ...settings, objectivePreset, constraintPreset }));
   });
 });
