@@ -75,7 +75,7 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
             </div>
             <div className="parameter">
               <div className="parameter-label">
-                <div><label htmlFor={id("prior-weight")}>Prior weight</label><Help label="Gaussian prior">Adds one broad Gaussian (mean 0, σ = 10) to each KDE so unexplored regions keep some density. Weight 1 counts as one observation; 0 turns it off.</Help>
+                <div><label htmlFor={id("prior-weight")}>Prior weight</label><Help label="Gaussian prior">Adds one broad Gaussian (mean 0, σ = 10) to each KDE so unexplored regions keep some density. Weight 1 counts as one observation; 0 turns it off.{experiment.page === "play-3d" && experiment.constraint !== "none" && " The prior can be the only Good kernel."}</Help>
                 </div>
               </div>
               <select id={id("prior-weight")} value={priorWeight} onChange={(event) => change({ priorWeight: Number(event.target.value) })}>{priorWeights.map((weight) => <option key={weight} value={weight}>{weight === 0 ? "0 · Off" : weight}</option>)}</select>
@@ -91,7 +91,9 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
             </div>
             <div className="parameter">
               <div className="parameter-label">
-                <div><label htmlFor={id("candidates")}>Candidates</label><Help label="candidate count">Points sampled from ℓ(x) per trial; the one with the largest ℓ(x)/g(x) is evaluated. More candidates exploit more, without extra evaluations.</Help>
+                <div><label htmlFor={id("candidates")}>Candidates</label><Help label="candidate count">{experiment.page === "play-3d" && experiment.mode === "univariate"
+                  ? "Draws this many candidates per coordinate from ℓ and picks the highest ℓ/g for each."
+                  : "Draws this many candidates from ℓ per trial and picks the highest ℓ/g."} More candidates exploit more, without extra evaluations.</Help>
                 </div>
               </div>
               <select id={id("candidates")} value={candidates} onChange={(event) => change({ candidates: Number(event.target.value) })}>{candidateCounts.map((count) => <option key={count} value={count}>{count}</option>)}</select>
@@ -102,7 +104,9 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
     <section className={`config live-model-controls ${className}`} aria-label={`${labelPrefix}Interactive model controls`}>
       <div className="parameter">
         <div className="parameter-label">
-          <div><label htmlFor={id("gamma")}>Good fraction <span>γ</span></label><Help label="good fraction">The best {Math.round(gamma * 100)}% of observations form the good KDE ℓ(x); the rest form g(x). Lower γ focuses the search on fewer, better points.</Help>
+          <div><label htmlFor={id("gamma")}>Good fraction <span>γ</span></label><Help label="good fraction">{experiment.page === "play-3d" && experiment.constraint !== "none"
+            ? "Sets the target size of Good. Feasible trials rank first by objective. Infeasible filling uses the least-violating trials to fill empty slots."
+            : <>Good targets {Math.round(gamma * 100)}% of observations, rounded up, and leaves at least one trial in Bad. Lower γ focuses Good on fewer, better points.</>}</Help>
           </div>
           <output htmlFor={id("gamma")}>{Math.round(gamma * 100)}%</output>
         </div>

@@ -31,6 +31,7 @@ it("starts a sequential Play 3D search with no observations and a preview of its
   expect(html).toContain('class="scene-canvas-play-3d"');
   expect(html).toContain("About Play 3D density model");
   expect(html).toContain("keeping each (x₁, x₂) pair together.");
+  expect(html).toContain("each coordinate has its own KDE and candidate draw.");
   for (const label of ["Good fraction", "Bandwidth", "Scott", "Silverman", "settings-dialog", "Prior weight", "Startup trials", "Candidates", "Weights", "Reset model defaults", "Quadratic", "Rosenbrock"]) expect(html).toContain(label);
   expect(html).not.toContain("coming soon");
   expect(html).toContain("Density model");
@@ -57,6 +58,8 @@ it("labels unfitted observations as unclassified and describes the random fallba
     const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} />);
     expect(html).toContain('aria-label="Trial 1 · Unclassified · Infeasible');
     expect(html).toContain('aria-label="Trial 2 · Unclassified · Infeasible');
+    expect(html).toContain("KDEs appear after 2 observations if Good has trials or a prior.");
+    expect(html).toContain("adjust the target Good size and reshape ℓ and g.");
     expect(html).toContain("There is no Good group yet. The next trial is a uniform random draw.");
   } finally {
     initialPlayback.mockRestore();
@@ -91,7 +94,8 @@ it("shows the constraint selector with filling available only for an active pres
   const active = renderToStaticMarkup(<Play3DConstraintSettings preset="disk" infeasibleFilling onPresetChange={() => {}} onFillingChange={() => {}} />);
   expect(active).toContain('<option value="disk" selected="">Small disk</option>');
   expect(active).toContain('type="checkbox" checked=""');
-  expect(active).toContain('Infeasible filling');
+  expect(active).toContain("Infeasible filling");
+  expect(active).toContain("Good takes feasible trials first. With filling on, the least-violating infeasible trials fill open slots. With filling off, Good can fall short of its target size.");
   expect(active).toContain('1.5%');
 });
 
@@ -109,4 +113,16 @@ it("replaces EI weights when a shared link turns a constraint on", () => {
   const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} />);
   expect(html).toContain('<option value="uniform" selected="">Uniform</option>');
   expect(html).toContain('<option value="ei" disabled="">');
+});
+
+it("describes candidate sampling per coordinate in the univariate proposal", () => {
+  const playback = twoParam.moveTwoParamPlayback(twoParam.emptyTwoParamPlayback(), 2, 0, "univariate", { startupTrials: 2, candidates: 8 });
+  const initialPlayback = vi.spyOn(twoParam, "emptyTwoParamPlayback").mockReturnValueOnce(playback);
+  try {
+    const sharedSettings = new URLSearchParams("mode=univariate&startupTrials=2&candidates=8");
+    const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} />);
+    expect(html).toContain("Drew 8 candidates per coordinate from ℓ and picked the highest ℓ/g for each.");
+  } finally {
+    initialPlayback.mockRestore();
+  }
 });

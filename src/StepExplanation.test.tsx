@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import StepExplanation, { JourneyMath, LabTutorialButton, Range, kernelFormula, kernelFormulaCompact } from "./StepExplanation";
 import { labHints } from "./labHints";
+import * as explanation from "./explanation";
 
 it("opens with an experiment and keeps the lesson hidden until requested", () => {
   const html = renderToStaticMarkup(<StepExplanation />);
@@ -49,4 +50,16 @@ it("keeps the wide kernel formula on one line and uses an inline exponent on pho
   expect(kernelFormulaCompact).toContain(String.raw`\\`);
   expect(kernelFormulaCompact).toContain("e^");
   expect(kernelFormulaCompact).not.toContain(String.raw`\exp`);
+});
+
+it("labels the transformed acquisition curve with its formula", () => {
+  const acquisitionPlot = vi.spyOn(explanation, "acquisitionPlot").mockImplementationOnce(
+    (ratios, scores) => ({ logarithmic: true, curve: ratios.map(() => 0), candidates: scores.map(() => 0) }),
+  );
+  try {
+    const html = renderToStaticMarkup(<StepExplanation />);
+    expect(html).toMatch(/class="journey-acquisition-title"[^>]*>Acquisition · log\(1 \+ ℓ\/g\)<\/text>/);
+  } finally {
+    acquisitionPlot.mockRestore();
+  }
 });

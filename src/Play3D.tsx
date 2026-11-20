@@ -365,7 +365,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
     <details className="scaling-play-3d"><summary aria-label="How to read this view">?</summary><div className="scaling-content">
       <h3>How to read this view</h3>
       <p>Drag or use arrow keys to rotate; + / − to zoom. Hover the surface or focus an observation to read its values.</p>
-      <p>The faint surface is the objective; {constrained ? "the diamond marks the constrained optimum and the boundary outlines the feasible region. ✕ marks infeasible trials. KDEs appear when the split has a Good density." : "the diamond marks its optimum (estimated for Multimodal). KDEs appear after 2 observations."} The hollow marker is the next evaluation.</p>
+      <p>The faint surface is the objective; {constrained ? "the diamond marks the constrained optimum and the boundary outlines the feasible region. ✕ marks infeasible trials. KDEs appear after 2 observations if Good has trials or a prior." : "the diamond marks its optimum (estimated for Multimodal). KDEs appear after 2 observations."} The hollow marker is the next evaluation.</p>
       <p>Heights are rescaled to share one view: Linear keeps relative heights; Log1p expands the valley floor. Scaling never changes the optimizer, and hover shows original values.</p>
     </div></details>
     <div className="scene-inspection" aria-live="polite">{seekTarget === null ? inspection : `Moving to trial ${seekTarget}…`}</div>
@@ -382,7 +382,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
         <Help label="Play 3D trial playback">
           {!proposal ? `Search complete. All ${twoParamSettings.count} trials evaluated.` : noFeasibleGood ? "There is no Good group yet. The next trial is a uniform random draw." : proposal.method === "random"
             ? `Initial random exploration · ${step + 1} / ${settings.startupTrials}. ${settings.startupTrials === twoParamSettings.count ? "Every trial in this search is random." : `Uniform random draw until TPE starts at trial ${settings.startupTrials + 1}.`}`
-            : `TPE proposal · trial ${step + 1}. Drew ${settings.candidates} candidate${settings.candidates === 1 ? "" : "s"} from ℓ(x) and picked the largest ℓ(x)/g(x).`}{" "}
+            : `TPE proposal · trial ${step + 1}. Drew ${sceneInput.settings.candidates} candidate${sceneInput.settings.candidates === 1 ? "" : "s"}${sceneInput.mode === "univariate" ? " per coordinate from ℓ and picked the highest ℓ/g for each." : " from ℓ(x) and picked the highest ℓ(x)/g(x)."}`}{" "}
           <span id="trial-seek-help-play-3d">Seeking back discards later trials.</span>
         </Help>
         {constrained && <span> · {feasibleCount}</span>}
@@ -396,7 +396,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
       <Play3DConstraintSettings preset={constraintPreset} infeasibleFilling={settings.infeasibleFilling ?? true} onPresetChange={changeConstraint}
         onFillingChange={(infeasibleFilling) => editSettings({ ...settings, infeasibleFilling })} />
       <div className="scene-toolbar-group">
-        <div className="parameter density-picker"><div className="parameter-label"><label className="sr-only" htmlFor="density-mode">Density model</label><Help label="Play 3D density model"><strong>{mode === "multivariate" ? "Multivariate" : "Univariate"}</strong><br />Multivariate: kernels span both coordinates, keeping each (x₁, x₂) pair together. Univariate: each coordinate has its own KDE and is chosen independently.</Help></div><select id="density-mode" value={mode} onChange={(event) => { cancelSeek(); setMode(event.target.value as DensityMode); setPlaying(false); setInspection(""); }}><option value="multivariate">Multivariate</option><option value="univariate">Univariate</option></select></div>
+        <div className="parameter density-picker"><div className="parameter-label"><label className="sr-only" htmlFor="density-mode">Density model</label><Help label="Play 3D density model"><strong>{mode === "multivariate" ? "Multivariate" : "Univariate"}</strong><br />Multivariate: kernels span both coordinates, keeping each (x₁, x₂) pair together. Univariate: each coordinate has its own KDE and candidate draw.</Help></div><select id="density-mode" value={mode} onChange={(event) => { cancelSeek(); setMode(event.target.value as DensityMode); setPlaying(false); setInspection(""); }}><option value="multivariate">Multivariate</option><option value="univariate">Univariate</option></select></div>
         </div>
     </ModelSettingsPanel>
     <details className="performance-monitor" onToggle={(event) => setComparisonOpen(event.currentTarget.open)}>
@@ -427,7 +427,7 @@ export function Play3DConstraintSettings({ preset, infeasibleFilling, onPresetCh
     </div>
     {preset !== "none" && <div className="parameter infeasible-filling">
       <label><input type="checkbox" checked={infeasibleFilling} onChange={(event) => onFillingChange(event.target.checked)} /> Infeasible filling</label>
-      <Help label="infeasible filling">When there are too few feasible trials to fill Good, add trials in order of increasing total violation. With filling off, only feasible trials go in Good.</Help>
+      <Help label="infeasible filling">Good takes feasible trials first. With filling on, the least-violating infeasible trials fill open slots. With filling off, Good can fall short of its target size.</Help>
     </div>}
   </>;
 }

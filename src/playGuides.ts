@@ -8,7 +8,7 @@ export const playGuides: Record<PlayGuideId, { label: string; action: string }> 
   },
   gamma: {
     label: "Good fraction",
-    action: "Drag Good fraction γ to move the Good/Bad split and reshape ℓ and g.",
+    action: "Drag Good fraction γ to adjust the target Good size and reshape ℓ and g.",
   },
   bandwidth: {
     label: "Bandwidth",

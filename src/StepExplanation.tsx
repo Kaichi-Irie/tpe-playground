@@ -720,7 +720,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         <line x1={left} x2={right} y1={sampleBase} y2={sampleBase} />
         <g opacity={1 - evaluation}>
         <path data-ratio-curve="true" d={path(ratios, sampleBase, ratioScale * scoreVisibility)} opacity={scoreVisibility} />
-        <text className="journey-acquisition-title" x={left} y={stage === 6 ? sampleBase - 40 : lane * 2 + 50}>{stage === 6 ? `Candidates zⱼ · M = ${settings.candidates}` : ratioPlot.logarithmic ? "Acquisition α(x) · log scale" : "Acquisition α(x)"}</text>
+        <text className="journey-acquisition-title" x={left} y={stage === 6 ? sampleBase - 40 : lane * 2 + 50}>{stage === 6 ? `Candidates zⱼ · M = ${settings.candidates}` : ratioPlot.logarithmic ? "Acquisition · log(1 + ℓ/g)" : "Acquisition α(x)"}</text>
         </g>
         {[-5,-4,-3,-2,-1,0,1,2,3,4,5].map((x) => <g key={x}><line x1={sx(x)} x2={sx(x)} y1={sampleBase} y2={sampleBase + 6} /><text x={sx(x)} y={sampleBase + 23} textAnchor="middle">{x}</text></g>)}
         <text x={W - 4 * screenScale} y={sampleBase - 8 * ui} textAnchor="end">x</text>

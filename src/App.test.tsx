@@ -1,6 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import App from "./App";
+import { defaults, trialLimit } from "./oneParamTpe";
+import * as playback from "./playback";
+import * as plotSize from "./usePlotSize";
 
 it("renders the density explorer with playback controls and an empty initial history", () => {
   const html = renderToStaticMarkup(<App />);
@@ -107,4 +110,32 @@ it("starts a shared Play 2D search at trial zero with the linked settings", () =
   expect(html).toContain('aria-valuetext="15 percent"');
   expect(html).toContain("Share link");
   expect(html.replace(/<article\b[^>]*class="about-page"[\s\S]*?<\/article>/, "")).not.toContain("Infeasible filling");
+});
+
+it("describes Replay at the end of a search", () => {
+  const completed = playback.movePlayback(playback.emptyPlayback(), trialLimit, 0, 1, { ...defaults, startupTrials: trialLimit });
+  const initialPlayback = vi.spyOn(playback, "emptyPlayback").mockReturnValueOnce(completed);
+  try {
+    const html = renderToStaticMarkup(<App />);
+    expect(html).toContain("Replay reruns the search from trial 0 with the current settings.");
+  } finally {
+    initialPlayback.mockRestore();
+  }
+});
+
+it.each([380, 800])("mentions candidate ticks only when shown at plot width %i", (width) => {
+  const started = playback.movePlayback(playback.emptyPlayback(), 2, 0, 1, { ...defaults, startupTrials: 2 });
+  const initialPlayback = vi.spyOn(playback, "emptyPlayback").mockReturnValueOnce(started);
+  const size = vi.spyOn(plotSize, "usePlotSize").mockReturnValueOnce({ ref: { current: null }, width, height: 300, typeScale: 1 });
+  try {
+    const html = renderToStaticMarkup(<App initialRoute={{ page: "play-2d", share: new URLSearchParams("startupTrials=2") }} />);
+    const hasTicks = width >= 600;
+    expect(html.includes('class="candidate-tick"')).toBe(hasTicks);
+    expect(html.includes("Gray ticks: sampled candidates")).toBe(hasTicks);
+    expect(html.includes("Gray ticks show candidates.")).toBe(hasTicks);
+    expect(html).toContain("The dashed line marks the pick.");
+  } finally {
+    size.mockRestore();
+    initialPlayback.mockRestore();
+  }
 });
