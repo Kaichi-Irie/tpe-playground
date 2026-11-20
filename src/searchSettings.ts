@@ -2,6 +2,10 @@ import type { TpeConfig } from "./model/types";
 
 export type ModelSettings = Omit<TpeConfig, "mode">;
 
+export function constrainSettings(settings: ModelSettings): ModelSettings {
+  return settings.weights === "ei" ? { ...settings, weights: "uniform" } : settings;
+}
+
 export const priorWeights = [0, 0.1, 0.5, 1, 2, 5];
 export const candidateCounts = [1, 4, 8, 24, 64, 128];
 export const startupTrialCounts = (trialLimit: number) => [2, 5, 10, 20, 30, 50, 100, trialLimit];

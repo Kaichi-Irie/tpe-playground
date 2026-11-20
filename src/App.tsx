@@ -6,7 +6,7 @@ import { playGuides } from "./playGuides";
 import { usePlayGuide } from "./usePlayGuide";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { weightOptions } from "./searchSettings";
-import { playPageHrefs, readBrowserRoute, readSharedSearch, type Route, type SharedSearch } from "./shareSearch";
+import { playPageHrefs, readRoute, readSharedSearch, type Route, type SharedSearch } from "./shareSearch";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { trialLimit, buildView1D, prior, searchDefaults, defaults, domain, proposeTrial, proposal1DFromTrace, type Trial } from "./tpe";
 
@@ -76,7 +76,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
   useEffect(() => { if (page === "lab") setLabVisited(true); }, [page]);
   const [algorithmContainer, setAlgorithmContainer] = useState<HTMLDivElement | null>(null);
   const syncRoute = useCallback(() => {
-    const next = readBrowserRoute();
+    const next = readRoute(window.location.hash);
     setPlaying(false);
     if (next.share && next.page === "1d") {
       searchGeneration.current += 1;

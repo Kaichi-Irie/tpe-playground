@@ -3,9 +3,9 @@ import { clearSeenHints, completedTaskGuides, guidePlacement, hintsForStage, lab
 
 const storageKey = "tpe-lab-hints-seen";
 
-function stubStorage(name: "localStorage" | "sessionStorage") {
+function stubStorage() {
   const store = new Map<string, string>();
-  vi.stubGlobal(name, {
+  vi.stubGlobal("sessionStorage", {
     getItem: (key: string) => store.get(key) ?? null,
     setItem: (key: string, value: string) => { store.set(key, value); },
     removeItem: (key: string) => { store.delete(key); },
@@ -43,7 +43,7 @@ describe("lab hints", () => {
   });
 
   it("remembers seen hints and ignores unknown or corrupt storage", () => {
-    const store = stubStorage("sessionStorage");
+    const store = stubStorage();
     saveSeenHints(new Set<LabHintId>(["gamma", "prior"]));
     expect([...loadSeenHints()]).toEqual(["gamma", "prior"]);
     store.set(storageKey, JSON.stringify(["gamma", "unknown", 3]));
@@ -54,20 +54,8 @@ describe("lab hints", () => {
     expect(store.has(storageKey)).toBe(false);
   });
 
-  it("removes the legacy local entry without restoring it", () => {
-    const local = stubStorage("localStorage");
-    const session = stubStorage("sessionStorage");
-    local.set(storageKey, JSON.stringify(["gamma"]));
-
-    expect(loadSeenHints().size).toBe(0);
-    expect(local.has(storageKey)).toBe(false);
-    expect(session.has(storageKey)).toBe(false);
-    saveSeenHints(new Set(["prior"]));
-    expect(local.has(storageKey)).toBe(false);
-  });
-
   it("clears the seen hints stored for this tab", () => {
-    const store = stubStorage("sessionStorage");
+    const store = stubStorage();
     saveSeenHints(new Set(["gamma"]));
     expect(loadSeenHints()).toEqual(new Set(["gamma"]));
 
@@ -75,14 +63,6 @@ describe("lab hints", () => {
 
     expect(store.has(storageKey)).toBe(false);
     expect(loadSeenHints().size).toBe(0);
-  });
-
-  it("loads tab storage when legacy cleanup is blocked", () => {
-    vi.stubGlobal("localStorage", { removeItem: blockedStorage });
-    const store = stubStorage("sessionStorage");
-    store.set(storageKey, JSON.stringify(["gamma"]));
-
-    expect(loadSeenHints()).toEqual(new Set(["gamma"]));
   });
 
   it("works without storage", () => {
