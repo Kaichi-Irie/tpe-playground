@@ -10,7 +10,7 @@ const legacyPlay2DUrl = "https://kaichi-irie.github.io/tpe-playground/#play-2d?s
 const legacyPlay3DUrl = "https://kaichi-irie.github.io/tpe-playground/#play-3d?seed=99&preset=rosenbrock&gamma=0.35&bandwidth=0.82&bandwidthRule=silverman&weights=ei&priorWeight=0.5&startupTrials=20&candidates=64&mode=univariate";
 const legacyConstrainedPlay3DUrl = "https://kaichi-irie.github.io/tpe-playground/#play-3d?seed=17&preset=quadratic&gamma=0.30&bandwidth=0.55&bandwidthRule=constant&weights=recency&priorWeight=0&startupTrials=2&candidates=4&mode=multivariate&constraint=band&infeasibleFilling=false";
 const play2DDefaults: SharedSearch<ObjectivePreset> = {
-  seed: 50, preset: "multimodal", settings: { ...defaults, ...searchDefaults, priorWeight: prior.weight },
+  seed: 0, preset: "multimodal", settings: { ...defaults, ...searchDefaults, priorWeight: prior.weight },
 };
 const play3DDefaults: SharedSearch<TwoParamObjectivePreset> = {
   seed: twoParamSettings.seed, preset: "multimodal", settings: { ...twoParamDefaultModelSettings, bandwidthRule: "constant" },
