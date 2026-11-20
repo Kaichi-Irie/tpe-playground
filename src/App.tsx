@@ -135,6 +135,7 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
   const guide = usePlayGuide<HTMLDivElement>({ page: "play-2d", step, startupTrials, acquisitionVisible: visible.acquisition, seeking: false }, page === "play-2d");
   const guideAcquisition = guide.active === "acquisition";
   const trials = useMemo(() => playback.trials.slice(0, step), [playback.trials, step]);
+  const proposals = useMemo(() => playback.proposals.slice(0, step), [playback.proposals, step]);
   const model = useMemo(() => buildOneParamView(trials, grid, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }), [trials, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
   const proposal = useMemo(() => step === trialLimit ? undefined : playback.proposals[step] ?? (model.fitted && step >= startupTrials ? oneParamProposalFromTrace(model.fitted.propose(seed)) : proposeTrial(trials, seed, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset })), [step, playback.proposals, model.fitted, trials, seed, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
   const bestValue = trials.length ? Math.min(...trials.map((trial) => trial.y)).toFixed(3) : "—";
@@ -253,7 +254,7 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
       </ModelSettingsPanel>
     <details className="performance-monitor">
         <summary><span className="performance-caption">Best f(x) <strong title={bestValue}>{bestValue}</strong></span><span>Performance <span aria-hidden="true">⌄</span></span></summary>
-        <ProgressComparison trials={trials} proposals={playback.proposals} seed={seed} objectivePreset={objectivePreset} />
+        <ProgressComparison trials={trials} proposals={proposals} randomOnly={startupTrials >= trialLimit} seed={seed} objectivePreset={objectivePreset} />
       </details>
       </div>
       </div>

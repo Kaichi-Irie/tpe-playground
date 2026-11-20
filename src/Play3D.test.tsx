@@ -50,6 +50,7 @@ it("describes random-only playback without a TPE start trial", () => {
 it("labels unfitted observations as unclassified and describes the random fallback", () => {
   const settings = { constraintPreset: "disk", startupTrials: 2, priorWeight: 0, infeasibleFilling: false } as const;
   const playback = twoParam.moveTwoParamPlayback(twoParam.emptyTwoParamPlayback(), 2, 50, "multivariate", settings);
+  // Server rendering cannot step playback, so initialize the component at trial 2.
   const initialPlayback = vi.spyOn(twoParam, "emptyTwoParamPlayback").mockReturnValueOnce(playback);
   try {
     const sharedSettings = new URLSearchParams("seed=50&constraint=disk&startupTrials=2&priorWeight=0&infeasibleFilling=false");

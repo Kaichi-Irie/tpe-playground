@@ -29,6 +29,7 @@ export const Play3DPerformance = memo(function Play3DPerformance({ trials, propo
     flippedTrials,
     feasibleCount: `${currentTrials.filter((trial) => trial.feasible).length} / ${trials.length} feasible`,
   } : undefined;
-  return <ComparisonPanel trials={currentTrials} currentLabel={currentRunLabel(proposals, constraintPreset !== "none")} randomTrials={randomTrials} minimum={minimum} relative={false}
+  const currentLabel = currentRunLabel(proposals, startupTrials >= twoParamSettings.count, constrained ? filling : undefined);
+  return <ComparisonPanel trials={currentTrials} currentLabel={currentLabel} randomTrials={randomTrials} minimum={minimum} relative={false}
     approximate={constraintPreset === "none" && objectivePreset === "multimodal"} constrained={constrained} />;
 });

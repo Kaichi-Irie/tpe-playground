@@ -4,6 +4,14 @@ import { Play3DPerformance } from "./Play3DPerformance";
 import { ProgressPlot } from "./ProgressPlot";
 import { twoParamDefaultModelSettings, emptyTwoParamPlayback, findTwoParamObjectiveMinimum, moveTwoParamPlayback, twoParamObjectivePresets, twoParamSettings } from "./twoParamTpe";
 
+it.each([0, 5])("labels default Play 3D performance as TPE at trial %i", (step) => {
+  const seed = 42;
+  const run = moveTwoParamPlayback(emptyTwoParamPlayback(), step, seed);
+  const html = renderToStaticMarkup(<Play3DPerformance {...run} seed={seed} objectivePreset="multimodal" />);
+  expect(html).toContain('class="comparison-tpe"><i aria-hidden="true"></i>TPE');
+  expect(html).toContain("Best so far: TPE versus Random search");
+});
+
 it("uses a reproducible random baseline sharing startup observations for every Play 3D objective", () => {
   for (const objectivePreset of Object.keys(twoParamObjectivePresets) as (keyof typeof twoParamObjectivePresets)[]) {
     const random = moveTwoParamPlayback(emptyTwoParamPlayback(), 200, 42, "multivariate", { startupTrials: twoParamSettings.count, objectivePreset });
@@ -62,6 +70,8 @@ it("labels the current constrained run from its TPE proposals and the comparison
     <Play3DPerformance {...run} seed={seed} objectivePreset="multimodal" constraintPreset={constraintPreset} settings={settings} />,
   );
 
+  expect(render(emptyTwoParamPlayback(), on)).toContain('class="comparison-tpe"><i aria-hidden="true"></i>Filling on');
+  expect(render(start)).toContain('class="comparison-tpe"><i aria-hidden="true"></i>Filling off');
   expect(render(uniformOn)).toContain('class="comparison-tpe"><i aria-hidden="true"></i>Filling on');
   expect(render(uniformOff)).toContain('class="comparison-tpe"><i aria-hidden="true"></i>Filling off');
   const html = render(mixed);
