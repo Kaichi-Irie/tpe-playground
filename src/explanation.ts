@@ -1,6 +1,7 @@
-import { fitOneParamModel, type Trial, type WeightStrategy } from "./oneParamTpe";
+import { domain, fitOneParamModel, type Trial, type WeightStrategy } from "./oneParamTpe";
 import { getObjective, type ObjectivePreset } from "./objectives";
 import { createLogDensity } from "./model/density";
+import { logTruncatedNormalPeak } from "./model/truncnorm";
 import type { Kernel } from "./model/types";
 
 export interface ExplanationExample {
@@ -29,8 +30,10 @@ export const fixedExample: ExplanationExample = {
 export const explanationGrid = Array.from({ length: 301 }, (_, i) => -5 + i / 30);
 
 export function kernelContribution(kernel: Kernel, x: number): number {
+  if (x < domain[0] || x > domain[1] || kernel.mixtureWeight === 0) return 0;
   const h = kernel.bandwidths.x;
-  return kernel.mixtureWeight * Math.exp(-0.5 * ((x - kernel.center.x) / h) ** 2) / (h * Math.sqrt(2 * Math.PI));
+  const center = kernel.center.x;
+  return Math.exp(Math.log(kernel.mixtureWeight) + logTruncatedNormalPeak(center, h, ...domain) - 0.5 * ((x - center) / h) ** 2);
 }
 
 // Reuse the optimizer's snapshots and proposal trace; the lesson has no second TPE implementation.

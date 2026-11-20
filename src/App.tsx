@@ -18,6 +18,7 @@ import { Help } from "./Help";
 import { ProgressComparison } from "./ProgressComparison";
 
 import { emptyPlayback, keepObservations, movePlayback } from "./playback";
+import { logTruncatedNormalPeak } from "./model/truncnorm";
 
 const StepExplanation = lazy(() => import("./StepExplanation"));
 
@@ -149,9 +150,13 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
   const group = model.fitted?.snapshot.groups[0];
   const goodWidth = group?.good.kernels.find((kernel) => kernel.source.kind === "observation")?.bandwidths.x;
   const badWidth = group?.bad.kernels.find((kernel) => kernel.source.kind === "observation")?.bandwidths.x;
-  // Constant keeps its fixed axis; automatic rules rescale to the current kernels.
-  const minimumWidth = Math.min(goodWidth ?? bandwidth, badWidth ?? bandwidth, ...(priorWeight > 0 ? [prior.bandwidth] : []));
-  const densityMax = Math.ceil(1 / (minimumWidth * Math.sqrt(2 * Math.PI)) * 10) / 10;
+  const peak = useMemo(() => {
+    if (!group) return Math.exp(logTruncatedNormalPeak(prior.mean, bandwidth, ...domain));
+    return Math.max(...[...group.good.kernels, ...group.bad.kernels].map((kernel) =>
+      Math.exp(logTruncatedNormalPeak(kernel.center.x, kernel.bandwidths.x, ...domain)),
+    ));
+  }, [group, bandwidth]);
+  const densityMax = Math.ceil(peak * 10) / 10;
   const groupName = (trial: Trial) => step < 2 ? "Unclassified" : goodIds.has(trial.id) ? "Good" : "Bad";
   const sd = (d: number) => box.bottom - d / densityMax * (box.bottom - box.top);
   const goodIds = new Set(model.good.map((t) => t.id));

@@ -25,16 +25,16 @@ and constraint. The link opens at trial zero. Playback history stays in memory.
 
 History keys include coordinates and objective/constraint values, not just IDs.
 They are deterministic cache/provenance identifiers, not cryptographic digests.
-Exact history reconstruction still requires the observations. Version 1 records
-the per-trial seed mixing and Box–Muller sampling implementation; seed alone is
-not a cross-version reproducibility guarantee.
+Exact history reconstruction still requires the observations. Version 2 records component-wise truncated sampling using the existing per-trial
+seed mixing and Box–Muller generator. Share links created in v1.0.0 replay a
+different optimized trajectory.
 
 ## Fitting and proposing
 
 `fitTpe(problem, observations, config)` returns a fitted model exposing:
 
 - `snapshot`: serializable model parameters and diagnostics.
-- `evaluate(points)`: full-space `logL`, `logG`, and `score = logL - logG`.
+- `evaluate(points)`: `logL`, `logG`, and `score = logL - logG`. The ratio is undefined outside the box.
 - `propose(seed)`: candidate traces and the selected coordinates.
 
 `proposeTpe(...)` applies the startup rule before fitting. A fitted model may be
@@ -91,14 +91,18 @@ Kernels have one bandwidth per coordinate. Constant uses the configured width
 for every observation kernel. Scott and Silverman resolve widths separately for
 each density and coordinate within a parameter group. Prior widths remain fixed.
 
-To preserve the existing educational model, density values integrate to one over
-the whole real space. Sampling rejects the entire mixture draw outside the box,
-thus sampling the mixture conditioned on the box. These measures are explicitly
-named in the snapshot. The displayed full-space log ratio differs from the ratio
-of box-conditioned densities by a group-wise constant, so candidate ordering is
-unchanged. It is not a reproduction of Optuna's truncated-component estimator.
-Rejection sampling is bounded and throws for pathological settings instead of
-hanging the browser.
+Each observation and prior kernel is a product of per-coordinate truncated
+Gaussians. For each coordinate, the Gaussian is divided by its probability mass
+inside that coordinate's search interval. The error function, log CDF, and
+interval-mass routines are adapted from Optuna v5.1.0. Each component and mixture
+integrates to one on the box and has log density `-Infinity` outside it. Marginals
+drop the omitted coordinates' terms, including their normalization factors, and
+preserve the mixture weights.
+
+Sampling chooses a component by weight once, then uses bounded Box–Muller
+rejection for each coordinate of that component. The snapshot records
+`normalization: "truncated-box"` and `sampling: "truncated-components"`.
+Optuna parity remains a separate goal because bandwidths and weights still differ.
 
 ## Visualization
 
@@ -122,11 +126,13 @@ WeakMap so old models can be garbage collected.
 
 ## Verification and references
 
-Tests cover seeded pre-refactor trajectories (30 trials, seed 42), normalization,
-independent cross peaks versus joint peaks, per-group winner selection, snapshot
-round trips and immutability, invalid inputs, field semantics, and branching with
-historical settings. The trajectory fixture was captured from origin/main at
-`8e35761` before the refactor; comparisons allow floating-point roundoff.
+The [trajectory fixture](../src/model/fixtures/trajectories.json) records 30 trials
+from the truncated-kernel model with seed 42 in both the one-parameter search and
+the joint two-parameter search. Comparisons allow floating-point roundoff.
+Tests also cover box normalization, analytic marginals, independent cross peaks
+versus joint peaks, per-group winner selection, snapshot round trips and
+immutability, invalid inputs, field semantics, and branching with historical
+settings.
 
 Design references (interfaces and separation of responsibilities, not numerical
 compatibility claims):

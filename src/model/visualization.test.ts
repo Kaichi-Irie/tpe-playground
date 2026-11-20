@@ -42,8 +42,12 @@ describe("shared visualization evaluation", () => {
           const actual = evaluate(point);
           expect(actual["good-density"]).toBeCloseTo(Math.exp(logL), 12);
           expect(actual["bad-density"]).toBeCloseTo(Math.exp(logG), 12);
-          expect(actual["log-ratio"]).toBeCloseTo(logL - logG, 12);
-          expect(Number.isFinite(actual["log-ratio"])).toBe(true);
+          if (x1 > 5) {
+            expect(actual).toEqual({ "good-density": 0, "bad-density": 0, "log-ratio": NaN });
+          } else {
+            expect(actual["log-ratio"]).toBeCloseTo(logL - logG, 12);
+            expect(Number.isFinite(actual["log-ratio"])).toBe(true);
+          }
         }
         expect(() => evaluate({ x1: NaN, x2: 0 })).toThrow();
         expect(() => evaluate({})).toThrow();

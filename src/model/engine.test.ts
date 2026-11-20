@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import legacy from "./fixtures/legacy-trajectories.json";
+import trajectories from "./fixtures/trajectories.json";
 import { createDensity, logDensity } from "./density";
 import { fitTpe, proposeTpe, restoreModel, validateInput } from "./engine";
 import { evaluateField } from "./visualization";
@@ -12,13 +12,14 @@ const trials: Observation[] = [[-2, -2], [2, 2], [-3, 3], [3, -3]].map(([x1, x2]
 const config = { ...twoParamConfig(), gamma: 0.5, bandwidth: 0.5, startupTrials: 2 };
 
 describe("shared TPE model", () => {
-  it("preserves pre-refactor seeded one-parameter and joint two-parameter trajectories", () => {
-    const one = movePlayback(emptyPlayback(), legacy.one.length, 42, 1, defaults).trials;
-    const two = moveTwoParamPlayback(emptyTwoParamPlayback(), legacy.two.length, 42, "multivariate", { priorWeight: 0 }).trials;
+  // The fixture records the truncated-kernel model with seed 42.
+  it("reproduces seeded one-parameter and joint two-parameter truncated-kernel trajectories", () => {
+    const one = movePlayback(emptyPlayback(), trajectories.one.length, 42, 1, defaults).trials;
+    const two = moveTwoParamPlayback(emptyTwoParamPlayback(), trajectories.two.length, 42, "multivariate", { priorWeight: 0 }).trials;
     expect(one).toHaveLength(30);
     expect(two).toHaveLength(30);
-    one.forEach((t, i) => { expect(t.x).toBeCloseTo(legacy.one[i].x, 12); expect(t.y).toBeCloseTo(legacy.one[i].y, 12); });
-    two.forEach((t, i) => { expect(t.x1).toBeCloseTo(legacy.two[i].x1, 12); expect(t.x2).toBeCloseTo(legacy.two[i].x2, 12); });
+    one.forEach((t, i) => { expect(t.x).toBeCloseTo(trajectories.one[i].x, 12); expect(t.y).toBeCloseTo(trajectories.one[i].y, 12); });
+    two.forEach((t, i) => { expect(t.x1).toBeCloseTo(trajectories.two[i].x1, 12); expect(t.x2).toBeCloseTo(trajectories.two[i].x2, 12); });
   });
 
   it("keeps independent cross peaks and joint paired peaks distinct", () => {
@@ -33,18 +34,23 @@ describe("shared TPE model", () => {
     expect(independent.snapshot.groups).toHaveLength(2);
     for (const model of [joint, independent]) {
       const trace = model.propose(42);
+      expect(trace.version).toBe(2);
       if (trace.method !== "tpe") throw new Error("Expected TPE.");
       for (const group of trace.groups) {
         const best = group.candidates[group.selectedIndex];
         expect(best.score).toBe(Math.max(...group.candidates.map((c) => c.score)));
         for (const id of group.parameterIds) expect(trace.selected[id]).toBe(best.params[id]);
-        for (const c of group.candidates) expect(Object.keys(c.params)).toEqual(group.parameterIds);
+        for (const candidate of group.candidates) {
+          expect(Object.keys(candidate.params)).toEqual(group.parameterIds);
+          expect(Object.values(candidate.params).every((value) => value >= -5 && value <= 5)).toBe(true);
+        }
       }
     }
   });
 
   it("round trips immutable snapshots without resampling or changing evaluation", () => {
     const model = fitTpe(twoParamProblem, trials, { ...config, priorWeight: 0.5 });
+    expect(model.snapshot.version).toBe(2);
     const snapshot = JSON.parse(JSON.stringify(model.snapshot));
     const restored = restoreModel(snapshot);
     const points = [{ x1: 0, x2: 1 }];
@@ -79,7 +85,7 @@ describe("shared TPE model", () => {
 
   it("separates startup proposals from explanatory fitted densities", () => {
     const settings = twoParamConfig();
-    expect(proposeTpe(twoParamProblem, trials, settings, 42).method).toBe("random");
+    expect(proposeTpe(twoParamProblem, trials, settings, 42)).toMatchObject({ method: "random", version: 2 });
     expect(fitTpe(twoParamProblem, trials, settings).snapshot.partition.good.length).toBeGreaterThan(0);
   });
 });
@@ -104,11 +110,11 @@ describe("visualization contract", () => {
 
   it("distinguishes slices from normalized marginals and marginal density ratios", () => {
     const model = fitTpe(twoParamProblem, trials, { ...config, priorWeight: 0 });
-    const points = Array.from({ length: 1000 }, (_, i) => ({ x1: -10 + (i + 0.5) * 0.02 }));
+    const points = Array.from({ length: 2000 }, (_, i) => ({ x1: -5 + (i + 0.5) * 0.005 }));
     const marginal = evaluateField(model, { field: "good-density", axes: ["x1"], points, projection: { kind: "marginal" } });
-    expect(marginal.values.reduce((s, v) => s + v * 0.02, 0)).toBeCloseTo(1, 8);
+    expect(marginal.values.reduce((s, v) => s + v * 0.005, 0)).toBeCloseTo(1, 8);
     const slice = evaluateField(model, { field: "good-density", axes: ["x1"], points, projection: { kind: "slice", fixed: { x2: 0 } } });
-    expect(slice.values.reduce((s, v) => s + v * 0.02, 0)).toBeLessThan(0.01);
+    expect(slice.values.reduce((s, v) => s + v * 0.005, 0)).toBeLessThan(0.01);
     const request = { axes: ["x1"], points: [{ x1: 0 }], projection: { kind: "marginal" as const } };
     const l = evaluateField(model, { ...request, field: "good-density" }).values[0];
     const g = evaluateField(model, { ...request, field: "bad-density" }).values[0];
@@ -121,7 +127,7 @@ describe("visualization contract", () => {
     const density = createDensity(twoParamProblem.parameters, trials.slice(0, 2), 0.5, [2, 0], 0.5);
     const marginal = (x1: number) => Math.exp(logDensity(density, { x1 }, ["x1"]));
     let integral = 0;
-    for (let x1 = -100; x1 < 100; x1 += 0.05) integral += marginal(x1 + 0.025) * 0.05;
+    for (let i = 0; i < 2000; i++) integral += marginal(-5 + (i + 0.5) * 0.005) * 0.005;
     expect(integral).toBeCloseTo(1, 8);
   });
 

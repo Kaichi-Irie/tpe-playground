@@ -11,11 +11,15 @@ describe("interactive explanation", () => {
   });
 
   it("shows weighted components that sum to the optimizer density, including the prior", () => {
+    const edgeExample = { ...fixedExample, trials: completeInitialInputs([-5, 5], fixedExample.objectivePreset) };
     for (const weights of ["uniform", "recency", "ei"] as const) {
-      const data = buildExplanation(fixedExample, { ...explanationDefaults, weights, priorWeight: 4 });
+      const data = buildExplanation(edgeExample, { ...explanationDefaults, weights, priorWeight: 4 });
       for (const kind of ["good", "bad"] as const) {
         const kernels = data.group[kind].kernels;
         expect(kernels.reduce((sum, k) => sum + k.mixtureWeight, 0)).toBeCloseTo(1, 12);
+        for (const x of [-5.01, 5.01]) {
+          expect(kernels.every((kernel) => kernelContribution(kernel, x) === 0)).toBe(true);
+        }
         explanationGrid.forEach((x, i) => {
           expect(kernels.reduce((sum, k) => sum + kernelContribution(k, x), 0)).toBeCloseTo((kind === "good" ? data.goodDensity : data.badDensity)[i], 12);
         });

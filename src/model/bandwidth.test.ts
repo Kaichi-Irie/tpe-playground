@@ -45,7 +45,7 @@ it("fits separate normalized group widths and leaves the prior width unchanged",
       expect(new Set(widths).size).toBe(1);
       expect(density.kernels.at(-1)?.bandwidths.x).toBe(10);
       let integral = 0;
-      for (let x = -100; x < 100; x += 0.01) integral += Math.exp(logDensity(density, { x: x + 0.005 })) * 0.01;
+      for (let i = 0; i < 5000; i++) integral += Math.exp(logDensity(density, { x: -5 + (i + 0.5) * 0.002 })) * 0.002;
       expect(integral).toBeCloseTo(1, 8);
     }
     expect(fitted.propose(42)).toEqual(fitted.propose(42));
@@ -81,10 +81,10 @@ it("fits coordinate-wise adaptive widths in both two-parameter density modes, pr
       expect(goodWidths.x2).toBeCloseTo(10 / 8, 12);
       for (const group of model.snapshot.groups) for (const density of [group.good, group.bad]) {
         expect(density.kernels.at(-1)?.bandwidths).toEqual(Object.fromEntries(group.parameterIds.map((id) => [id, 10])));
-        // Integrate every marginal over essentially the full Gaussian support.
+        // Integrate every marginal over its search interval.
         for (const id of group.parameterIds) {
           let integral = 0;
-          for (let x = -100; x < 100; x += 0.1) integral += Math.exp(logDensity(density, { [id]: x + 0.05 }, [id])) * 0.1;
+          for (let i = 0; i < 5000; i++) integral += Math.exp(logDensity(density, { [id]: -5 + (i + 0.5) * 0.002 }, [id])) * 0.002;
           expect(integral).toBeCloseTo(1, 8);
         }
       }
