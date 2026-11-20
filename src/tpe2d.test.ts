@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildDemo2D, createJointKDE, generateTrials2D, emptyPlayback2D, movePlayback2D, proposeTrial2D, settings2D, objective2D, getObjective2D, objectivePresets2D } from "./tpe2d";
 
-const sample = (x1: number, x2: number) => ({ id: 1, x1, x2, value: 0 });
+const sample = (x1: number, x2: number) => ({ id: 1, x1, x2, value: 0, constraints: [], violation: 0 });
 describe("joint 2D KDE", () => {
   it("normalizes on the plane, including kernels centered at the viewing boundary", () => {
     const kde = createJointKDE([sample(-5, 5), sample(0, 0)], 0.65);
@@ -151,4 +151,37 @@ it("replays adaptive 2D searches deterministically and branches without rewritin
     expect(changed.trials.slice(0, 12)).toEqual(initial.trials);
     expect(changed.trials.every((t) => Number.isFinite(t.value) && Math.abs(t.x1) <= 5 && Math.abs(t.x2) <= 5)).toBe(true);
   }
+});
+
+describe("2D constraints", () => {
+  it("exposes feasibility and filling membership for a hand-built disk history", () => {
+    const trials = [[3, 3], [0, 0], [3.8, 3], [4, 3]].map(([x1, x2], index) => {
+      const constraint = Math.hypot(x1 - 3, x2 - 3) - 0.7;
+      return { id: index + 1, x1, x2, value: objective2D(x1, x2), constraints: [constraint], violation: Math.max(0, constraint) };
+    });
+    const settings = { constraintPreset: "disk", gamma: 0.5 } as const;
+    const view = buildDemo2D(trials, "multivariate", settings);
+    expect([...view.feasibleIds]).toEqual([1]);
+    expect([...view.filledIds]).toEqual([3]);
+    expect([...view.goodIds]).toEqual([1, 3]);
+    expect([...buildDemo2D(trials, "multivariate", { ...settings, infeasibleFilling: false }).goodIds]).toEqual([1]);
+  });
+
+  it("records raw constraints and summed violations in a reproducible seeded run", () => {
+    const settings = { constraintPreset: "band" } as const;
+    const state = movePlayback2D(emptyPlayback2D(), 30, 42, "multivariate", settings);
+    expect(state).toEqual(movePlayback2D(emptyPlayback2D(), 30, 42, "multivariate", settings));
+    for (const { x1, x2, constraints, violation } of state.trials) {
+      expect(constraints).toEqual([(x1 + x2 - 3.2) / Math.SQRT2, (2.8 - x1 - x2) / Math.SQRT2]);
+      expect(violation).toBe(constraints.reduce((sum, value) => sum + Math.max(0, value), 0));
+    }
+  });
+
+  it("reproduces first feasible disk trials with and without filling for the default seed", () => {
+    const run = (infeasibleFilling: boolean) => movePlayback2D(emptyPlayback2D(), 200, 42, "multivariate", { constraintPreset: "disk", infeasibleFilling });
+    const on = run(true).trials.find((trial) => trial.violation === 0)?.id;
+    const off = run(false).trials.find((trial) => trial.violation === 0)?.id;
+    expect(on).toBe(17);
+    expect(off).toBe(18);
+  });
 });

@@ -25,14 +25,22 @@ export interface TpeConfig {
   readonly priorWeight: number;
   readonly startupTrials: number;
   readonly candidates: number;
+  readonly infeasibleFilling?: boolean;
 }
 export interface WeightedTrial { readonly trialId: number; readonly weight: number }
-export interface Partition {
-  readonly kind: "single-objective";
-  readonly threshold: number;
+export type Partition = {
   readonly good: readonly WeightedTrial[];
   readonly bad: readonly WeightedTrial[];
-}
+} & (
+  { readonly kind: "single-objective"; readonly threshold: number } |
+  {
+    readonly kind: "constrained-single-objective";
+    readonly nBelow: number;
+    readonly feasibleTrialIds: readonly number[];
+    readonly violations: Readonly<Record<number, number>>;
+    readonly filledTrialIds: readonly number[];
+  }
+);
 export interface Kernel {
   readonly source: { readonly kind: "observation"; readonly trialId: number } | { readonly kind: "prior" };
   readonly center: Point;
@@ -80,7 +88,7 @@ interface ProposalContext {
   readonly selected: Point;
 }
 export type ProposalTrace = ProposalContext & (
-  { readonly method: "random"; readonly reason: "startup" } |
+  { readonly method: "random"; readonly reason: "startup" | "no-feasible-good" } |
   { readonly method: "tpe"; readonly modelId: string; readonly groups: readonly GroupTrace[] }
 );
 export type RandomSource = () => number;

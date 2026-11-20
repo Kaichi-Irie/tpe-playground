@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import legacy from "./fixtures/legacy-trajectories.json";
 import { createDensity, logDensity } from "./density";
-import { fitTpe, proposeTpe, restoreModel } from "./engine";
+import { fitTpe, proposeTpe, restoreModel, validateInput } from "./engine";
 import { evaluateField } from "./visualization";
 import { buildView1D, config1D, defaults, observations1D, problem1D, runSearch } from "../tpe";
 import { buildDemo2D, config2D, emptyPlayback2D, movePlayback2D, observations2D, problem2D, proposeTrial2D } from "../tpe2d";
@@ -132,5 +132,39 @@ describe("visualization contract", () => {
     const back = movePlayback2D(next, 10);
     expect(back.proposals).toHaveLength(10);
     expect(movePlayback2D(back, 12)).toEqual(joint);
+  });
+});
+
+describe("constrained TPE", () => {
+  const problem = { ...problem2D, constraintCount: 2 };
+  const infeasible = trials.map((trial) => ({ ...trial, constraints: [-0.5, 1] }));
+
+  it("validates every constraint and rejects EI even during startup", () => {
+    expect(() => validateInput(problem, infeasible, config)).not.toThrow();
+    for (const constraints of [[], [0], [0, 1, 2], [NaN, 0], [0, Infinity], [-Infinity, 0]]) {
+      expect(() => validateInput(problem, [{ ...infeasible[0], constraints }], config)).toThrow("Invalid observations");
+    }
+    expect(() => validateInput(problem, [], { ...config, weights: "ei" })).toThrow("EI weights");
+  });
+
+  it("uses the startup RNG and records the fallback when Good is empty without a prior", () => {
+    const settings = { ...config, infeasibleFilling: false };
+    const fallback = proposeTpe(problem, infeasible, settings, 42);
+    const startup = proposeTpe(problem, infeasible, { ...settings, startupTrials: 10 }, 42);
+    expect(startup).toMatchObject({ method: "random", reason: "startup" });
+    expect(fallback).toMatchObject({ method: "random", reason: "no-feasible-good", selected: startup.selected });
+    expect(() => fitTpe(problem, infeasible, settings)).toThrow("Good density");
+  });
+
+  it("fits a prior-only Good density and proposes with TPE when the prior is enabled", () => {
+    const settings = { ...config, infeasibleFilling: false, priorWeight: 0.5, bandwidthRule: "scott" } as const;
+    const fitted = fitTpe(problem, infeasible, settings);
+    expect(fitted.snapshot.partition.good).toEqual([]);
+    expect(fitted.snapshot.groups[0].good.kernels).toEqual([{
+      source: { kind: "prior" }, center: { x1: 0, x2: 0 }, bandwidths: { x1: 10, x2: 10 },
+      observationWeight: 0.5, mixtureWeight: 1,
+    }]);
+    expect(proposeTpe(problem, infeasible, settings, 42)).toEqual(fitted.propose(42));
+    expect(fitted.propose(42).method).toBe("tpe");
   });
 });

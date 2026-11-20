@@ -11,7 +11,7 @@ export type ShareExperiment = { page: "1d"; preset: string } | { page: "2d"; pre
 export type SharedSearch<Preset extends string> = {
   seed: number;
   preset: Preset;
-  settings: Required<ModelSettings>;
+  settings: Required<Omit<ModelSettings, "infeasibleFilling">>;
 };
 
 export type Route = { page: Page; share: URLSearchParams | null };
@@ -51,7 +51,7 @@ export function createShareUrl(documentUrl: string, experiment: ShareExperiment,
     priorWeight: String(settings.priorWeight),
     startupTrials: String(settings.startupTrials),
     candidates: String(settings.candidates),
-  } satisfies Required<Record<keyof ModelSettings, string>>;
+  } satisfies Record<keyof SharedSearch<string>["settings"], string>;
   const params = new URLSearchParams({ v: "2", seed: String(seed), preset: experiment.preset, ...model });
   if (experiment.page === "2d") params.set("mode", experiment.mode);
   url.hash = `${playShareHashes[experiment.page]}?${params}`;

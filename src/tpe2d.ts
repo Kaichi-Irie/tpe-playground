@@ -1,11 +1,13 @@
 import { createDensity, createLogDensity } from "./model/density";
-import { fitTpe, proposeTpe } from "./model/engine";
+import { fitTpe, needsFeasibleGood, proposeTpe } from "./model/engine";
+import { totalViolation } from "./model/partition";
+import { constrainedOptima2D, getConstraint2D, type ConstraintPreset2D } from "./constraints2D";
 import { advanceHistory } from "./model/history";
 import { createFieldEvaluator, evaluateFieldGrid2D } from "./model/visualization";
 import type { DensityMode, Observation, Problem, ProposalTrace, TpeConfig } from "./model/types";
 export type { DensityMode } from "./model/types";
 
-export interface Trial2D { id: number; x1: number; x2: number; value: number }
+export interface Trial2D { id: number; x1: number; x2: number; value: number; constraints: number[]; violation: number }
 export const settings2D = { bandwidth: 0.65, gamma: 0.25, count: 200, seed: 42, startupTrials: 10, candidates: 24 };
 
 export function objective2D(x1: number, x2: number): number {
@@ -24,8 +26,9 @@ export function getObjective2D(preset: ObjectivePreset2D = "multimodal") {
 }
 
 // Deterministic global grid followed by local refinement for the multimodal reference.
-export function findObjectiveOptimum2D(preset: ObjectivePreset2D): { x1: number; x2: number; value: number } {
+export function findObjectiveOptimum2D(preset: ObjectivePreset2D, constraintPreset: ConstraintPreset2D = "none"): { x1: number; x2: number; value: number } {
   getObjective2D(preset);
+  if (constraintPreset !== "none") return { ...constrainedOptima2D[constraintPreset][preset] };
   if (preset === "quadratic") return { x1: 1.5, x2: -1, value: 0 };
   if (preset === "rosenbrock") return { x1: 1, x2: 1, value: 0 };
   const evaluate = getObjective2D(preset).evaluate;
@@ -50,8 +53,8 @@ export function findObjectiveOptimum2D(preset: ObjectivePreset2D): { x1: number;
   return { x1: best.x, x2: best.y, value: best.value };
 }
 
-export function findObjectiveMinimum2D(preset: ObjectivePreset2D): number {
-  return findObjectiveOptimum2D(preset).value;
+export function findObjectiveMinimum2D(preset: ObjectivePreset2D, constraintPreset?: ConstraintPreset2D): number {
+  return findObjectiveOptimum2D(preset, constraintPreset).value;
 }
 
 export function generateTrials2D(seed = settings2D.seed, count = settings2D.count): Trial2D[] {
@@ -60,18 +63,22 @@ export function generateTrials2D(seed = settings2D.seed, count = settings2D.coun
   const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return (state + 0.5) / 2 ** 32; };
   return Array.from({ length: count }, (_, i) => {
     const x1 = random() * 10 - 5, x2 = random() * 10 - 5;
-    return { id: i + 1, x1, x2, value: objective2D(x1, x2) };
+    return { id: i + 1, x1, x2, value: objective2D(x1, x2), constraints: [], violation: 0 };
   });
 }
 
 export const problem2D: Problem = { id: "2d", parameters: [{ id: "x1", low: -5, high: 5 }, { id: "x2", low: -5, high: 5 }], directions: ["minimize"], constraintCount: 0 };
-export const observations2D = (trials: readonly Trial2D[]): Observation[] => trials.map((t) => ({ id: t.id, params: { x1: t.x1, x2: t.x2 }, objectives: [t.value], constraints: [] }));
+function problemForConstraint2D(preset: ConstraintPreset2D = "none"): Problem {
+  return preset === "none" ? problem2D : { ...problem2D, id: `2d-${preset}`, constraintCount: getConstraint2D(preset).constraints.length };
+}
+export const observations2D = (trials: readonly Trial2D[]): Observation[] => trials.map((t) => ({ id: t.id, params: { x1: t.x1, x2: t.x2 }, objectives: [t.value], constraints: t.constraints }));
 export type ModelSettings2D = Omit<TpeConfig, "mode">;
-export type SearchSettings2D = Partial<ModelSettings2D> & { objectivePreset?: ObjectivePreset2D };
+export type SearchSettings2D = Partial<ModelSettings2D> & { objectivePreset?: ObjectivePreset2D; constraintPreset?: ConstraintPreset2D };
 export const defaultModelSettings2D: ModelSettings2D = { bandwidthRule: "constant", bandwidth: settings2D.bandwidth, gamma: settings2D.gamma, weights: "uniform", priorWeight: 0, startupTrials: settings2D.startupTrials, candidates: settings2D.candidates };
 export const config2D = (mode: DensityMode = "multivariate", settings: SearchSettings2D = {}): TpeConfig => {
-  const { objectivePreset: _objectivePreset, ...modelSettings } = settings;
-  return { ...defaultModelSettings2D, ...modelSettings, mode };
+  const { objectivePreset: _objectivePreset, constraintPreset, ...modelSettings } = settings;
+  const { infeasibleFilling, ...config } = { ...defaultModelSettings2D, ...modelSettings, mode };
+  return constraintPreset && constraintPreset !== "none" ? { ...config, infeasibleFilling: infeasibleFilling ?? true } : config;
 };
 
 export function createJointKDE(samples: readonly Trial2D[], bandwidth: number) {
@@ -82,9 +89,15 @@ export function createJointKDE(samples: readonly Trial2D[], bandwidth: number) {
 
 export function buildDemo2D(trials: readonly Trial2D[] = generateTrials2D(), mode: DensityMode = "multivariate", settings: SearchSettings2D = {}) {
   const objective = getObjective2D(settings.objectivePreset);
-  const hasDensities = trials.length >= 2;
-  const fitted = hasDensities ? fitTpe(problem2D, observations2D(trials), config2D(mode, settings)) : null;
-  const goodIds = new Set(fitted?.snapshot.partition.good.map((m) => m.trialId) ?? []);
+  const problem = problemForConstraint2D(settings.constraintPreset);
+  const observations = observations2D(trials);
+  const config = config2D(mode, settings);
+  const hasPartition = trials.length >= 2;
+  const fitted = hasPartition && !needsFeasibleGood(problem, observations, config) ? fitTpe(problem, observations, config) : null;
+  const partition = fitted?.snapshot.partition;
+  const goodIds = new Set(partition?.good.map((member) => member.trialId));
+  const feasibleIds = new Set(trials.filter((trial) => trial.violation === 0).map((trial) => trial.id));
+  const filledIds = new Set(partition?.kind === "constrained-single-objective" ? partition.filledTrialIds : []);
   const fields = fitted ? createFieldEvaluator(fitted, { axes: ["x1", "x2"], projection: { kind: "full" } }) : null;
   const evaluate = (x1: number, x2: number) => {
     const values = fields?.({ x1, x2 });
@@ -108,7 +121,7 @@ export function buildDemo2D(trials: readonly Trial2D[] = generateTrials2D(), mod
   };
   let visualization: ReturnType<typeof buildVisualization> | undefined;
   const getVisualization = () => visualization ??= buildVisualization();
-  return { trials, fitted, goodIds, hasDensities, evaluate,
+  return { trials, fitted, goodIds, feasibleIds, filledIds, hasPartition, hasDensities: fitted !== null, evaluate,
     get grid() { return getVisualization().grid; },
     get scales() { return getVisualization().scales; },
   };
@@ -123,7 +136,7 @@ export const emptyPlayback2D = (): Playback2D => ({ trials: [], proposals: [] })
 export function proposeTrial2D(trials: readonly Trial2D[], seed = settings2D.seed, mode: DensityMode = "multivariate", settings: SearchSettings2D = {}): Proposal2D {
   getObjective2D(settings.objectivePreset);
   if (!Number.isInteger(seed)) throw new Error("Invalid seed.");
-  const trace = proposeTpe(problem2D, observations2D(trials), config2D(mode, settings), seed);
+  const trace = proposeTpe(problemForConstraint2D(settings.constraintPreset), observations2D(trials), config2D(mode, settings), seed);
   return proposal2DFromTrace(trace);
 }
 
@@ -135,8 +148,12 @@ export function proposal2DFromTrace(trace: ProposalTrace): Proposal2D {
 
 export function movePlayback2D(state: Playback2D, next: number, seed = settings2D.seed, mode: DensityMode = "multivariate", settings: SearchSettings2D = {}): Playback2D {
   const objective = getObjective2D(settings.objectivePreset);
+  const constraint = getConstraint2D(settings.constraintPreset);
   const { trials, proposals } = advanceHistory(state.trials, state.proposals, next, settings2D.count,
     (past) => proposeTrial2D(past, seed, mode, settings),
-    (proposal, id) => ({ id, x1: proposal.x1, x2: proposal.x2, value: objective.evaluate(proposal.x1, proposal.x2) }));
+    ({ x1, x2 }, id) => {
+      const constraints = constraint.constraints.map((evaluate) => evaluate(x1, x2));
+      return { id, x1, x2, value: objective.evaluate(x1, x2), constraints, violation: totalViolation(constraints) };
+    });
   return { trials, proposals };
 }

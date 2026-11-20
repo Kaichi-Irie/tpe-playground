@@ -1,0 +1,72 @@
+import type { ObjectivePreset2D } from "./tpe2d";
+
+type Coordinate = readonly [x1: number, x2: number];
+type Constraint = (x1: number, x2: number) => number;
+interface ConstraintDefinition {
+  label: string;
+  description: string;
+  formula: string;
+  feasibleShare: string;
+  constraints: readonly Constraint[];
+  boundaries: readonly (readonly Coordinate[])[];
+}
+
+const diagonal = (sum: number) => Array.from({ length: 97 }, (_, i): Coordinate => {
+  const x1 = sum - 5 + (10 - sum) * i / 96;
+  return [x1, sum - x1];
+});
+const diskBoundary = Array.from({ length: 97 }, (_, i): Coordinate => {
+  const angle = 2 * Math.PI * (i % 96) / 96;
+  return [3 + 0.7 * Math.cos(angle), 3 + 0.7 * Math.sin(angle)];
+});
+
+export const constraintPresets2D = {
+  none: { label: "None", description: "The whole search domain is feasible.", formula: "", feasibleShare: "100%", constraints: [], boundaries: [] },
+  disk: {
+    label: "Small disk", description: "A disk of radius 0.7 centered at (3, 3).",
+    formula: "hypot(x₁ − 3, x₂ − 3) − 0.7 ≤ 0", feasibleShare: "1.5%",
+    constraints: [(x1, x2) => Math.hypot(x1 - 3, x2 - 3) - 0.7], boundaries: [diskBoundary],
+  },
+  band: {
+    label: "Thin band", description: "The space between two parallel lines.",
+    formula: "(x₁ + x₂ − 3.2)/√2 ≤ 0 and (2.8 − x₁ − x₂)/√2 ≤ 0", feasibleShare: "2.8%",
+    constraints: [(x1, x2) => (x1 + x2 - 3.2) / Math.SQRT2, (x1, x2) => (2.8 - x1 - x2) / Math.SQRT2],
+    boundaries: [diagonal(2.8), diagonal(3.2)],
+  },
+  halfplane: {
+    label: "Half-plane", description: "The side of the diagonal where x₁ + x₂ is at least 3.",
+    formula: "(3 − x₁ − x₂)/√2 ≤ 0", feasibleShare: "25%",
+    constraints: [(x1, x2) => (3 - x1 - x2) / Math.SQRT2], boundaries: [diagonal(3)],
+  },
+} satisfies Record<string, ConstraintDefinition>;
+
+export type ConstraintPreset2D = keyof typeof constraintPresets2D;
+
+export function getConstraint2D(preset: ConstraintPreset2D = "none"): ConstraintDefinition {
+  if (!Object.prototype.hasOwnProperty.call(constraintPresets2D, preset)) throw new Error("Unknown 2D constraint preset.");
+  return constraintPresets2D[preset];
+}
+
+export function violation(x1: number, x2: number, preset: ConstraintPreset2D): number {
+  return getConstraint2D(preset).constraints.reduce((sum, constraint) => sum + Math.max(0, constraint(x1, x2)), 0);
+}
+
+// Constrained references from issue #47. Disk coordinates are refined onto the
+// feasible side of the boundary to preserve the precision of the objective values.
+export const constrainedOptima2D = {
+  disk: {
+    multimodal: { x1: 2.425204327816748, x2: 2.600487878482530, value: 3.52863724504 },
+    quadratic: { x1: 2.820727560240071, x2: 2.323345440906138, value: 2.19735104013 },
+    rosenbrock: { x1: 2.315728490720231, x2: 3.147555079844691, value: 0.492372851409 },
+  },
+  band: {
+    multimodal: { x1: 3.06489403, x2: -0.12322861, value: 0.99258810262 },
+    quadratic: { x1: 2.88, x2: -0.08, value: 0.38088 },
+    rosenbrock: { x1: 1.24622306, x2: 1.55377694, value: 6.06755012619e-5 },
+  },
+  halfplane: {
+    multimodal: { x1: 3.08953093, x2: -0.08953093, value: 0.993969214296 },
+    quadratic: { x1: 3, x2: 0, value: 0.45 },
+    rosenbrock: { x1: 1.30254287, x2: 1.69745713, value: 9.1602614156e-5 },
+  },
+} satisfies Record<Exclude<ConstraintPreset2D, "none">, Record<ObjectivePreset2D, { x1: number; x2: number; value: number }>>;

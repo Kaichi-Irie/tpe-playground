@@ -21,3 +21,21 @@ it("uses a reproducible random baseline sharing startup observations for every 2
     expect(html).not.toContain("Infinity");
   }
 });
+
+it("compares three constrained runs and omits lines before their first feasible trial", () => {
+  const constraintPreset = "disk";
+  const trials = movePlayback2D(emptyPlayback2D(), 17, 42, "multivariate", { constraintPreset }).trials;
+  const html = renderToStaticMarkup(<ProgressComparison2D trials={trials} seed={42} objectivePreset="multimodal" constraintPreset={constraintPreset} />);
+  expect(html).toContain('<i aria-hidden="true"></i>Filling on');
+  expect(html).toContain('<i aria-hidden="true"></i>Filling off');
+  expect(html).toContain('<i aria-hidden="true"></i>Random');
+  expect(html).toContain('/ 17 feasible');
+  expect(html).not.toContain("Average regret");
+  expect(html).toContain("tpe-progress-line");
+  expect(html).not.toContain("third-progress-line");
+  expect(html).not.toContain("random-progress-line");
+  const completeRun = movePlayback2D(emptyPlayback2D(), 200, 42, "multivariate", { constraintPreset }).trials;
+  const completeHtml = renderToStaticMarkup(<ProgressComparison2D trials={completeRun} seed={42} objectivePreset="multimodal" constraintPreset={constraintPreset} />);
+  expect(completeHtml).toContain("third-progress-line");
+  expect(completeHtml).toContain("random-progress-line");
+});

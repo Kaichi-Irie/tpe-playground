@@ -1,3 +1,4 @@
+import { constraintPresets2D, getConstraint2D, type ConstraintPreset2D } from "./constraints2D";
 import { prepareSurface2D, projectSurface2D } from "./projectSurface2D";
 import { measure2D } from "./performance2D";
 import { seekPlayback2D } from "./seekPlayback2D";
@@ -27,6 +28,7 @@ const initialView = { yaw: -0.65, pitch: 0.5, zoom: 1 };
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
 const domainWidth = 10;
+const constraintHintKey = "tpe-play-2d-constraint-hint-seen";
 const defaultSearch: SharedSearch<ObjectivePreset2D> = {
   seed: settings2D.seed,
   preset: "multimodal",
@@ -49,9 +51,28 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
   const [mode, setMode] = useState<DensityMode>(() => sharedSettings?.get("mode") === "univariate" ? "univariate" : "multivariate");
   const [settings, setSettings] = useState<ModelSettings2D>(initialSearch.settings);
   const [objectivePreset, setObjectivePreset] = useState(initialSearch.preset);
-  const searchSettings = useMemo(() => ({ ...settings, objectivePreset }), [settings, objectivePreset]);
+  const [constraintPreset, setConstraintPreset] = useState<ConstraintPreset2D>("none");
+  const [constraintHint, setConstraintHint] = useState(false);
+  const [constraintHintSeen, setConstraintHintSeen] = useState(() => {
+    try { return globalThis.sessionStorage?.getItem(constraintHintKey) === "1"; } catch { return false; }
+  });
+  const constrained = constraintPreset !== "none";
+  const searchSettings = useMemo(() => ({ ...settings, objectivePreset, constraintPreset }), [settings, objectivePreset, constraintPreset]);
+  function changeConstraint(preset: ConstraintPreset2D) {
+    setConstraintPreset(preset);
+    if (preset === "none") setConstraintHint(false);
+    else {
+      if (settings.weights === "ei") setSettings({ ...settings, weights: "uniform" });
+      if (!constraintHintSeen) {
+        setConstraintHintSeen(true);
+        setConstraintHint(true);
+        try { globalThis.sessionStorage?.setItem(constraintHintKey, "1"); } catch { /* The page still remembers the hint. */ }
+      }
+    }
+    restart();
+  }
   const objectiveDefinition = getObjective2D(objectivePreset);
-  const objectiveView = useMemo(() => createObjectiveView2D(objectivePreset), [objectivePreset]);
+  const objectiveView = useMemo(() => createObjectiveView2D(objectivePreset, constraintPreset), [objectivePreset, constraintPreset]);
   const [heightScale, setHeightScale] = useState<ObjectiveHeightScale>("log");
   function editSettings(next: ModelSettings2D) {
     if (next.gamma !== settings.gamma) guide.retire("gamma");
@@ -122,7 +143,19 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
   }
 
   const [visible, setVisible] = useState<Record<Layer, boolean>>({ objective: true, good: true, bad: true, observations: true, acquisition: false });
-  const guide = usePlayGuide({ page: "2d", step, startupTrials: settings.startupTrials, acquisitionVisible: visible.acquisition, seeking: seekTarget !== null });
+  const guide = usePlayGuide({ page: "2d", step, startupTrials: settings.startupTrials, acquisitionVisible: visible.acquisition, seeking: seekTarget !== null }, !constraintHint);
+  useEffect(() => {
+    if (!constraintHint) return;
+    function onEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !event.defaultPrevented && !guide.workspaceRef.current?.querySelector("dialog[open]")) {
+        event.preventDefault();
+        setConstraintHint(false);
+        if (document.activeElement?.closest(".lab-guide")) guide.workspaceRef.current?.querySelector<HTMLElement>(".settings-toggle")?.focus();
+      }
+    }
+    document.addEventListener("keydown", onEscape);
+    return () => document.removeEventListener("keydown", onEscape);
+  }, [constraintHint, guide.workspaceRef]);
   const guideAcquisition = guide.active === "acquisition";
   const [view, setView] = useState(initialView);
   const [inspection, setInspection] = useState("");
@@ -201,12 +234,12 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     };
     return { good: mesh("good"), bad: mesh("bad"), acquisition: mesh("acquisition") };
   }), [model, densityStride, visible.good, visible.bad, visible.acquisition]);
-  function prepareSurface(mesh: SurfaceVertex2D[][], key: Surface, label: string, evaluate: (x1: number, x2: number) => number) {
+  function prepareSurface(mesh: SurfaceVertex2D[][], key: Surface, label: string, evaluate: (x1: number, x2: number) => number, feasible?: (x1: number, x2: number) => boolean) {
     return prepareSurface2D(mesh, key, (x1, x2) => {
       if (!drag.current) setInspection(`${label} · x₁ = ${x1.toFixed(2)}, x₂ = ${x2.toFixed(2)} · value = ${evaluate(x1, x2).toPrecision(4)}`);
-    });
+    }, feasible);
   }
-  const preparedObjective = useMemo(() => measure2D("objective-surface-prepare", () => prepareSurface(objectiveMesh, "objective", "Objective contours", objectiveDefinition.evaluate)), [objectiveMesh, objectiveDefinition]);
+  const preparedObjective = useMemo(() => measure2D("objective-surface-prepare", () => prepareSurface(objectiveMesh, "objective", "Objective contours", objectiveDefinition.evaluate, objectiveView.feasible)), [objectiveMesh, objectiveDefinition, objectiveView.feasible]);
   const preparedDensities = useMemo(() => measure2D("density-surface-prepare", () => ({
     good: prepareSurface(densityMeshes.good, "good", "Good KDE ℓ(x)", (x1, x2) => model.evaluate(x1, x2).good),
     bad: prepareSurface(densityMeshes.bad, "bad", "Bad KDE g(x)", (x1, x2) => model.evaluate(x1, x2).bad),
@@ -217,11 +250,20 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
   const objectiveScene = useMemo(() => measure2D("objective-project", () => {
     if (!visible.objective) return [];
     const items: SceneItem2D[] = projectSurface2D(preparedObjective, project);
-    objectiveView.contours.forEach(({ level, a, b }, index) => {
+    objectiveView.contours.forEach(({ level, a, b, muted }, index) => {
       const start = project(a.x1, a.x2, scale("objective", level));
       const end = project(b.x1, b.x2, scale("objective", level));
-      items.push({ id: `contour-${index}`, kind: "segment", depth: (start.depth + end.depth) / 2 + 0.01, points: [start.x, start.y, end.x, end.y], inspect: () => { if (!drag.current) setInspection(`Objective contour · f(x) = ${level.toPrecision(4)}`); } });
+      items.push({ id: `contour-${index}`, kind: "segment", muted, depth: (start.depth + end.depth) / 2 + 0.01, points: [start.x, start.y, end.x, end.y], inspect: () => { if (!drag.current) setInspection(`Objective contour · f(x) = ${level.toPrecision(4)}`); } });
     });
+    for (const [lineIndex, line] of objectiveView.boundaries.entries()) {
+      for (const onSurface of [false, true]) {
+        const points = line.map(({ x1, x2, objective }) => project(x1, x2, onSurface ? scale("objective", objective) : 0));
+        for (let index = 1; index < points.length; index++) {
+          const a = points[index - 1], b = points[index];
+          items.push({ id: `boundary-${lineIndex}-${onSurface}-${index}`, kind: "boundary", depth: (a.depth + b.depth) / 2 + 0.015, points: [a.x, a.y, b.x, b.y] });
+        }
+      }
+    }
     return measure2D("objective-sort", () => items.sort((a, b) => a.depth - b.depth));
   }), [preparedObjective, objectiveView, objectiveDefinition, heightScale, view, visible.objective]);
   const scene = useMemo(() => measure2D("dynamic-project", () => {
@@ -232,8 +274,8 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     }
     if (visible.observations) for (const trial of model.trials) {
       const p = project(trial.x1, trial.x2, scale("objective", trial.value));
-      const group = !model.hasDensities ? "unclassified" : model.goodIds.has(trial.id) ? "good" : "bad";
-      items.push({ id: `trial-${trial.id}`, kind: "trial", depth: p.depth + 0.02, x: p.x, y: p.y, group });
+      const group = !model.hasPartition ? "unclassified" : model.goodIds.has(trial.id) ? "good" : "bad";
+      items.push({ id: `trial-${trial.id}`, kind: "trial", depth: p.depth + 0.02, x: p.x, y: p.y, group, feasible: model.feasibleIds.has(trial.id) });
     }
     if (proposal) {
       const p = project(proposal.x1, proposal.x2, scale("objective", objectiveDefinition.evaluate(proposal.x1, proposal.x2)));
@@ -247,8 +289,9 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
   // focusable, labelled and hoverable without adding per-frame paint work.
   const markerTargets = visible.observations ? model.trials.map((trial) => {
     const p = project(trial.x1, trial.x2, scale("objective", trial.value));
-    const group = !model.hasDensities ? "Unclassified" : model.goodIds.has(trial.id) ? "Good" : "Bad";
-    const label = `Trial ${trial.id} · ${group} · x₁ = ${trial.x1.toFixed(2)}, x₂ = ${trial.x2.toFixed(2)} · f(x) = ${trial.value.toFixed(3)}`;
+    const group = !model.hasPartition ? "Unclassified" : model.goodIds.has(trial.id) ? "Good" : "Bad";
+    const feasibility = sceneInput.settings.constraintPreset === "none" ? "" : trial.violation === 0 ? " · Feasible" : ` · Infeasible · violation ${trial.violation.toPrecision(3)}`;
+    const label = `Trial ${trial.id} · ${group}${feasibility} · x₁ = ${trial.x1.toFixed(2)}, x₂ = ${trial.x2.toFixed(2)} · f(x) = ${trial.value.toFixed(3)}`;
     return <circle key={`trial-${trial.id}`} cx={p.x} cy={p.y} r={4.5} className="observation-target-2d" tabIndex={0} aria-label={label} onFocus={() => setInspection(label)} onPointerEnter={() => { if (!drag.current) setInspection(label); }}><title>{label}</title></circle>;
   }) : null;
   const proposalLabel = proposal ? `Next evaluation · x₁ = ${proposal.x1.toFixed(3)}, x₂ = ${proposal.x2.toFixed(3)}` : null;
@@ -256,9 +299,9 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     if (!visible.objective) return null;
     const optimum = objectiveView.optimum;
     const p = project(optimum.x1, optimum.x2, scale("objective", optimum.value));
-    const label = `${objectivePreset === "multimodal" ? "Estimated optimum" : "Optimum"} · x₁ = ${optimum.x1.toFixed(3)}, x₂ = ${optimum.x2.toFixed(3)} · f(x) = ${optimum.value.toPrecision(4)}`;
+    const label = `${constrained ? "Constrained optimum" : objectivePreset === "multimodal" ? "Estimated optimum" : "Optimum"} · x₁ = ${optimum.x1.toFixed(3)}, x₂ = ${optimum.x2.toFixed(3)} · f(x) = ${optimum.value.toPrecision(4)}`;
     return <g className="optimum-2d" role="img" tabIndex={0} aria-label={label} onFocus={() => setInspection(label)} onPointerEnter={() => { if (!drag.current) setInspection(label); }}>
-      <title>{label}</title><path d={`M${p.x},${p.y - 7} l7,7 l-7,7 l-7,-7 Z`} /><text x={p.x + 12 * labelScale} y={p.y - 12 * labelScale}>{`Optimum (${optimum.x1.toFixed(objectivePreset === "multimodal" ? 2 : 1)}, ${optimum.x2.toFixed(objectivePreset === "multimodal" ? 2 : 1)})`}</text>
+      <title>{label}</title><path d={`M${p.x},${p.y - 7} l7,7 l-7,7 l-7,-7 Z`} /><text x={p.x + 12 * labelScale} y={p.y - 12 * labelScale}>{constrained ? "Constrained optimum" : `Optimum (${optimum.x1.toFixed(objectivePreset === "multimodal" ? 2 : 1)}, ${optimum.x2.toFixed(objectivePreset === "multimodal" ? 2 : 1)})`}</text>
     </g>;
   })();
   const floor = useMemo(() => [-5, -2.5, 0, 2.5, 5].flatMap((tick) => [[project(tick, -5, 0), project(tick, 5, 0)], [project(-5, tick, 0), project(5, tick, 0)]].map(([a, b]) => [a.x, a.y, b.x, b.y] as const)),
@@ -283,7 +326,10 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     guide.retire("rotate");
     setView((v) => ({ ...v, zoom: clamp(v.zoom * factor, 0.55, 1.7) }));
   }
-  const bestValue = step ? Math.min(...playback.trials.map((trial) => trial.value)).toFixed(3) : "—";
+  const feasibleTrials = constrained ? playback.trials.filter((trial) => trial.violation === 0) : playback.trials;
+  const feasibleCount = `${feasibleTrials.length} / ${step} feasible`;
+  const bestValue = feasibleTrials.length ? Math.min(...feasibleTrials.map((trial) => trial.value)).toFixed(3) : "—";
+  const noFeasibleGood = proposal?.trace.method === "random" && proposal.trace.reason === "no-feasible-good";
   return <section className="visual-workspace explorer-2d" ref={guide.workspaceRef} onKeyDown={guide.onKeyDown} aria-labelledby="explorer-2d-heading">
     <div className="canvas-plot">
     <div className="canvas-controls">
@@ -291,7 +337,7 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
       onToggle={() => { cancelSeek(); if (complete) moveTo(0); setPlaying(!playing || complete); }} />
 
     </div>
-    <div className="legend" aria-label="2D plot layers">{layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} data-guide-target={key === "acquisition" && guideAcquisition || undefined} aria-describedby={key === "acquisition" && guideAcquisition ? guide.textId : undefined} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : "Acquisition"}</span></button>)}</div>
+    <div className="legend" aria-label="2D plot layers">{layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} data-guide-target={key === "acquisition" && guideAcquisition || undefined} aria-describedby={key === "acquisition" && guideAcquisition ? guide.textId : undefined} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{key === "observations" && constrained ? "Observations · ✕ infeasible" : label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : "Acquisition"}</span></button>)}</div>
     <div className="scene-stage">
     <CanvasScene2D items={scene} floor={floor} viewBox={viewBox} />
     <svg className="scene-2d" ref={sceneRef} viewBox={sceneBox} style={{ "--chart-zoom": chartZoom } as CSSProperties} role="group" aria-label="Interactive 3D landscape and KDE surfaces" data-guide-target={guide.active === "rotate" || undefined} aria-describedby={guide.active === "rotate" ? `view-help ${guide.textId}` : "view-help"} tabIndex={0}
@@ -315,22 +361,27 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     <details className="scaling-2d"><summary aria-label="How to read this view">?</summary><div className="scaling-content">
       <h3>How to read this view</h3>
       <p>Drag or use arrow keys to rotate; + / − to zoom. Hover the surface or focus an observation to read its values.</p>
-      <p>The faint surface is the objective; the diamond marks its optimum (estimated for Multimodal). The hollow marker is the next evaluation. KDEs appear after 2 observations.</p>
+      <p>The faint surface is the objective; {constrained ? "the diamond marks the constrained optimum and the boundary outlines the feasible region. ✕ marks infeasible trials. KDEs appear when the split has a Good density." : "the diamond marks its optimum (estimated for Multimodal). KDEs appear after 2 observations."} The hollow marker is the next evaluation.</p>
       <p>Heights are rescaled to share one view: Linear keeps relative heights; Log1p expands the valley floor. Scaling never changes the optimizer, and hover shows original values.</p>
     </div></details>
     <div className="scene-inspection" aria-live="polite">{seekTarget === null ? inspection : `Moving to trial ${seekTarget}…`}</div>
+    {constraintHint && <LabHintBubble textId="constraint-hint-text-2d" message="✕ marks trials that break the constraint. TPE fills open spots in the Good group with the trials that break it least. Turn Infeasible filling off in Settings to compare." phase="meaning" placement="bottom" onDismiss={(keyboard) => {
+      setConstraintHint(false);
+      if (keyboard) guide.workspaceRef.current?.querySelector<HTMLElement>(".settings-toggle")?.focus();
+    }} />}
     {guide.active && <LabHintBubble textId={guide.textId} message={playGuides[guide.active].action} phase="action" placement="bottom" onDismiss={guide.dismiss} />}
     </div>
 
-    <ModelSettingsPanel experiment={{ page: "2d", preset: objectivePreset, mode }} className="settings-2d" idSuffix="-2d" labelPrefix="2D " defaultSettings={defaultModelSettings2D} trialLimit={settings2D.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); restart(); }}
-      status={<div className="proposal">
-        <span>{!proposal ? "Search complete" : proposal.method === "random" ? `Random start · ${step + 1} / ${settings.startupTrials}` : `TPE · trial ${step + 1}`}</span>
+    <ModelSettingsPanel experiment={{ page: "2d", preset: objectivePreset, mode }} className="settings-2d" idSuffix="-2d" labelPrefix="2D " defaultSettings={defaultModelSettings2D} trialLimit={settings2D.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} disableEi={constrained} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); restart(); }}
+      status={<div className={constrained ? "proposal canvas-status" : "proposal"}>
+        <span>{!proposal ? "Search complete" : noFeasibleGood ? `Uniform random · trial ${step + 1}` : proposal.method === "random" ? `Random start · ${step + 1} / ${settings.startupTrials}` : `TPE · trial ${step + 1}`}</span>
         <Help label="2D trial playback">
-          {!proposal ? `Search complete. All ${settings2D.count} trials evaluated.` : proposal.method === "random"
+          {!proposal ? `Search complete. All ${settings2D.count} trials evaluated.` : noFeasibleGood ? "The Good group has no feasible trials or prior. The next trial is a uniform random draw." : proposal.method === "random"
             ? `Initial random exploration · ${step + 1} / ${settings.startupTrials}. ${settings.startupTrials === settings2D.count ? "Every trial in this search is random." : `Uniform random draw until TPE starts at trial ${settings.startupTrials + 1}.`}`
             : `TPE proposal · trial ${step + 1}. Drew ${settings.candidates} candidate${settings.candidates === 1 ? "" : "s"} from ℓ(x) and picked the largest ℓ(x)/g(x).`}{" "}
           <span id="trial-seek-help-2d">Seeking back discards later trials.</span>
         </Help>
+        {constrained && <span> · {feasibleCount}</span>}
       </div>}>
       <h2 id="explorer-2d-heading" className="sr-only">Explore two dimensions</h2>
       <div className="scene-toolbar-group">
@@ -338,13 +389,41 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
           <div className="parameter-label"><label htmlFor="objective-preset-2d">Objective</label><Help label="2D objective preset"><strong>{objectiveDefinition.label}</strong><br />{objectiveDefinition.description}<br />Minimize over [−5, 5]².<br />{objectiveDefinition.formula}<br />Changing it restarts the search.</Help></div><select id="objective-preset-2d" value={objectivePreset} onChange={(event) => { setObjectivePreset(event.target.value as ObjectivePreset2D); restart(); }}>{(Object.keys(objectivePresets2D) as ObjectivePreset2D[]).map((preset) => <option key={preset} value={preset}>{objectivePresets2D[preset].label}</option>)}</select>
         </div>
       </div>
+      <ConstraintSettings2D preset={constraintPreset} infeasibleFilling={settings.infeasibleFilling ?? true} onPresetChange={changeConstraint}
+        onFillingChange={(infeasibleFilling) => editSettings({ ...settings, infeasibleFilling })} />
       <div className="scene-toolbar-group">
         <div className="parameter density-picker"><div className="parameter-label"><label className="sr-only" htmlFor="density-mode">Density model</label><Help label="2D density model"><strong>{mode === "multivariate" ? "Multivariate" : "Univariate"}</strong><br />Multivariate: kernels span both coordinates, keeping each (x₁, x₂) pair together. Univariate: each coordinate has its own KDE and is chosen independently.</Help></div><select id="density-mode" value={mode} onChange={(event) => { cancelSeek(); setMode(event.target.value as DensityMode); setPlaying(false); setInspection(""); }}><option value="multivariate">Multivariate</option><option value="univariate">Univariate</option></select></div>
         </div>
     </ModelSettingsPanel>
     <details className="performance-monitor" onToggle={(event) => setComparisonOpen(event.currentTarget.open)}>
       <summary><span className="performance-caption">Best f(x) <strong title={bestValue}>{bestValue}</strong></span><span>Performance <span aria-hidden="true">⌄</span></span></summary>
-      {comparisonOpen && <ProgressComparison2D trials={playback.trials} seed={seed} objectivePreset={objectivePreset} />}
+      {comparisonOpen && <ProgressComparison2D trials={playback.trials} seed={seed} objectivePreset={objectivePreset} constraintPreset={constraintPreset} mode={mode} settings={settings} />}
     </details>
   </section>;
+}
+
+export function ConstraintSettings2D({ preset, infeasibleFilling, onPresetChange, onFillingChange }: {
+  preset: ConstraintPreset2D;
+  infeasibleFilling: boolean;
+  onPresetChange: (preset: ConstraintPreset2D) => void;
+  onFillingChange: (enabled: boolean) => void;
+}) {
+  const definition = getConstraint2D(preset);
+  return <>
+    <div className="parameter constraint-picker">
+      <div className="parameter-label"><label htmlFor="constraint-preset-2d">Constraint</label>
+        <Help label="2D constraint preset"><strong>{definition.label}</strong><br />
+          {definition.description}<br />{definition.formula && <>{definition.formula}<br /></>}
+          About {definition.feasibleShare} of the domain is feasible. Changing the constraint restarts the search.
+        </Help>
+      </div>
+      <select id="constraint-preset-2d" value={preset} onChange={(event) => onPresetChange(event.target.value as ConstraintPreset2D)}>
+        {Object.entries(constraintPresets2D).map(([id, constraint]) => <option key={id} value={id}>{constraint.label}</option>)}
+      </select>
+    </div>
+    {preset !== "none" && <div className="parameter infeasible-filling">
+      <label><input type="checkbox" checked={infeasibleFilling} onChange={(event) => onFillingChange(event.target.checked)} /> Infeasible filling</label>
+      <Help label="infeasible filling">When there are too few feasible trials to fill Good, add trials in order of increasing total violation. With filling off, only feasible trials go in Good.</Help>
+    </div>}
+  </>;
 }

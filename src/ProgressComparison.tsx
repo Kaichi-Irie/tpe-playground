@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from "react";
-import { comparisonFloor, averageRegret, relativeBestSoFar, bestSoFar } from "./comparison";
+import { comparisonFloor, averageRegret, relativeBestSoFar, bestSoFar, bestFeasibleSoFar } from "./comparison";
 import { findObjectiveMinimum, type ObjectivePreset } from "./objectives";
 import { PanelClose } from "./PanelClose";
 import { Help } from "./Help";
@@ -12,46 +12,53 @@ export const ProgressComparison = memo(function ProgressComparison({ trials, see
   return <ComparisonPanel trials={trials} randomTrials={randomTrials} minimum={minimum.y} />;
 });
 
-export function ComparisonPanel({ trials, randomTrials, minimum, relative = true, approximate = false }: {
-  trials: readonly Trial[];
-  randomTrials: readonly Trial[];
+type MetricTrial = Trial & { feasible?: boolean };
+
+export function ComparisonPanel({ trials, randomTrials, minimum, relative = true, approximate = false, constrained }: {
+  trials: readonly MetricTrial[];
+  randomTrials: readonly MetricTrial[];
+  constrained?: { currentLabel: string; flippedLabel: string; flippedTrials: readonly MetricTrial[]; feasibleCount: string };
   minimum: number;
   relative?: boolean;
   approximate?: boolean;
 }) {
-  const [metric, setMetric] = useState<"best" | "regret">("best");
+  const [selectedMetric, setMetric] = useState<"best" | "regret">("best");
+  const metric = constrained ? "best" : selectedMetric;
   const random = randomTrials.slice(0, trials.length);
-  const tpeBest = relative ? relativeBestSoFar(trials, minimum) : bestSoFar(trials).map((value) => Math.max(0, value - minimum));
-  const randomBest = relative ? relativeBestSoFar(random, minimum) : bestSoFar(random).map((value) => Math.max(0, value - minimum));
-  const tpeRegret = averageRegret(trials, minimum);
-  const randomRegret = averageRegret(random, minimum);
+  const feasibleGap = (samples: readonly MetricTrial[]) => bestFeasibleSoFar(samples).map((value) => value === null ? null : Math.max(0, value - minimum));
+  const bestGap = (samples: readonly MetricTrial[]) => constrained ? feasibleGap(samples) : relative
+    ? relativeBestSoFar(samples, minimum)
+    : bestSoFar(samples).map((value) => Math.max(0, value - minimum));
+  const tpeRegret = constrained ? [] : averageRegret(trials, minimum);
+  const randomRegret = constrained ? [] : averageRegret(random, minimum);
   // Average regret can rise or fall. Bound it using only observed values.
   const positiveRegrets = [...tpeRegret, ...randomRegret].filter((value) => value > 0);
   const regretFloor = positiveRegrets.length
     ? Math.max(comparisonFloor, 10 ** Math.floor(Math.log10(Math.min(...positiveRegrets))))
     : comparisonFloor;
   const title = metric === "best" ? "Best so far" : "Average regret";
-  const definition = metric === "best"
+  const definition = constrained ? "Minimum f(xᵢ) − f(x*) over feasible trials through trial t." : metric === "best"
     ? relative ? "minᵢ≤ₜ [f(xᵢ) − f(x*)] / f(x*)" : "minᵢ≤ₜ [f(xᵢ) − f(x*)]"
     : "(1/t) Σᵢ₌₁ᵗ [f(xᵢ) − f(x*)]";
   const floor = metric === "best" ? comparisonFloor : regretFloor;
   return <section className="workspace comparison" aria-label="Search performance">
-    <div className="section-heading"><h2>Performance</h2><PanelClose label="performance panel" /></div>
+    <div className="section-heading"><h2>Performance</h2>{constrained && <span>{constrained.feasibleCount}</span>}<PanelClose label="performance panel" /></div>
     <div className="comparison-toolbar">
       <div className="comparison-controls" role="group" aria-label="Comparison metric">
         <button type="button" aria-pressed={metric === "best"} onClick={() => setMetric("best")}>Best so far</button>
-        <button type="button" aria-pressed={metric === "regret"} onClick={() => setMetric("regret")}>Average regret</button>
+        {!constrained && <button type="button" aria-pressed={metric === "regret"} onClick={() => setMetric("regret")}>Average regret</button>}
       </div>
       <Help key={metric} label={title}>
         <strong>{title}</strong><br />
-        {metric === "best" ? relative ? "The smallest gap to the optimum found so far, relative to the optimum." : "The smallest gap to the optimum found so far." : "The average gap to the optimum across all evaluations so far."}<br />
+        {constrained ? "Each line starts at its first feasible trial. The reference is the constrained optimum." : metric === "best" ? relative ? "The smallest gap to the optimum found so far, relative to the optimum." : "The smallest gap to the optimum found so far." : "The average gap to the optimum across all evaluations so far."}<br />
         {definition}<br />
         {approximate && <>The optimum reference is numerically estimated.<br /></>}
         The vertical axis uses a logarithmic scale. Values ≤ {floor.toExponential(0)} are drawn at the bottom.
       </Help>
     </div>
     <ProgressPlot title={title} definition={definition}
-      tpe={metric === "best" ? tpeBest : tpeRegret} random={metric === "best" ? randomBest : randomRegret}
-      floor={floor} />
+      tpe={metric === "best" ? bestGap(trials) : tpeRegret} random={metric === "best" ? bestGap(random) : randomRegret}
+      third={constrained && { label: constrained.flippedLabel, values: feasibleGap(constrained.flippedTrials.slice(0, trials.length)) }}
+      currentLabel={constrained?.currentLabel} floor={floor} />
   </section>;
 }

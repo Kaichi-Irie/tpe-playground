@@ -1031,3 +1031,12 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
   .live-model-controls .parameter:has([data-guide-target]),
   .scene-stage:has([data-guide-target]) { outline-color: Highlight; }
 }
+
+.explorer-2d { --constraint-boundary: #24715f; }
+[data-theme="dark"] .explorer-2d { --constraint-boundary: #83dfc4; }
+.settings-dialog .infeasible-filling label { min-height: 44px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.infeasible-filling input { accent-color: var(--accent); }
+.performance-monitor .comparison-values.constrained-values { flex-wrap: nowrap; gap: 10px; }
+.comparison-values .comparison-third i { border-top: 2.5px dotted var(--acquisition); }
+.third-progress-line { fill: none; stroke: var(--acquisition); stroke-width: 2.5; stroke-dasharray: 2 3; }
+.third-progress-point { fill: var(--surface); stroke: var(--acquisition); stroke-width: 2; }
