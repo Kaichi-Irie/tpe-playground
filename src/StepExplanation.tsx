@@ -29,8 +29,8 @@ const h = String.raw`\htmlClass{journey-accent}{h}`;
 const compactLabQuery = "(max-width: 800px)";
 const acquisitionFormula = String.raw`${alphaMath}(x)=\frac{${goodMath}(x)}{${badMath}(x)}`;
 const nextFormula = String.raw`x_{\mathrm{next}}=\underset{z_j}{\arg\max}\;${alphaMath}(z_j)`;
-const normalKernel = String.raw`k_i(x;${h})=\mathcal N(x\mid x_i,${h}^2)`;
-const kernelScale = String.raw`\frac{1}{${h}\sqrt{2\pi}}`;
+const normalKernel = String.raw`k_i(x;${h})=\mathcal N_{[-5,5]}(x\mid x_i,${h}^2)`;
+const kernelScale = String.raw`\frac{1}{Z_i${h}\sqrt{2\pi}}`;
 export const kernelFormula = String.raw`${normalKernel}=${kernelScale}\exp\!\left(-\frac{(x-x_i)^2}{2${h}^2}\right)`;
 export const kernelFormulaCompact = String.raw`\begin{gathered}${normalKernel}\\=${kernelScale}\,e^{-(x-x_i)^2/(2${h}^2)}\end{gathered}`;
 
@@ -198,7 +198,10 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
   const scoreVisibility = clamp(p - 6);
   const evaluation = clamp(p - 7);
   const densityMax = Math.max(0.001, ...data.goodDensity, ...data.badDensity);
-  const densityScale = mix(H * 0.25, laneCurveHeight, scoring) / mix(1 / (settings.bandwidth * Math.sqrt(2 * Math.PI)), densityMax, weighting);
+  const kernelMax = useMemo(() => Math.max(...[...data.group.good.kernels, ...data.group.bad.kernels].map((kernel) =>
+    kernelContribution({ ...kernel, mixtureWeight: 1 }, kernel.center.x),
+  )), [data]);
+  const densityScale = mix(H * 0.25, laneCurveHeight, scoring) / mix(kernelMax, densityMax, weighting);
   const ratioPlot = acquisitionPlot(data.logRatios, data.candidates.map((candidate) => candidate.score));
   const ratios = ratioPlot.curve;
   const ratioScale = laneCurveHeight;
@@ -236,7 +239,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     rounds > 0 ? "New observation added. Split the data again." : initialComplete ? "Tap the grid to split Good and Bad." : "Pick a point x. Observe its value.",
     "Split data into Good and Bad.",
     "Model where Good and Bad inputs occur.",
-    "Spread each point into a smooth density.",
+    "Spread each point into a density on [−5, 5]. Zᵢ is the Gaussian mass in that interval.",
     "Sum weighted kernels into densities.",
     "Roll the dice. Find your next move.",
     "Which candidate wins?",

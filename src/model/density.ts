@@ -1,4 +1,5 @@
 import type { DensitySnapshot, Kernel, Parameter, Point, RandomSource } from "./types";
+import { logTruncatedNormalPeak, sampleTruncatedNormal } from "./truncnorm";
 
 export function createDensity(parameters: readonly Parameter[], samples: readonly { id: number; params: Point }[], bandwidth: number, weights: readonly number[], priorWeight = 0): DensitySnapshot {
   const total = weights.reduce((sum, weight) => sum + weight, priorWeight);
@@ -11,11 +12,16 @@ export function createDensity(parameters: readonly Parameter[], samples: readonl
   }));
   if (priorWeight > 0) kernels.push({
     source: { kind: "prior" },
-    center: Object.fromEntries(parameters.map((p) => [p.id, (p.low + p.high) / 2])),
+    center: Object.fromEntries(parameters.map((p) => [p.id, p.low + (p.high - p.low) / 2])),
     bandwidths: Object.fromEntries(parameters.map((p) => [p.id, p.high - p.low])),
     observationWeight: priorWeight, mixtureWeight: priorWeight / total,
   });
-  return { parameters: parameters.map((p) => ({ ...p })), kernels, normalization: "full-space", sampling: "condition-mixture-on-domain" };
+  return { parameters: parameters.map((p) => ({ ...p })), kernels, normalization: "truncated-box", sampling: "truncated-components" };
+}
+
+function kernelBase(kernel: Kernel, parameters: readonly Parameter[]): number {
+  return Math.log(kernel.mixtureWeight) + parameters.reduce((sum, { id, low, high }) =>
+    sum + logTruncatedNormalPeak(kernel.center[id], kernel.bandwidths[id], low, high), 0);
 }
 
 // Cache only immutable model snapshots; editable caller-owned densities are never cached.
@@ -23,13 +29,15 @@ const evaluators = new WeakMap<DensitySnapshot, Map<string, (point: Point) => nu
 
 export function createLogDensity(model: DensitySnapshot, axes: readonly string[] = model.parameters.map((p) => p.id)): (point: Point) => number {
   if (new Set(axes).size !== axes.length || axes.some((id) => !model.parameters.some((p) => p.id === id))) throw new Error("Invalid density axes.");
+  const parameters = axes.map((id) => model.parameters.find((p) => p.id === id)!);
   const terms = model.kernels.filter((k) => k.mixtureWeight > 0).map((kernel) => ({
-    base: Math.log(kernel.mixtureWeight) - axes.reduce((sum, id) => sum + Math.log(kernel.bandwidths[id]) + 0.5 * Math.log(2 * Math.PI), 0),
+    base: kernelBase(kernel, parameters),
     centers: axes.map((id) => kernel.center[id]),
     widths: axes.map((id) => kernel.bandwidths[id]),
   }));
   return (point) => {
     if (axes.some((id) => !Number.isFinite(point[id]))) throw new Error("Invalid evaluation point.");
+    if (parameters.some(({ id, low, high }) => point[id] < low || point[id] > high)) return -Infinity;
     let max = -Infinity;
     const values = new Array<number>(terms.length);
     for (let i = 0; i < terms.length; i++) {
@@ -52,13 +60,18 @@ export function createLogDensity(model: DensitySnapshot, axes: readonly string[]
 export function logDensityGrid2D(model: DensitySnapshot, xId: string, xs: readonly number[], yId: string, ys: readonly number[]): number[][] {
   if (xId === yId || model.parameters.length !== 2 || [xId, yId].some((id) => !model.parameters.some((p) => p.id === id)) || [...xs, ...ys].some((v) => !Number.isFinite(v))) throw new Error("Invalid density grid.");
   const axes = model.parameters.map((p) => p.id);
+  const xParameter = model.parameters.find((p) => p.id === xId)!;
+  const yParameter = model.parameters.find((p) => p.id === yId)!;
+  const xInBox = xs.map((x) => x >= xParameter.low && x <= xParameter.high);
+  const yInBox = ys.map((y) => y >= yParameter.low && y <= yParameter.high);
   const terms = model.kernels.filter((k) => k.mixtureWeight > 0).map((kernel) => ({
-    base: Math.log(kernel.mixtureWeight) - axes.reduce((sum, id) => sum + Math.log(kernel.bandwidths[id]) + 0.5 * Math.log(2 * Math.PI), 0),
+    base: kernelBase(kernel, model.parameters),
     x: xs.map((x) => 0.5 * ((x - kernel.center[xId]) / kernel.bandwidths[xId]) ** 2),
     y: ys.map((y) => 0.5 * ((y - kernel.center[yId]) / kernel.bandwidths[yId]) ** 2),
   }));
   const values = new Float64Array(terms.length);
   return xs.map((_, i) => ys.map((_, j) => {
+    if (!xInBox[i] || !yInBox[j]) return -Infinity;
     let max = -Infinity;
     for (let k = 0; k < terms.length; k++) {
       const term = terms[k];
@@ -85,25 +98,13 @@ export function logDensity(model: DensitySnapshot, point: Point, axes: readonly 
 }
 
 export function sampleDensity(model: DensitySnapshot, random: RandomSource): Point {
-  // Reject the entire mixture draw, not only a coordinate or a fixed component.
-  // A bound prevents pathological bandwidths from locking the browser forever.
-  for (let attempt = 0; attempt < 100000; attempt++) {
-    const total = model.kernels.reduce((sum, k) => sum + k.observationWeight, 0);
-    const choice = random() * total;
-    let cumulative = 0;
-    const kernel = model.kernels.find((k) => (cumulative += k.observationWeight) > choice)!;
-    const params: Record<string, number> = {};
-    for (let i = 0; i < model.parameters.length; i += 2) {
-      const radius = Math.sqrt(-2 * Math.log(random()));
-      const angle = 2 * Math.PI * random();
-      const a = model.parameters[i].id;
-      params[a] = kernel.center[a] + kernel.bandwidths[a] * radius * Math.cos(angle);
-      if (i + 1 < model.parameters.length) {
-        const b = model.parameters[i + 1].id;
-        params[b] = kernel.center[b] + kernel.bandwidths[b] * radius * Math.sin(angle);
-      }
-    }
-    if (model.parameters.every((p) => params[p.id] >= p.low && params[p.id] <= p.high)) return params;
+  const total = model.kernels.reduce((sum, k) => sum + k.observationWeight, 0);
+  const choice = random() * total;
+  let cumulative = 0;
+  const kernel = model.kernels.find((k) => (cumulative += k.observationWeight) > choice)!;
+  const params: Record<string, number> = {};
+  for (const { id, low, high } of model.parameters) {
+    params[id] = sampleTruncatedNormal(kernel.center[id], kernel.bandwidths[id], low, high, random);
   }
-  throw new Error("Could not sample within the domain; reduce bandwidth or prior weight.");
+  return params;
 }

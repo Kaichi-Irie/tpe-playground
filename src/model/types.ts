@@ -51,9 +51,8 @@ export interface Kernel {
 export interface DensitySnapshot {
   readonly parameters: readonly Parameter[];
   readonly kernels: readonly Kernel[];
-  // Preserve the existing educational model: full-space density, bounded draws.
-  readonly normalization: "full-space";
-  readonly sampling: "condition-mixture-on-domain";
+  readonly normalization: "truncated-box";
+  readonly sampling: "truncated-components";
 }
 export interface GroupModel {
   readonly id: string;
@@ -62,7 +61,7 @@ export interface GroupModel {
   readonly bad: DensitySnapshot;
 }
 export interface ModelSnapshot {
-  readonly version: 1;
+  readonly version: 2;
   readonly id: string;
   readonly problem: Problem;
   readonly config: TpeConfig;
@@ -79,7 +78,7 @@ export interface GroupTrace {
   readonly selectedIndex: number;
 }
 interface ProposalContext {
-  readonly version: 1;
+  readonly version: 2;
   readonly seed: number;
   readonly config: TpeConfig;
   readonly problem: Problem;

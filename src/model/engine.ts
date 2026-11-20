@@ -72,7 +72,7 @@ function modelRuntime(snapshot: ModelSnapshot) {
         Object.assign(selected, candidates[selectedIndex].params);
         return { groupId: group.id, parameterIds: group.parameterIds, candidates, selectedIndex };
       });
-      return freezeData({ version: 1, method: "tpe", modelId: snapshot.id, seed, config: snapshot.config, problem: snapshot.problem, historyKey: snapshot.historyKey, inputTrialIds: snapshot.inputTrialIds, groups, selected });
+      return freezeData({ version: 2, method: "tpe", modelId: snapshot.id, seed, config: snapshot.config, problem: snapshot.problem, historyKey: snapshot.historyKey, inputTrialIds: snapshot.inputTrialIds, groups, selected });
     },
   };
 }
@@ -104,7 +104,7 @@ function fitValidatedTpe(problem: Problem, trials: readonly Observation[], confi
     return { id: `group-${i}`, parameterIds: parameters.map((p) => p.id), good: density(partition.good), bad: density(partition.bad) };
   });
   const historyKey = dataKey(trials.map((t) => [t.id, problem.parameters.map((p) => t.params[p.id]), t.objectives, t.constraints]));
-  return modelRuntime(freezeData({ version: 1, id: dataKey([problem, config, historyKey]), historyKey, problem: structuredClone(problem), config: { ...config }, inputTrialIds: trials.map((t) => t.id), partition, groups }));
+  return modelRuntime(freezeData({ version: 2, id: dataKey([problem, config, historyKey]), historyKey, problem: structuredClone(problem), config: { ...config }, inputTrialIds: trials.map((t) => t.id), partition, groups }));
 }
 
 export function proposeTpe(problem: Problem, trials: readonly Observation[], config: TpeConfig, seed: number): ProposalTrace {
@@ -112,7 +112,7 @@ export function proposeTpe(problem: Problem, trials: readonly Observation[], con
   const startup = trials.length < config.startupTrials;
   if (!startup && !needsFeasibleGood(problem, trials, config)) return fitValidatedTpe(problem, trials, config).propose(seed);
   const random = createRandom(seed, trials.length);
-  return freezeData({ version: 1, method: "random", reason: startup ? "startup" : "no-feasible-good", seed, problem: structuredClone(problem), config: { ...config }, inputTrialIds: trials.map((t) => t.id), historyKey: dataKey(trials.map((t) => [t.id, problem.parameters.map((p) => t.params[p.id]), t.objectives, t.constraints])), selected: Object.fromEntries(problem.parameters.map((p) => [p.id, p.low + random() * (p.high - p.low)])) });
+  return freezeData({ version: 2, method: "random", reason: startup ? "startup" : "no-feasible-good", seed, problem: structuredClone(problem), config: { ...config }, inputTrialIds: trials.map((t) => t.id), historyKey: dataKey(trials.map((t) => [t.id, problem.parameters.map((p) => t.params[p.id]), t.objectives, t.constraints])), selected: Object.fromEntries(problem.parameters.map((p) => [p.id, p.low + random() * (p.high - p.low)])) });
 }
 
 export function needsFeasibleGood(problem: Problem, trials: readonly Observation[], config: TpeConfig): boolean {

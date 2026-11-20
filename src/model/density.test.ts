@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { createDensity, logDensity } from "./density";
+import { createDensity, createLogDensity, logDensity, logDensityGrid2D, sampleDensity } from "./density";
 
 const parameters = [{ id: "x", low: -5, high: 5 }];
 const samples = [{ id: 1, params: { x: -1 } }, { id: 2, params: { x: 1 } }];
@@ -28,32 +28,69 @@ it.each([0, 0.1, 0.5, 1, 5])("normalizes the one-dimensional mixture with prior 
     expect(Math.exp(logDensity(mixture, { x }))).toBeCloseTo(expected, 12);
   }
 
-  const step = 0.05;
+  const step = 0.002;
   let integral = 0;
-  for (let i = 0; i < 4000; i++) {
-    const x = -100 + (i + 0.5) * step;
-    integral += Math.exp(logDensity(mixture, { x })) * step;
+  const evaluate = createLogDensity(mixture);
+  for (let i = 0; i < 5000; i++) {
+    const x = -5 + (i + 0.5) * step;
+    integral += Math.exp(evaluate({ x })) * step;
   }
   expect(integral).toBeCloseTo(1, 8);
 });
 
-it("normalizes a joint density on the plane with a kernel at the viewing boundary", () => {
-  const center = { x: -5, y: 5 };
-  const density = createDensity(
-    [...parameters, { id: "y", low: -5, high: 5 }],
-    [{ id: 1, params: center }, { id: 2, params: { x: 0, y: 0 } }],
-    0.65,
-    [1, 1],
-  );
-  const step = 0.1;
+const jointParameters = [...parameters, { id: "y", low: 0, high: 6 }];
+const jointSamples = [{ id: 1, params: { x: -5, y: 6 } }, { id: 2, params: { x: 0, y: 2 } }];
+
+it("normalizes a one-dimensional mixture with edge and interior kernels", () => {
+  const density = createDensity(parameters, jointSamples, 0.65, [2, 1], 0.5);
+  const evaluate = createLogDensity(density);
+  const step = 0.01;
   let integral = 0;
-  for (let i = 0; i < 180; i++) {
-    const x = -9 + (i + 0.5) * step;
-    for (let j = 0; j < 180; j++) {
-      const y = -9 + (j + 0.5) * step;
-      integral += Math.exp(logDensity(density, { x, y })) * step ** 2;
+  for (let i = 0; i < 1000; i++) integral += Math.exp(evaluate({ x: -5 + (i + 0.5) * step })) * step;
+  expect(integral).toBeCloseTo(1, 6);
+  expect(density).toMatchObject({ normalization: "truncated-box", sampling: "truncated-components" });
+});
+
+it("normalizes a joint mixture with edge and interior kernels and preserves its analytic marginal", () => {
+  const density = createDensity(jointParameters, jointSamples, 0.65, [2, 1], 0.5);
+  const evaluate = createLogDensity(density);
+  const step = 0.02;
+  let integral = 0;
+  for (let i = 0; i < 500; i++) {
+    const x = -5 + (i + 0.5) * step;
+    for (let j = 0; j < 300; j++) {
+      const y = (j + 0.5) * step;
+      integral += Math.exp(evaluate({ x, y })) * step ** 2;
     }
   }
   expect(integral).toBeCloseTo(1, 6);
-  expect(Math.exp(logDensity(density, center))).toBeGreaterThan(0);
+  const marginal = createLogDensity(density, ["x"]);
+  const oneDimensional = createLogDensity(createDensity(parameters, jointSamples, 0.65, [2, 1], 0.5));
+  for (const x of [-5, -1, 0, 2, 5]) {
+    expect(marginal({ x })).toBeCloseTo(oneDimensional({ x }), 12);
+  }
+});
+
+it("assigns zero density outside the box for points, marginals, and grids", () => {
+  const density = createDensity(jointParameters, jointSamples, 0.65, [2, 1]);
+  expect(logDensity(density, { x: -5.01, y: 6 })).toBe(-Infinity);
+  expect(logDensity(density, { x: -5, y: 6.01 })).toBe(-Infinity);
+  expect(logDensity(density, { x: 5.01 }, ["x"])).toBe(-Infinity);
+  const boundary = logDensity(density, { x: -5, y: 6 });
+  expect(Number.isFinite(boundary)).toBe(true);
+  expect(logDensityGrid2D(density, "y", [6, 6.01], "x", [-5.01, -5])).toEqual([
+    [-Infinity, boundary], [-Infinity, -Infinity],
+  ]);
+});
+
+it("retries each rejected coordinate without redrawing the component or accepted coordinates", () => {
+  const density = createDensity(jointParameters, jointSamples, 1, [1, 1]);
+  const radiusOne = Math.exp(-0.5);
+  const draws = [0.25, radiusOne, 0.5, radiusOne, 0, radiusOne, 0, radiusOne, 0.5];
+  let i = 0;
+  expect(sampleDensity(density, () => {
+    if (i >= draws.length) throw new Error("Unexpected extra draw.");
+    return draws[i++];
+  })).toEqual({ x: -4, y: 5 });
+  expect(i).toBe(draws.length);
 });
