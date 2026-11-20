@@ -1,6 +1,6 @@
-import { resolveBandwidth, validateBandwidthRule } from "./bandwidth";
+import { neighborBandwidths, resolveBandwidth, validateBandwidthRule } from "./bandwidth";
 import { createDensity, logDensity, sampleDensity } from "./density";
-import { partitionConstrainedSingleObjective, partitionSingleObjective, totalViolation } from "./partition";
+import { partitionConstrainedSingleObjective, partitionSingleObjective, totalViolation, validateWeightStrategy } from "./partition";
 import type { Evaluation, GroupModel, GroupTrace, ModelSnapshot, Observation, Point, Problem, ProposalTrace, TpeConfig } from "./types";
 
 export function freezeData<T>(value: T): T {
@@ -21,7 +21,8 @@ export function dataKey(value: unknown): string {
 
 export function validateInput(problem: Problem, trials: readonly Observation[], config: TpeConfig): void {
   const { bandwidth, gamma, weights, priorWeight, startupTrials, candidates, mode } = config;
-  if (!["univariate", "multivariate"].includes(mode) || !["uniform", "recency", "ei"].includes(weights) || !Number.isFinite(bandwidth) || bandwidth <= 0 || !Number.isFinite(gamma) || gamma <= 0 || gamma >= 1 || !Number.isFinite(priorWeight) || priorWeight < 0 || !Number.isInteger(startupTrials) || startupTrials < 2 || startupTrials > 10000 || !Number.isInteger(candidates) || candidates < 1 || candidates > 10000) throw new Error("Invalid TPE configuration.");
+  if (!["univariate", "multivariate"].includes(mode) || !Number.isFinite(bandwidth) || bandwidth <= 0 || !Number.isFinite(gamma) || gamma <= 0 || gamma >= 1 || !Number.isFinite(priorWeight) || priorWeight < 0 || !Number.isInteger(startupTrials) || startupTrials < 2 || startupTrials > 10000 || !Number.isInteger(candidates) || candidates < 1 || candidates > 10000) throw new Error("Invalid TPE configuration.");
+  validateWeightStrategy(weights);
   validateBandwidthRule(config.bandwidthRule ?? "constant");
   if (problem.directions.length !== 1 || !["minimize", "maximize"].includes(problem.directions[0])) throw new Error("Only single-objective partitioning is currently supported.");
   if (!Number.isInteger(problem.constraintCount) || problem.constraintCount < 0) throw new Error("Invalid constraint count.");
@@ -94,11 +95,21 @@ function fitValidatedTpe(problem: Problem, trials: readonly Observation[], confi
   const groups = parameterGroups.map((parameters, i): GroupModel => {
     const density = (members: typeof partition.good) => {
       const samples = members.map((m) => byId.get(m.trialId)!);
-      // Apply the existing 1D rules per coordinate; joint kernels keep paired centers.
-      const widths = Object.fromEntries(parameters.map((parameter) => [parameter.id,
-        resolveBandwidth(samples.map((sample) => sample.params[parameter.id]), config.bandwidthRule ?? "constant", config.bandwidth, parameter.high - parameter.low, config.priorWeight > 0),
-      ]));
       const result = createDensity(parameters, samples, config.bandwidth, members.map((m) => m.weight), config.priorWeight);
+      const rule = config.bandwidthRule ?? "constant";
+      const includePrior = config.priorWeight > 0;
+      if (rule === "neighbor") {
+        // Every coordinate gets its own widths, with each joint kernel keeping its trial index.
+        const widths = parameters.map((parameter) => neighborBandwidths(
+          samples.map((sample) => sample.params[parameter.id]), parameter.low, parameter.high, includePrior,
+        ));
+        return { ...result, kernels: result.kernels.map((kernel, index) => kernel.source.kind === "observation"
+          ? { ...kernel, bandwidths: Object.fromEntries(parameters.map(({ id }, axis) => [id, widths[axis][index]])) }
+          : kernel) };
+      }
+      const widths = Object.fromEntries(parameters.map((parameter) => [parameter.id,
+        resolveBandwidth(samples.map((sample) => sample.params[parameter.id]), rule, config.bandwidth, parameter.high - parameter.low, includePrior),
+      ]));
       return { ...result, kernels: result.kernels.map((kernel) => kernel.source.kind === "observation" ? { ...kernel, bandwidths: widths } : kernel) };
     };
     return { id: `group-${i}`, parameterIds: parameters.map((p) => p.id), good: density(partition.good), bad: density(partition.bad) };

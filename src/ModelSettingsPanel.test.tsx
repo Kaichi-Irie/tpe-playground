@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
+import { applyOptunaPreset } from "./searchSettings";
 import { twoParamDefaultModelSettings, twoParamSettings } from "./twoParamTpe";
 
 function renderPanel(status?: string, props: Partial<React.ComponentProps<typeof ModelSettingsPanel>> = {}) {
@@ -102,4 +103,18 @@ it("explains candidate sampling and Good for constrained univariate searches", (
   const unconstrained = renderPanel();
   expect(unconstrained).toContain("Draws this many candidates from ℓ per trial and picks the highest ℓ/g.");
   expect(unconstrained).toContain("rounded up, and leaves at least one trial in Bad.");
+});
+
+it("disables the Optuna preset when it matches and shows each coordinate's observation width range", () => {
+  const settings = applyOptunaPreset({ bandwidth: 0.73 });
+  const widths = [
+    { label: "x₁", values: [4, 2, 3, 2] },
+    { label: "x₂", values: [1, 3, 1, 2] },
+  ];
+  const html = renderPanel(undefined, { settings, widths });
+  expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Optuna preset<\/button>/);
+  expect(html).toContain("x₁ 2.00–4.00 · x₂ 1.00–3.00");
+  expect(html).toMatch(/<input id="bandwidth"[^>]*value="2.5"/);
+  expect(renderPanel(undefined, { settings: { ...settings, gamma: 0.2 } }))
+    .toMatch(/<button type="button">Optuna preset<\/button>/);
 });

@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { createDensity } from "./density";
 import { partitionConstrainedSingleObjective, weightsFor } from "./partition";
 
 const samples = [0, 2, 4, 6].map((y, index) => ({ id: index + 1, y }));
@@ -56,4 +57,27 @@ it("allows fewer Good members with filling off and applies recency within each g
   expect(result.good).toEqual([{ trialId: 4, weight: 0.5 }, { trialId: 6, weight: 1.5 }, { trialId: 5, weight: 1 }]);
   expect(result.bad).toHaveLength(5);
   expect(() => partitionConstrainedSingleObjective(trials, 0.75, "ei", "minimize")).toThrow("EI weights");
+});
+
+it.each([
+  { n: 24, ramp: [] },
+  { n: 25, ramp: [] },
+  { n: 26, ramp: [1 / 26] },
+  { n: 30, ramp: [1 / 30, 33 / 120, 31 / 60, 91 / 120, 1] },
+])("matches Optuna's raw weights and prior share for n=$n", ({ n, ramp }) => {
+  const ordered = Array.from({ length: n }, (_, index) => ({ id: index * 2 + 1, y: -index, params: { x: 0 } }));
+  const reversed = [...ordered].reverse();
+  const expected = [...ramp, ...Array(n - ramp.length).fill(1)];
+  const weights = weightsFor(reversed, sampleValue, "optuna");
+  weights.forEach((weight, index) => expect(weight).toBeCloseTo(expected[n - 1 - index], 14));
+
+  const total = expected.reduce((sum, weight) => sum + weight, 0);
+  const density = createDensity([{ id: "x", low: -5, high: 5 }], reversed, 1, weights, 1);
+  expect(density.kernels.at(-1)?.mixtureWeight).toBeCloseTo(1 / (total + 1), 14);
+});
+
+it("uses trial order for Optuna weights after filling Good with infeasible trials", () => {
+  const result = partitionConstrainedSingleObjective(trials, 0.75, "optuna", "minimize");
+  expect(result.filledTrialIds).toEqual([2, 3, 7]);
+  expect(result.good.map(({ trialId }) => trialId)).toEqual([2, 3, 4, 5, 6, 7]);
 });

@@ -1,11 +1,18 @@
 import type { ReactNode } from "react";
 import { ResponsiveSettings } from "./ResponsiveSettings";
-import type { BandwidthRule } from "./model/bandwidth";
+import { bandwidthRules, type BandwidthRule } from "./model/bandwidth";
 import type { WeightStrategy } from "./model/types";
 import { Help } from "./Help";
 import { ShareSearchLink } from "./ShareSearchLink";
 import type { ShareExperiment } from "./shareSearch";
-import { bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrialCounts, weightOptions, type ModelSettings } from "./searchSettings";
+import { applyOptunaPreset, bandwidthRange, candidateCounts, gammaRange, matchesOptunaPreset, priorWeights, startupTrialCounts, weightOptions, type ModelSettings } from "./searchSettings";
+
+const bandwidthLabels: Record<BandwidthRule, string> = {
+  constant: "Constant",
+  scott: "Scott",
+  silverman: "Silverman",
+  neighbor: "Neighbor (Optuna)",
+};
 
 interface Props {
   children?: ReactNode;
@@ -18,7 +25,7 @@ interface Props {
   seed: number;
   onNewSeed: () => void;
   trialLimit: number;
-  widths: readonly { label: string; value: number }[];
+  widths: readonly { label: string; values: readonly number[] }[];
   domainWidth: number;
   idSuffix?: string;
   labelPrefix?: string;
@@ -37,16 +44,28 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
     return settings[key] === defaultSettings[key];
   });
   const weightOption = weightOptions.find((option) => option.value === weights)!;
-  const displayedWidth = bandwidthRule === "constant" ? bandwidth : widths[0]?.value;
-  const sliderWidth = displayedWidth ?? bandwidth;
-  const sliderMax = domainWidth;
-  const widthText = bandwidthRule !== "constant" && widths.length > 1
-    ? widths.map(({ label, value }) => `${label}: ${value.toFixed(2)}`).join(" · ")
-    : displayedWidth?.toFixed(2) ?? "—";
+  const widthSummaries = bandwidthRule === "constant" ? [] : widths.filter(({ values }) => values.length > 0).map(({ label, values }) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = (sorted.length - 1) / 2;
+    const median = (sorted[Math.floor(middle)] + sorted[Math.ceil(middle)]) / 2;
+    const min = sorted[0];
+    const max = sorted[sorted.length - 1];
+    return { label, median, text: min === max ? min.toFixed(2) : `${min.toFixed(2)}–${max.toFixed(2)}` };
+  });
+  const sliderWidth = widthSummaries[0]?.median ?? bandwidth;
+  const widthText = bandwidthRule === "constant" ? bandwidth.toFixed(2) : widthSummaries.map(({ label, text }) =>
+    experiment.page === "play-3d" ? `${label} ${text}` : text,
+  ).join(" · ") || "—";
+  const widthDescription = bandwidthRule === "constant" ? widthText : widthSummaries.length
+    ? `${widthText}, good KDE` : "Available when Good has observations";
   return (
     <div className="model-controls">
     <ResponsiveSettings footer={<>
       <button type="button" className="settings-reset" disabled={isDefault} onClick={() => onChange(defaultSettings)} aria-label="Reset model defaults">Reset defaults</button>
+      <span className="settings-preset-action">
+        <button type="button" disabled={matchesOptunaPreset(settings)} onClick={() => onChange(applyOptunaPreset(settings))}>Optuna preset</button>
+        <Help label="Optuna preset">Uses Optuna 5.1’s split, kernel widths and weights for completed trials in single-objective continuous searches. Optuna defaults to multivariate TPE. This button keeps the current density mode. Random draws differ, so search trajectories can differ.</Help>
+      </span>
       <ShareSearchLink experiment={experiment} seed={seed} settings={settings} />
     </>}><div className="settings-form">
       <fieldset className="settings-fields"><legend>Experiment</legend>
@@ -61,10 +80,10 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
       <fieldset className="settings-fields"><legend>Model</legend>
             <div className="parameter">
               <div className="parameter-label">
-                <div><label htmlFor={id("bandwidth-rule")}>Bandwidth rule</label><Help label="bandwidth rule">Constant uses h as set. Scott and Silverman choose a width from each group's spread and size, so kernels narrow as observations accumulate. Silverman is less sensitive to outliers.</Help>
+                <div><label htmlFor={id("bandwidth-rule")}>Bandwidth rule</label><Help label="bandwidth rule">Constant uses h as set. Scott and Silverman choose a width from each group's spread and size, so kernels narrow as observations accumulate. Silverman is less sensitive to outliers. Neighbor (Optuna) sets each kernel’s width from its neighboring observations, with clipping to keep widths positive.</Help>
                 </div>
               </div>
-              <select id={id("bandwidth-rule")} aria-label={`${labelPrefix}Bandwidth rule`} value={bandwidthRule} onChange={(event) => change({ bandwidthRule: event.target.value as BandwidthRule })}><option value="constant">Constant</option><option value="scott">Scott</option><option value="silverman">Silverman</option></select>
+              <select className="bandwidth-rule-select" id={id("bandwidth-rule")} aria-label={`${labelPrefix}Bandwidth rule`} value={bandwidthRule} onChange={(event) => change({ bandwidthRule: event.target.value as BandwidthRule })}>{bandwidthRules.map((rule) => <option key={rule} value={rule}>{bandwidthLabels[rule]}</option>)}</select>
             </div>
             <div className="parameter primary-weights">
               <div className="parameter-label">
@@ -118,10 +137,10 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
           </div>
           <output htmlFor={id("bandwidth")}>{widthText}</output>
         </div>
-        {bandwidthRule !== "constant" && <span className="bandwidth-mode">{bandwidthRule === "scott" ? "Scott" : "Silverman"} · good KDE · drag to set constant h</span>}
+        {bandwidthRule !== "constant" && <span className="bandwidth-mode">{bandwidthLabels[bandwidthRule]} · good KDE · drag to set constant h</span>}
         <div className="bandwidth-controls">
 
-          <input id={id("bandwidth")} data-guide-target={guide?.id === "bandwidth" || undefined} aria-describedby={guide?.id === "bandwidth" ? guide.describedBy : undefined} type="range" {...bandwidthRange} max={sliderMax} value={sliderWidth} aria-valuetext={displayedWidth === undefined ? "Available after 2 observations" : `${displayedWidth.toFixed(2)}${bandwidthRule === "constant" ? "" : ", good KDE"}`} onChange={(event) => change({ bandwidth: Number(event.target.value), bandwidthRule: "constant" })} />
+          <input id={id("bandwidth")} data-guide-target={guide?.id === "bandwidth" || undefined} aria-describedby={guide?.id === "bandwidth" ? guide.describedBy : undefined} type="range" {...bandwidthRange} max={domainWidth} value={sliderWidth} aria-valuetext={widthDescription} onChange={(event) => change({ bandwidth: Number(event.target.value), bandwidthRule: "constant" })} />
         </div>
       </div>
     </section></div>
