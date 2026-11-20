@@ -271,8 +271,19 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
           <li><strong>Model.</strong> Fit densities ℓ(x) and g(x) to the two groups using kernel density estimation (KDE).</li>
           <li><strong>Sample.</strong> Draw candidates from ℓ(x), evaluate the one with the highest ℓ(x)/g(x), and repeat.</li>
         </ol>
-        <p>Explore the steps in <a href={playPageHrefs["1d"]} onClick={openPlay2D}>Play 2D</a> or <a href={playPageHrefs["2d"]}>Play 3D</a>. For bandwidths, weights, and other design choices, see <a href="https://arxiv.org/abs/2304.11127">Watanabe’s TPE tutorial</a>.</p>
-        <p>TPE Playground uses a simplified educational implementation. <a href="https://github.com/Kaichi-Irie/tpe-playground">View the playground’s source code on GitHub</a>.</p>
+        <p>For bandwidths, weights, and other design choices, see <a href="https://arxiv.org/abs/2304.11127">Watanabe’s TPE tutorial</a>.</p>
+        <h2>Explore the playground</h2>
+        <ul className="explanation-steps">
+          <li><strong><a href="#lab">Lab</a>.</strong> Follow one TPE decision step by step, from 10 observations to the next trial: split, kernels, densities, candidates, and the choice. Adjust γ, bandwidth, prior, weighting, and the number of candidates along the way, with hints for each control.</li>
+          <li><strong><a href={playPageHrefs["1d"]} onClick={openPlay2D}>Play 2D</a>.</strong> Run TPE on a one-dimensional objective, trial by trial. Watch ℓ(x), g(x), and their ratio change, and compare progress against random search.</li>
+          <li><strong><a href={playPageHrefs["2d"]}>Play 3D</a>.</strong> Run TPE on a two-dimensional surface. Compare multivariate and univariate density models, and add a constraint to see constrained search.</li>
+        </ul>
+        <p>In Play 2D and Play 3D, <strong>Settings → Share link</strong> copies a URL that restarts the same search: objective, seed, settings, and any constraint.</p>
+        <p>TPE Playground is a simplified educational implementation: single-objective, with continuous inputs only. <a href="https://github.com/Kaichi-Irie/tpe-playground">View the playground’s source code on GitHub</a>.</p>
+        <h2>Constrained TPE</h2>
+        <p>Play 3D can restrict the search to a feasible region c(x) ≤ 0. Constraint values are observed like the objective, so TPE learns the region from trials.</p>
+        <p>The playground follows Optuna’s <strong>joint</strong> approach. Feasible trials rank first by objective value. If they cannot fill the good group, <strong>Infeasible filling</strong> adds the infeasible trials with the smallest violation. A single pair ℓ(x), g(x) then models objective and feasibility together (<a href="https://arxiv.org/abs/2606.09889">Watanabe &amp; Irie, 2026</a>).</p>
+        <p>The original <a href="https://ijcai.org/proceedings/2023/486">c-TPE</a> instead fits a separate density ratio to each constraint and multiplies them. That independent variant is not implemented here.</p>
         <section className="algorithm-comparison" aria-labelledby="comparison-heading">
           <h2 id="comparison-heading">TPE and other optimizers</h2>
           <div className="algorithm-table-scroll" role="region" aria-label="Optimization algorithm comparison" tabIndex={0}>
