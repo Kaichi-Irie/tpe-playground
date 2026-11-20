@@ -1,7 +1,7 @@
-import type { SceneItem2D, SurfaceLayer2D } from "./CanvasScene2D";
-import type { SurfaceVertex2D } from "./surfaceMesh2D";
+import type { Play3DSceneItem, Play3DSurfaceLayer } from "./Play3DCanvas";
+import type { TwoParamSurfaceVertex } from "./twoParamSurfaceMesh";
 
-interface SurfaceTriangle2D {
+interface TwoParamSurfaceTriangle {
   id: string;
   a: number;
   b: number;
@@ -9,20 +9,20 @@ interface SurfaceTriangle2D {
   inspect: () => void;
   muted?: boolean;
 }
-interface PreparedSurface2D {
-  vertices: SurfaceVertex2D[];
-  triangles: SurfaceTriangle2D[];
-  layer: SurfaceLayer2D;
+interface TwoParamPreparedSurface {
+  vertices: TwoParamSurfaceVertex[];
+  triangles: TwoParamSurfaceTriangle[];
+  layer: Play3DSurfaceLayer;
 }
-export interface ProjectedPoint2D { x: number; y: number; depth: number }
+export interface TwoParamProjectedPoint { x: number; y: number; depth: number }
 
 // Topology, centroids and inspection callbacks depend on the mesh, not camera.
-export function prepareSurface2D(mesh: SurfaceVertex2D[][], layer: SurfaceLayer2D, inspect: (x1: number, x2: number) => void, feasible?: (x1: number, x2: number) => boolean): PreparedSurface2D {
+export function prepareTwoParamSurface(mesh: TwoParamSurfaceVertex[][], layer: Play3DSurfaceLayer, inspect: (x1: number, x2: number) => void, feasible?: (x1: number, x2: number) => boolean): TwoParamPreparedSurface {
   const vertices = mesh.flat();
   const offsets: number[] = [];
   let offset = 0;
   for (const row of mesh) { offsets.push(offset); offset += row.length; }
-  const triangles: SurfaceTriangle2D[] = [];
+  const triangles: TwoParamSurfaceTriangle[] = [];
   for (let i = 0; i < mesh.length - 1; i++) for (let j = 0; j < mesh[i].length - 1; j++) {
     const corners = [offsets[i] + j, offsets[i + 1] + j, offsets[i + 1] + j + 1, offsets[i] + j + 1];
     for (const [part, indices] of [[0, [0, 1, 2]], [1, [0, 2, 3]]] as const) {
@@ -36,7 +36,7 @@ export function prepareSurface2D(mesh: SurfaceVertex2D[][], layer: SurfaceLayer2
 }
 
 // Each shared vertex is projected once; triangles reference the projected values.
-export function projectSurface2D(surface: PreparedSurface2D, project: (x1: number, x2: number, height: number) => ProjectedPoint2D): SceneItem2D[] {
+export function projectTwoParamSurface(surface: TwoParamPreparedSurface, project: (x1: number, x2: number, height: number) => TwoParamProjectedPoint): Play3DSceneItem[] {
   const points = surface.vertices.map((p) => project(p.x1, p.x2, p.height));
   return surface.triangles.map(({ id, a, b, c, inspect, muted }) => ({
     id, inspect, muted, kind: "triangle", layer: surface.layer,

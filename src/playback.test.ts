@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { emptyPlayback, keepObservations, movePlayback } from "./playback";
-import { buildView1D, defaults, proposeTrial, runSearch } from "./tpe";
+import { buildOneParamView, defaults, proposeTrial, runSearch } from "./oneParamTpe";
 
 it("preserves evaluated points while bandwidth changes densities and future proposals", () => {
   const before = movePlayback(emptyPlayback(), 15, 42, 1, defaults);
@@ -8,7 +8,7 @@ it("preserves evaluated points while bandwidth changes densities and future prop
   const edited = keepObservations(before);
   const config = { ...defaults, bandwidth: 0.1 };
   const grid = [-5, 0, 5];
-  expect(buildView1D(edited.trials, grid, 1, config).goodDensity).not.toEqual(buildView1D(edited.trials, grid, 1, defaults).goodDensity);
+  expect(buildOneParamView(edited.trials, grid, 1, config).goodDensity).not.toEqual(buildOneParamView(edited.trials, grid, 1, defaults).goodDensity);
   const next = movePlayback(edited, 16, 42, 1, config);
   expect(next.trials.slice(0, 15)).toEqual(snapshot.trials);
   expect(next.proposals[15]).toEqual(proposeTrial(snapshot.trials, 42, 1, config));

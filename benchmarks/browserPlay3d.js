@@ -1,10 +1,10 @@
 // Run in a foreground dev-server tab, on #play-3d. Uses only public DOM controls.
-// await (await import('/tpe-playground/benchmarks/browser2d.js')).benchmark2D('rotate')
-export async function benchmark2D(scenario, count = 120, trackMutations = false, durationMs = 0) {
+// await (await import('/tpe-playground/benchmarks/browserPlay3d.js')).benchmarkPlay3D('rotate')
+export async function benchmarkPlay3D(scenario, count = 120, trackMutations = false, durationMs = 0) {
   if (!['idle', 'rotate', 'play', 'play-rotate', 'bandwidth', 'seek'].includes(scenario)) throw new Error('Unknown scenario.');
   const scene = document.querySelector('[aria-label="Interactive 3D landscape and KDE surfaces"]');
-  const trial = document.querySelector('[aria-label="2D Trial progress"]');
-  const bandwidth = document.querySelector('#bandwidth-2d');
+  const trial = document.querySelector('[aria-label="Play 3D Trial progress"]');
+  const bandwidth = document.querySelector('#bandwidth-play-3d');
   if (!scene || !trial || !bandwidth) throw new Error('Open Play 3D first.');
   if (document.visibilityState !== 'visible') throw new Error('Keep the benchmark tab visible.');
   const frame = () => new Promise((resolve, reject) => {
@@ -56,7 +56,7 @@ export async function benchmark2D(scenario, count = 120, trackMutations = false,
     const observer = new PerformanceObserver((list) => entries.push(...list.getEntries().map((entry) => entry.toJSON())));
     observer.observe({ type }); observers.push({ observer, entries });
   }
-  performance.getEntriesByType("measure").filter((entry) => entry.name.startsWith("tpe2d:")).forEach((entry) => performance.clearMeasures(entry.name));
+  performance.getEntriesByType("measure").filter((entry) => entry.name.startsWith("play3d:")).forEach((entry) => performance.clearMeasures(entry.name));
   const start = performance.now();
   let seekFrame = null;
   let elapsed;
@@ -103,7 +103,7 @@ export async function benchmark2D(scenario, count = 120, trackMutations = false,
     startTrials: scenario === 'seek' ? 0 : 100, endTrials: trial.getAttribute('aria-valuetext'),
     elapsed, frames: durations.length, seekMaxFrameGap: seekFrames.length ? Math.max(...seekFrames) : undefined, median: sorted.length ? (sorted[Math.floor((sorted.length - 1) / 2)] + sorted[Math.floor(sorted.length / 2)]) / 2 : undefined, p95: sorted[Math.floor(sorted.length * 0.95)],
     max: sorted.at(-1), mutations: trackMutations ? { added, removed, attributes } : null, elements: scene.querySelectorAll('*').length,
-    phases: phaseEntries.filter((entry) => entry.name.startsWith("tpe2d:") && entry.startTime >= start && entry.startTime < start + elapsed).map((entry) => ({ name: entry.name, duration: entry.duration })),
+    phases: phaseEntries.filter((entry) => entry.name.startsWith("play3d:") && entry.startTime >= start && entry.startTime < start + elapsed).map((entry) => ({ name: entry.name, duration: entry.duration })),
     measurementStart: start,
     supportedEntryTypes: PerformanceObserver.supportedEntryTypes,
     longTasks: { count: tasks.length, max: Math.max(0, ...tasks.map((e) => e.duration)), entries: tasks },

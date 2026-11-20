@@ -17,7 +17,7 @@ For a production browser comparison:
 npm run bench:browser
 ```
 
-Open `http://127.0.0.1:4173/tpe-playground/benchmarks/runner.html?profile2d#play-3d`
+Open `http://127.0.0.1:4173/tpe-playground/benchmarks/runner.html?profilePlay3d#play-3d`
 in a visible foreground tab. Wait for the explorer to load, then press **Run browser
 benchmark**. The suite runs idle, keyboard rotation, timed Play, Play + rotation,
 bandwidth changes (about 10 seconds each), then 0→200 seek. Download the results;
@@ -27,7 +27,7 @@ optionally put them in ignored `benchmarks/results/` and summarize with:
 node benchmarks/summarize.mjs benchmarks/results/foreground-results.json
 ```
 
-Use `?profile2d&mutations#play-3d` for a separate 10-input diagnostic. It counts DOM
+Use `?profilePlay3d&mutations#play-3d` for a separate 10-input diagnostic. It counts DOM
 mutations and hashes exact scene geometry/attributes/painter order. Play uses one
 Next trial per frame in this diagnostic so faster renderers still end at trial 110.
 It is not a timing comparison. Normal timed runs use the real one-second timer.
@@ -48,6 +48,10 @@ included in the deployed app. Results download locally; no collection server or
 external telemetry is used. Normal app sessions record no profiling measures.
 
 ## Retained evidence (2026-11-14)
+
+The recorded runs used `?profile2d` and the `tpe2d:` timing prefix, now
+`?profilePlay3d` and `play3d:`. The former harness files `browser2d.js` and
+`model2d.ts` are now `browserPlay3d.js` and `modelTwoParam.ts`.
 
 [measurements-2026-11-14.json](measurements-2026-11-14.json) contains the selected
 runs, original source-file hashes, raw frame intervals for eight final timed
@@ -149,7 +153,7 @@ bandwidth inputs produced 2 scene rebuilds and 1 canvas draw (2.8 ms). iOS
 Simulator Safari (iPhone 17e), 200 trials, 8 s of rapid bandwidth drags: the old
 build stalled several seconds and dropped a tap until queued input drained; the
 canvas build applied every value and the next tap at once. Not yet measured on a
-physical phone. `browser2d.js` fingerprints only SVG markup, so its hash no longer
+physical phone. `browserPlay3d.js` fingerprints only SVG markup, so its hash no longer
 covers painted geometry; compare canvas output visually or by pixels instead.
 
 ## Issue status

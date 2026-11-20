@@ -31,6 +31,8 @@ npm run dev
 
 Open http://127.0.0.1:5173/tpe-playground/. Run `npm run check` for type checking, tests, and a production build.
 
+The [one-parameter adapter](src/oneParamTpe.ts) serves Play 2D and the Lab. The [two-parameter adapter](src/twoParamTpe.ts) serves Play 3D.
+
 [Development and model notes](docs/development.md) · [Model architecture](docs/tpe-model.md)
 
 ## License

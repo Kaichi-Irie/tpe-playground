@@ -30,20 +30,20 @@ function validatePriorWeight(weight: number): void {
   if (!Number.isFinite(weight) || weight < 0) throw new Error("Prior weight must be finite and nonnegative.");
 }
 
-const problem1D: Problem = { id: "multimodal", parameters: [{ id: "x", low: -5, high: 5 }], directions: ["minimize"], constraintCount: 0 };
-const observations1D = (trials: readonly Trial[]): Observation[] => trials.map((t) => ({ id: t.id, params: { x: t.x }, objectives: [t.y], constraints: [] }));
-const config1D = (config: SearchConfig, priorWeight: number): TpeConfig => ({ mode: "univariate", bandwidth: config.bandwidth, bandwidthRule: config.bandwidthRule ?? "constant", gamma: config.gamma, weights: config.weights ?? "uniform", priorWeight, startupTrials: config.startupTrials ?? searchDefaults.startupTrials, candidates: config.candidates ?? searchDefaults.candidates });
+const oneParamProblem: Problem = { id: "multimodal", parameters: [{ id: "x", low: -5, high: 5 }], directions: ["minimize"], constraintCount: 0 };
+const oneParamObservations = (trials: readonly Trial[]): Observation[] => trials.map((t) => ({ id: t.id, params: { x: t.x }, objectives: [t.y], constraints: [] }));
+const oneParamConfig = (config: SearchConfig, priorWeight: number): TpeConfig => ({ mode: "univariate", bandwidth: config.bandwidth, bandwidthRule: config.bandwidthRule ?? "constant", gamma: config.gamma, weights: config.weights ?? "uniform", priorWeight, startupTrials: config.startupTrials ?? searchDefaults.startupTrials, candidates: config.candidates ?? searchDefaults.candidates });
 
-export function fitModel1D(trials: readonly Trial[], priorWeight = 0, config: SearchConfig = defaults) {
-  return fitTpe({ ...problem1D, id: config.objectivePreset ?? "multimodal" }, observations1D(trials), config1D(config, priorWeight));
+export function fitOneParamModel(trials: readonly Trial[], priorWeight = 0, config: SearchConfig = defaults) {
+  return fitTpe({ ...oneParamProblem, id: config.objectivePreset ?? "multimodal" }, oneParamObservations(trials), oneParamConfig(config, priorWeight));
 }
 
 // Visualization adapter: all fields and memberships come from one fitted model.
-export function buildView1D(trials: readonly Trial[], grid: readonly number[], priorWeight: number, config: SearchConfig) {
+export function buildOneParamView(trials: readonly Trial[], grid: readonly number[], priorWeight: number, config: SearchConfig) {
   if (trials.length < 2) return { trials, fitted: null, good: [] as Trial[], bad: [] as Trial[], threshold: null, goodWeights: [], badWeights: [], acquisition: [], goodDensity: grid.map(() => 0), badDensity: grid.map(() => 0) };
-  const fitted = fitModel1D(trials, priorWeight, config);
+  const fitted = fitOneParamModel(trials, priorWeight, config);
   const partition = fitted.snapshot.partition;
-  if (partition.kind !== "single-objective") throw new Error("Play 1D requires an unconstrained partition.");
+  if (partition.kind !== "single-objective") throw new Error("A one-parameter search requires an unconstrained partition.");
   const byId = new Map(trials.map((t) => [t.id, t]));
   const field = (field: "good-density" | "bad-density" | "log-ratio") => evaluateField(fitted, { field, axes: ["x"], points: grid.map((x) => ({ x })), projection: { kind: "full" } }).values;
   return { trials, fitted, good: partition.good.map((m) => byId.get(m.trialId)!), bad: partition.bad.map((m) => byId.get(m.trialId)!), threshold: partition.threshold, goodWeights: partition.good.map((m) => m.weight), badWeights: partition.bad.map((m) => m.weight), acquisition: field("log-ratio"), goodDensity: field("good-density"), badDensity: field("bad-density") };
@@ -60,11 +60,11 @@ function validateSearchConfig(config: SearchConfig): void {
 
 export function proposeTrial(trials: readonly Trial[], seed: number, priorWeight = 0, config: SearchConfig = defaults): Proposal {
   validateSearchConfig(config);
-  const trace = proposeTpe({ ...problem1D, id: config.objectivePreset ?? "multimodal" }, observations1D(trials), config1D(config, priorWeight), seed);
-  return proposal1DFromTrace(trace);
+  const trace = proposeTpe({ ...oneParamProblem, id: config.objectivePreset ?? "multimodal" }, oneParamObservations(trials), oneParamConfig(config, priorWeight), seed);
+  return oneParamProposalFromTrace(trace);
 }
 
-export function proposal1DFromTrace(trace: ProposalTrace): Proposal {
+export function oneParamProposalFromTrace(trace: ProposalTrace): Proposal {
   const candidates = trace.method === "tpe" ? trace.groups[0].candidates.map((c) => ({ x: c.params.x, logRatio: c.score })) : [];
   return { method: trace.method, x: trace.selected.x, candidates, trace };
 }

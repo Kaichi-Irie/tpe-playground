@@ -31,7 +31,7 @@ const responsiveExceptions = new Map([
 ]);
 
 // SVG roots expose the base size for chart geometry and inherited text.
-const chartRoots = new Set([".chart-scroll svg", ".comparison-chart svg", ".scene-2d", ".journey-canvas", ".lab-intro-plot svg"]);
+const chartRoots = new Set([".chart-scroll svg", ".comparison-chart svg", ".scene-play-3d", ".journey-canvas", ".lab-intro-plot svg"]);
 const rules = stylesheets.flatMap((css) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]);
 
 test("all fluid type references resolve to current root tokens", () => {

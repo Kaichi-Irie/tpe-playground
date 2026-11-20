@@ -94,7 +94,7 @@ function fitValidatedTpe(problem: Problem, trials: readonly Observation[], confi
   const groups = parameterGroups.map((parameters, i): GroupModel => {
     const density = (members: typeof partition.good) => {
       const samples = members.map((m) => byId.get(m.trialId)!);
-      // Apply the existing 1D rules per coordinate; joint kernels keep paired centers.
+      // Apply the bandwidth rules per coordinate; joint kernels keep paired centers.
       const widths = Object.fromEntries(parameters.map((parameter) => [parameter.id,
         resolveBandwidth(samples.map((sample) => sample.params[parameter.id]), config.bandwidthRule ?? "constant", config.bandwidth, parameter.high - parameter.low, config.priorWeight > 0),
       ]));

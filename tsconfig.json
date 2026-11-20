@@ -17,6 +17,6 @@
   "include": [
     "src",
     "vite.config.ts",
-    "benchmarks/model2d.ts"
+    "benchmarks/modelTwoParam.ts"
   ]
 }

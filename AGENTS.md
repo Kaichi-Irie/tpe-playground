@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-TPE Playground is a browser-only React/TypeScript app built with Vite. `src/main.tsx` mounts the UI; `src/App.tsx` and neighboring components implement the explorers and Lab. Keep numerical logic in `src/model/`, independent of React, DOM, cameras, and objective evaluators. `src/tpe.ts` and `src/tpe2d.ts` adapt the shared engine for the UI; follow `docs/tpe-model.md` when changing model contracts.
+TPE Playground is a browser-only React/TypeScript app built with Vite. `src/main.tsx` mounts the UI; `src/App.tsx` and neighboring components implement the explorers and Lab. Keep numerical logic in `src/model/`, independent of React, DOM, cameras, and objective evaluators. `src/tpe.ts` and `src/twoParamTpe.ts` adapt the shared engine for the UI; follow `docs/tpe-model.md` when changing model contracts.
 
 Tests live beside source files, with regression fixtures in `src/model/fixtures/`. Bundled images and audio live in `src/assets/`; static files live in `public/`. Use `docs/` for technical notes, `design/` for design references, `scripts/` for utilities, and `benchmarks/` for performance tooling.
 

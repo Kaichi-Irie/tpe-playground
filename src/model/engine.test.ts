@@ -4,17 +4,17 @@ import { createDensity, logDensity } from "./density";
 import { fitTpe, proposeTpe, restoreModel, validateInput } from "./engine";
 import { evaluateField } from "./visualization";
 import { emptyPlayback, movePlayback } from "../playback";
-import { buildView1D, defaults, proposeTrial } from "../tpe";
-import { buildDemo2D, config2D, emptyPlayback2D, movePlayback2D, problem2D, proposeTrial2D } from "../tpe2d";
+import { buildOneParamView, defaults, proposeTrial } from "../oneParamTpe";
+import { buildTwoParamView, twoParamConfig, emptyTwoParamPlayback, moveTwoParamPlayback, twoParamProblem, proposeTwoParamTrial } from "../twoParamTpe";
 import type { Observation } from "./types";
 
 const trials: Observation[] = [[-2, -2], [2, 2], [-3, 3], [3, -3]].map(([x1, x2], i) => ({ id: i + 1, params: { x1, x2 }, objectives: [i], constraints: [] }));
-const config = { ...config2D(), gamma: 0.5, bandwidth: 0.5, startupTrials: 2 };
+const config = { ...twoParamConfig(), gamma: 0.5, bandwidth: 0.5, startupTrials: 2 };
 
 describe("shared TPE model", () => {
-  it("preserves pre-refactor seeded 1D and joint 2D trajectories", () => {
+  it("preserves pre-refactor seeded one-parameter and joint two-parameter trajectories", () => {
     const one = movePlayback(emptyPlayback(), legacy.one.length, 42, 1, defaults).trials;
-    const two = movePlayback2D(emptyPlayback2D(), legacy.two.length, 42, "multivariate", { priorWeight: 0 }).trials;
+    const two = moveTwoParamPlayback(emptyTwoParamPlayback(), legacy.two.length, 42, "multivariate", { priorWeight: 0 }).trials;
     expect(one).toHaveLength(30);
     expect(two).toHaveLength(30);
     one.forEach((t, i) => { expect(t.x).toBeCloseTo(legacy.one[i].x, 12); expect(t.y).toBeCloseTo(legacy.one[i].y, 12); });
@@ -23,8 +23,8 @@ describe("shared TPE model", () => {
 
   it("keeps independent cross peaks and joint paired peaks distinct", () => {
     const settings = { ...config, priorWeight: 0 };
-    const joint = fitTpe(problem2D, trials, settings);
-    const independent = fitTpe(problem2D, trials, { ...settings, mode: "univariate" });
+    const joint = fitTpe(twoParamProblem, trials, settings);
+    const independent = fitTpe(twoParamProblem, trials, { ...settings, mode: "univariate" });
     const at = [{ x1: -2, x2: -2 }, { x1: -2, x2: 2 }];
     const j = joint.evaluate(at), u = independent.evaluate(at);
     expect(j[0].logL - j[1].logL).toBeGreaterThan(20);
@@ -44,7 +44,7 @@ describe("shared TPE model", () => {
   });
 
   it("round trips immutable snapshots without resampling or changing evaluation", () => {
-    const model = fitTpe(problem2D, trials, { ...config, priorWeight: 0.5 });
+    const model = fitTpe(twoParamProblem, trials, { ...config, priorWeight: 0.5 });
     const snapshot = JSON.parse(JSON.stringify(model.snapshot));
     const restored = restoreModel(snapshot);
     const points = [{ x1: 0, x2: 1 }];
@@ -59,51 +59,51 @@ describe("shared TPE model", () => {
 
   it("distinguishes changed outcomes with the same IDs and does not mutate input", () => {
     const before = JSON.stringify(trials);
-    const first = fitTpe(problem2D, trials, config);
-    const second = fitTpe(problem2D, trials.map((t) => ({ ...t, objectives: [-t.objectives[0]] })), config);
+    const first = fitTpe(twoParamProblem, trials, config);
+    const second = fitTpe(twoParamProblem, trials.map((t) => ({ ...t, objectives: [-t.objectives[0]] })), config);
     expect(first.snapshot.historyKey).not.toBe(second.snapshot.historyKey);
     expect(first.snapshot.id).not.toBe(second.snapshot.id);
     expect(JSON.stringify(trials)).toBe(before);
-    const maximize = fitTpe({ ...problem2D, directions: ["maximize"] }, trials, config);
+    const maximize = fitTpe({ ...twoParamProblem, directions: ["maximize"] }, trials, config);
     expect(maximize.snapshot.partition.good.map((m) => m.trialId)).toEqual([4, 3]);
   });
 
   it("rejects unsupported objectives, constraints, duplicate IDs and malformed coordinates", () => {
-    expect(() => fitTpe({ ...problem2D, directions: ["minimize", "minimize"] }, trials, config)).toThrow();
-    expect(() => fitTpe({ ...problem2D, constraintCount: 1 }, trials, config)).toThrow();
-    expect(() => fitTpe(problem2D, [trials[0], trials[0]], config)).toThrow();
-    expect(() => fitTpe(problem2D, [{ ...trials[0], params: { x1: 1 } }, trials[1]], config)).toThrow();
-    expect(() => fitTpe(problem2D, trials, { ...config, bandwidth: NaN })).toThrow();
-    expect(() => proposeTpe(problem2D, [], config, NaN)).toThrow();
+    expect(() => fitTpe({ ...twoParamProblem, directions: ["minimize", "minimize"] }, trials, config)).toThrow();
+    expect(() => fitTpe({ ...twoParamProblem, constraintCount: 1 }, trials, config)).toThrow();
+    expect(() => fitTpe(twoParamProblem, [trials[0], trials[0]], config)).toThrow();
+    expect(() => fitTpe(twoParamProblem, [{ ...trials[0], params: { x1: 1 } }, trials[1]], config)).toThrow();
+    expect(() => fitTpe(twoParamProblem, trials, { ...config, bandwidth: NaN })).toThrow();
+    expect(() => proposeTpe(twoParamProblem, [], config, NaN)).toThrow();
   });
 
   it("separates startup proposals from explanatory fitted densities", () => {
-    const settings = config2D();
-    expect(proposeTpe(problem2D, trials, settings, 42).method).toBe("random");
-    expect(fitTpe(problem2D, trials, settings).snapshot.partition.good.length).toBeGreaterThan(0);
+    const settings = twoParamConfig();
+    expect(proposeTpe(twoParamProblem, trials, settings, 42).method).toBe("random");
+    expect(fitTpe(twoParamProblem, trials, settings).snapshot.partition.good.length).toBeGreaterThan(0);
   });
 });
 
 describe("visualization contract", () => {
   it("shares scores and membership with the proposal model in both pages", () => {
     const past = movePlayback(emptyPlayback(), 10, 42, 1, defaults).trials;
-    const view = buildView1D(past, [0, 1], 1, defaults);
-    const proposal1D = proposeTrial(past, 42, 1, defaults);
-    expect(view.fitted!.propose(42)).toEqual(proposal1D.trace);
+    const view = buildOneParamView(past, [0, 1], 1, defaults);
+    const oneParamProposal = proposeTrial(past, 42, 1, defaults);
+    expect(view.fitted!.propose(42)).toEqual(oneParamProposal.trace);
     expect(view.acquisition).toEqual(view.fitted!.evaluate([{ x: 0 }, { x: 1 }]).map((v) => v.score));
     for (const mode of ["univariate", "multivariate"] as const) {
-      const state = movePlayback2D(emptyPlayback2D(), 12, 42, mode);
-      const view2D = buildDemo2D(state.trials, mode);
-      const proposal = proposeTrial2D(state.trials, 42, mode);
+      const state = moveTwoParamPlayback(emptyTwoParamPlayback(), 12, 42, mode);
+      const twoParamView = buildTwoParamView(state.trials, mode);
+      const proposal = proposeTwoParamTrial(state.trials, 42, mode);
       expect(proposal.trace.method).toBe("tpe");
-      if (proposal.trace.method === "tpe") expect(proposal.trace.modelId).toBe(view2D.fitted!.snapshot.id);
-      expect(view2D.evaluate(0, 1).acquisition).toBeCloseTo(view2D.fitted!.evaluate([{ x1: 0, x2: 1 }])[0].score, 12);
+      if (proposal.trace.method === "tpe") expect(proposal.trace.modelId).toBe(twoParamView.fitted!.snapshot.id);
+      expect(twoParamView.evaluate(0, 1).acquisition).toBeCloseTo(twoParamView.fitted!.evaluate([{ x1: 0, x2: 1 }])[0].score, 12);
       if (mode === "univariate") expect(proposal.candidates).toEqual([]);
     }
   });
 
   it("distinguishes slices from normalized marginals and marginal density ratios", () => {
-    const model = fitTpe(problem2D, trials, { ...config, priorWeight: 0 });
+    const model = fitTpe(twoParamProblem, trials, { ...config, priorWeight: 0 });
     const points = Array.from({ length: 1000 }, (_, i) => ({ x1: -10 + (i + 0.5) * 0.02 }));
     const marginal = evaluateField(model, { field: "good-density", axes: ["x1"], points, projection: { kind: "marginal" } });
     expect(marginal.values.reduce((s, v) => s + v * 0.02, 0)).toBeCloseTo(1, 8);
@@ -118,7 +118,7 @@ describe("visualization contract", () => {
   });
 
   it("normalizes weighted joint densities, including a prior", () => {
-    const density = createDensity(problem2D.parameters, trials.slice(0, 2), 0.5, [2, 0], 0.5);
+    const density = createDensity(twoParamProblem.parameters, trials.slice(0, 2), 0.5, [2, 0], 0.5);
     const marginal = (x1: number) => Math.exp(logDensity(density, { x1 }, ["x1"]));
     let integral = 0;
     for (let x1 = -100; x1 < 100; x1 += 0.05) integral += marginal(x1 + 0.025) * 0.05;
@@ -126,22 +126,22 @@ describe("visualization contract", () => {
   });
 
   it("retains historical proposal settings when switching modes and branches on rewind", () => {
-    const joint = movePlayback2D(emptyPlayback2D(), 12);
+    const joint = moveTwoParamPlayback(emptyTwoParamPlayback(), 12);
     const old = JSON.stringify(joint);
-    const next = movePlayback2D(joint, 13, 42, "univariate");
+    const next = moveTwoParamPlayback(joint, 13, 42, "univariate");
     expect(next.trials.slice(0, 12)).toEqual(joint.trials);
     expect(next.proposals.slice(0, 12)).toEqual(joint.proposals);
     expect(next.proposals[12].trace.config.mode).toBe("univariate");
     expect(next.proposals[11].trace.config.mode).toBe("multivariate");
     expect(JSON.stringify(joint)).toBe(old);
-    const back = movePlayback2D(next, 10);
+    const back = moveTwoParamPlayback(next, 10);
     expect(back.proposals).toHaveLength(10);
-    expect(movePlayback2D(back, 12)).toEqual(joint);
+    expect(moveTwoParamPlayback(back, 12)).toEqual(joint);
   });
 });
 
 describe("constrained TPE", () => {
-  const problem = { ...problem2D, constraintCount: 2 };
+  const problem = { ...twoParamProblem, constraintCount: 2 };
   const infeasible = trials.map((trial) => ({ ...trial, constraints: [-0.5, 1] }));
 
   it("validates every constraint and rejects EI even during startup", () => {

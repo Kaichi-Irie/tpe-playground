@@ -1,4 +1,4 @@
-import { trialLimit, type Trial } from "./tpe";
+import { trialLimit, type Trial } from "./oneParamTpe";
 
 // Only evaluated observations contribute; there is no value before trial 1.
 export function bestSoFar(trials: readonly Trial[]): number[] {

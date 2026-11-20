@@ -1,4 +1,4 @@
-import { fitModel1D, type Trial, type WeightStrategy } from "./tpe";
+import { fitOneParamModel, type Trial, type WeightStrategy } from "./oneParamTpe";
 import { getObjective, type ObjectivePreset } from "./objectives";
 import { createLogDensity } from "./model/density";
 import type { Kernel } from "./model/types";
@@ -35,7 +35,7 @@ export function kernelContribution(kernel: Kernel, x: number): number {
 
 // Reuse the optimizer's snapshots and proposal trace; the lesson has no second TPE implementation.
 export function buildExplanation(example: ExplanationExample, settings: ExplanationSettings) {
-  const model = fitModel1D(example.trials, settings.priorWeight, {
+  const model = fitOneParamModel(example.trials, settings.priorWeight, {
     ...settings, bandwidthRule: "constant", startupTrials: 2, objectivePreset: example.objectivePreset,
   });
   const { partition } = model.snapshot;

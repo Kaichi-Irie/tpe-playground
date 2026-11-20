@@ -19,7 +19,7 @@ it("evaluates a zero-weight kernel as if it were omitted", () => {
   }
 });
 
-it.each([0, 0.1, 0.5, 1, 5])("normalizes the 1D mixture with prior weight %s", (priorWeight) => {
+it.each([0, 0.1, 0.5, 1, 5])("normalizes the one-dimensional mixture with prior weight %s", (priorWeight) => {
   const observed = createDensity(parameters, samples, bandwidth, [1, 1]);
   const broad = createDensity(parameters, [{ id: 1, params: { x: 0 } }], 10, [1]);
   const mixture = createDensity(parameters, samples, bandwidth, [1, 1], priorWeight);

@@ -2,8 +2,8 @@ import { useEffect, useRef, type MouseEventHandler, type ReactNode } from "react
 import { playPageHrefs, type Page } from "./shareSearch";
 
 const pages = [
-  { id: "1d", href: playPageHrefs["1d"], label: "Play 2D" },
-  { id: "2d", href: playPageHrefs["2d"], label: "Play 3D" },
+  { id: "play-2d", href: playPageHrefs["play-2d"], label: "Play 2D" },
+  { id: "play-3d", href: playPageHrefs["play-3d"], label: "Play 3D" },
   { id: "lab", href: "#lab", label: "Lab" },
   { id: "about", href: "#about", label: "About" },
 ] as const;
@@ -25,10 +25,10 @@ export function TopBar({ page, dark, onPlay2D, onThemeChange, actionSlot }: {
   const currentPage = pages.find((item) => item.id === page)!;
   const links = pages.map((item) => <a key={item.id} href={item.href} aria-current={page === item.id ? "page" : undefined} onClick={(event) => {
     menuRef.current?.hidePopover();
-    if (item.id === "1d") onPlay2D(event);
+    if (item.id === "play-2d") onPlay2D(event);
   }}>{item.label}<span className="page-check" aria-hidden="true">{page === item.id ? "✓" : ""}</span></a>);
   return <header className="app-header">
-    <h1 className="app-brand"><a href={playPageHrefs["1d"]} onClick={onPlay2D} aria-label="TPE Playground"><img src={`${import.meta.env.BASE_URL}favicon.svg`} width="28" height="28" alt="" /><span>TPE Playground</span></a></h1>
+    <h1 className="app-brand"><a href={playPageHrefs["play-2d"]} onClick={onPlay2D} aria-label="TPE Playground"><img src={`${import.meta.env.BASE_URL}favicon.svg`} width="28" height="28" alt="" /><span>TPE Playground</span></a></h1>
     <nav className="app-tabs" aria-label="Pages">{links}</nav>
     <button className="page-picker" popoverTarget="page-picker-menu" aria-label={`Pages: ${currentPage.label}`}><span>{currentPage.label}</span><span aria-hidden="true">⌄</span></button>
     <div id="page-picker-menu" className="page-picker-menu" popover="auto" ref={menuRef}><nav aria-label="Pages">{links}</nav></div>

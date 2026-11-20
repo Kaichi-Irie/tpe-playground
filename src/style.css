@@ -341,22 +341,22 @@ progress::-moz-progress-bar { background: var(--accent); }
 .view-controls button { border: 1px solid var(--border); border-radius: 6px; padding: 7px 14px; color: var(--text); background: var(--control); }
 .view-controls { padding: 10px 22px; }
 .view-controls > span { margin-right: auto; color: var(--muted); }
-.explorer-2d .plot-header p { font-size: var(--type-sm); margin-top: 4px; }
-.scene-2d { font-size: var(--chart-base); --chart-px: calc(var(--chart-base) / 14.4 * var(--chart-zoom, 1)); display: block; width: 100%; height: auto; touch-action: none; cursor: grab; }
-.scene-2d:active { cursor: grabbing; }
-/* Surfaces, contours, floor and markers are painted by CanvasScene2D. */
-.scene-canvas-2d { display: block; pointer-events: none; }
-.axes-2d line { stroke: var(--muted); stroke-width: 1; }
-.axes-2d text { fill: var(--text); font-size: calc(13 * var(--chart-px)); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; }
+.play-3d .plot-header p { font-size: var(--type-sm); margin-top: 4px; }
+.scene-play-3d { font-size: var(--chart-base); --chart-px: calc(var(--chart-base) / 14.4 * var(--chart-zoom, 1)); display: block; width: 100%; height: auto; touch-action: none; cursor: grab; }
+.scene-play-3d:active { cursor: grabbing; }
+/* Surfaces, contours, floor and markers are painted by Play3DCanvas. */
+.scene-canvas-play-3d { display: block; pointer-events: none; }
+.axes-play-3d line { stroke: var(--muted); stroke-width: 1; }
+.axes-play-3d text { fill: var(--text); font-size: calc(13 * var(--chart-px)); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; }
 /* Invisible, focusable twins of the painted trial markers. */
-.observation-target-2d { fill: transparent; stroke: none; }
-.observation-target-2d:focus { outline: none; stroke: var(--text); stroke-width: 3; }
-.scaling-2d { padding: 16px 22px; border-top: 1px solid var(--border); }
-.scaling-2d p { font-size: var(--type-sm); margin-top: 10px; max-width: 100ch; }
-@media (max-width: 700px) { .scene-2d { min-height: 360px; } .view-controls > span { flex-basis: 100%; } }
-.proposal-2d { pointer-events: none; }
-.explorer-2d .proposal > p:last-child { flex-basis: 100%; margin-left: 0; }
-.explorer-2d .proposal p { font-size: var(--type-sm); color: var(--muted); }
+.observation-target-play-3d { fill: transparent; stroke: none; }
+.observation-target-play-3d:focus { outline: none; stroke: var(--text); stroke-width: 3; }
+.scaling-play-3d { padding: 16px 22px; border-top: 1px solid var(--border); }
+.scaling-play-3d p { font-size: var(--type-sm); margin-top: 10px; max-width: 100ch; }
+@media (max-width: 700px) { .scene-play-3d { min-height: 360px; } .view-controls > span { flex-basis: 100%; } }
+.proposal-play-3d { pointer-events: none; }
+.play-3d .proposal > p:last-child { flex-basis: 100%; margin-left: 0; }
+.play-3d .proposal p { font-size: var(--type-sm); color: var(--muted); }
 
 /* A single visualization surface, with controls anchored to its edges. */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
@@ -571,93 +571,93 @@ header { height: 64px; padding: 10px 0; border: 0; }
 }
 
 /* A quiet frame around the two-dimensional landscape. */
-.explorer-2d .canvas-toolbar { flex-direction: row; align-items: center; padding: 10px 16px 0; gap: 8px; }
-.explorer-2d .scene-toolbar-group { display: flex; align-items: center; gap: 12px; }
-.explorer-2d .density-picker { display: flex; align-items: center; gap: 4px; }
-.explorer-2d .density-picker select { width: auto; background: transparent; border-color: transparent; font-weight: 600; }
-.explorer-2d .density-picker .help-content { left: auto; right: 0; }
-.explorer-2d .scene-panel { position: relative; }
-.explorer-2d .scene-panel summary { list-style: none; padding: 6px 4px; font-size: var(--type-sm); white-space: nowrap; }
-.explorer-2d .scene-panel summary::-webkit-details-marker { display: none; }
-.explorer-2d .scene-panel summary span { margin-left: 8px; }
-.explorer-2d .scene-panel-content { position: absolute; top: calc(100% + 8px); left: 0; width: 300px; max-width: calc(100vw - 56px); padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px var(--shadow); max-height: 60dvh; overflow: auto; }
-.explorer-2d .model-panel .scene-panel-content { left: auto; right: 0; }
-.explorer-2d .scene-panel-content h3, .explorer-2d .scaling-content h3 { font-size: var(--type-md); margin: 0 0 12px; }
-.explorer-2d .scene-panel-content p { font-size: var(--type-sm); margin: 8px 0; }
-.explorer-2d .panel-placeholder { color: var(--muted); }
-.explorer-2d .scene-panel-content dl { font-size: var(--type-sm); }
-.explorer-2d .scene-panel-content dl > div { display: flex; justify-content: space-between; padding: 6px 0; }
-.explorer-2d .scene-panel-content dd { margin: 0; }
-.explorer-2d .canvas-plot .legend { padding: 6px 20px 0; }
-.explorer-2d .scene-stage { position: relative; flex: 1; min-height: 0; }
-.explorer-2d :is(.scene-2d, .scene-canvas-2d) { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; }
-.explorer-2d .view-controls { position: absolute; right: 16px; bottom: 8px; padding: 0; }
-.explorer-2d .view-controls > div { display: flex; gap: 4px; }
-.explorer-2d .view-controls button { background: var(--surface); padding: 5px 10px; font-size: var(--type-sm); }
-.explorer-2d .scene-inspection { position: absolute; left: 20px; bottom: 8px; max-width: calc(100% - 220px); pointer-events: none; color: var(--muted); font-size: var(--type-sm); background: var(--surface); border-radius: 4px; }
-.explorer-2d .scaling-2d { position: absolute; right: 16px; top: 50px; z-index: 4; padding: 0; border: 0; }
-.explorer-2d .scaling-2d > summary { list-style: none; width: 24px; height: 24px; text-align: center; border: 1px solid var(--border); border-radius: 50%; font-size: var(--type-sm); background: var(--surface); }
-.explorer-2d .scaling-2d > summary::-webkit-details-marker { display: none; }
-.explorer-2d .scaling-content { position: absolute; right: 0; top: calc(100% + 8px); width: 380px; max-width: calc(100vw - 56px); max-height: 60dvh; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; box-shadow: 0 12px 32px var(--shadow); }
+.play-3d .canvas-toolbar { flex-direction: row; align-items: center; padding: 10px 16px 0; gap: 8px; }
+.play-3d .scene-toolbar-group { display: flex; align-items: center; gap: 12px; }
+.play-3d .density-picker { display: flex; align-items: center; gap: 4px; }
+.play-3d .density-picker select { width: auto; background: transparent; border-color: transparent; font-weight: 600; }
+.play-3d .density-picker .help-content { left: auto; right: 0; }
+.play-3d .scene-panel { position: relative; }
+.play-3d .scene-panel summary { list-style: none; padding: 6px 4px; font-size: var(--type-sm); white-space: nowrap; }
+.play-3d .scene-panel summary::-webkit-details-marker { display: none; }
+.play-3d .scene-panel summary span { margin-left: 8px; }
+.play-3d .scene-panel-content { position: absolute; top: calc(100% + 8px); left: 0; width: 300px; max-width: calc(100vw - 56px); padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px var(--shadow); max-height: 60dvh; overflow: auto; }
+.play-3d .model-panel .scene-panel-content { left: auto; right: 0; }
+.play-3d .scene-panel-content h3, .play-3d .scaling-content h3 { font-size: var(--type-md); margin: 0 0 12px; }
+.play-3d .scene-panel-content p { font-size: var(--type-sm); margin: 8px 0; }
+.play-3d .panel-placeholder { color: var(--muted); }
+.play-3d .scene-panel-content dl { font-size: var(--type-sm); }
+.play-3d .scene-panel-content dl > div { display: flex; justify-content: space-between; padding: 6px 0; }
+.play-3d .scene-panel-content dd { margin: 0; }
+.play-3d .canvas-plot .legend { padding: 6px 20px 0; }
+.play-3d .scene-stage { position: relative; flex: 1; min-height: 0; }
+.play-3d :is(.scene-play-3d, .scene-canvas-play-3d) { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; }
+.play-3d .view-controls { position: absolute; right: 16px; bottom: 8px; padding: 0; }
+.play-3d .view-controls > div { display: flex; gap: 4px; }
+.play-3d .view-controls button { background: var(--surface); padding: 5px 10px; font-size: var(--type-sm); }
+.play-3d .scene-inspection { position: absolute; left: 20px; bottom: 8px; max-width: calc(100% - 220px); pointer-events: none; color: var(--muted); font-size: var(--type-sm); background: var(--surface); border-radius: 4px; }
+.play-3d .scaling-play-3d { position: absolute; right: 16px; top: 50px; z-index: 4; padding: 0; border: 0; }
+.play-3d .scaling-play-3d > summary { list-style: none; width: 24px; height: 24px; text-align: center; border: 1px solid var(--border); border-radius: 50%; font-size: var(--type-sm); background: var(--surface); }
+.play-3d .scaling-play-3d > summary::-webkit-details-marker { display: none; }
+.play-3d .scaling-content { position: absolute; right: 0; top: calc(100% + 8px); width: 380px; max-width: calc(100vw - 56px); max-height: 60dvh; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; box-shadow: 0 12px 32px var(--shadow); }
 @media (max-width: 700px) {
-  .explorer-2d { min-height: 480px; }
-  .explorer-2d .canvas-toolbar { flex-direction: row; flex-wrap: wrap; padding: 8px 12px 0; }
-  .explorer-2d .scene-toolbar-group { gap: 8px; }
-  .explorer-2d .canvas-toolbar > .scene-toolbar-group:last-child { margin-left: auto; }
-  .explorer-2d .density-picker select { padding-inline: 0; }
-  .explorer-2d .canvas-plot .legend { padding: 6px 40px 0 12px; gap: 2px 12px; }
-  .explorer-2d .scaling-2d { top: 88px; right: 12px; }
-  .explorer-2d .view-controls { right: 12px; }
-  .explorer-2d .scene-inspection { left: 12px; max-width: calc(100% - 180px); }
+  .play-3d { min-height: 480px; }
+  .play-3d .canvas-toolbar { flex-direction: row; flex-wrap: wrap; padding: 8px 12px 0; }
+  .play-3d .scene-toolbar-group { gap: 8px; }
+  .play-3d .canvas-toolbar > .scene-toolbar-group:last-child { margin-left: auto; }
+  .play-3d .density-picker select { padding-inline: 0; }
+  .play-3d .canvas-plot .legend { padding: 6px 40px 0 12px; gap: 2px 12px; }
+  .play-3d .scaling-play-3d { top: 88px; right: 12px; }
+  .play-3d .view-controls { right: 12px; }
+  .play-3d .scene-inspection { left: 12px; max-width: calc(100% - 180px); }
 }
 
-/* Compact 2D controls with contextual explanations. */
-.explorer-2d .canvas-toolbar { flex-wrap: wrap; align-items: flex-end; gap: 12px 24px; padding: 14px 20px 8px; }
-.explorer-2d .canvas-toolbar > .scene-toolbar-group:last-child { flex: 1; justify-content: flex-end; gap: 20px; }
-.explorer-2d .settings-2d { grid-template-columns: max-content 128px 220px; gap: 20px; }
-.explorer-2d .settings-2d > .parameter .parameter-label > div { display: block; }
-.explorer-2d .settings-2d > .parameter .parameter-label { display: flex; justify-content: space-between; }
-.explorer-2d .objective-picker { display: flex; align-items: center; gap: 6px; }
-.explorer-2d .objective-picker > label { font-size: var(--type-sm); color: var(--muted); }
-.explorer-2d .objective-picker select { max-width: 145px; }
-.explorer-2d .objective-picker .help-trigger { width: 20px; height: 20px; }
-.explorer-2d .view-controls { top: 12px; bottom: auto; }
-.explorer-2d .scaling-2d { top: auto; bottom: 74px; left: 20px; right: auto; }
-.explorer-2d .scaling-content { left: 0; right: auto; top: auto; bottom: calc(100% + 8px); }
+/* Compact Play 3D controls with contextual explanations. */
+.play-3d .canvas-toolbar { flex-wrap: wrap; align-items: flex-end; gap: 12px 24px; padding: 14px 20px 8px; }
+.play-3d .canvas-toolbar > .scene-toolbar-group:last-child { flex: 1; justify-content: flex-end; gap: 20px; }
+.play-3d .settings-play-3d { grid-template-columns: max-content 128px 220px; gap: 20px; }
+.play-3d .settings-play-3d > .parameter .parameter-label > div { display: block; }
+.play-3d .settings-play-3d > .parameter .parameter-label { display: flex; justify-content: space-between; }
+.play-3d .objective-picker { display: flex; align-items: center; gap: 6px; }
+.play-3d .objective-picker > label { font-size: var(--type-sm); color: var(--muted); }
+.play-3d .objective-picker select { max-width: 145px; }
+.play-3d .objective-picker .help-trigger { width: 20px; height: 20px; }
+.play-3d .view-controls { top: 12px; bottom: auto; }
+.play-3d .scaling-play-3d { top: auto; bottom: 74px; left: 20px; right: auto; }
+.play-3d .scaling-content { left: 0; right: auto; top: auto; bottom: calc(100% + 8px); }
 @media (max-width: 1000px) {
-  .explorer-2d .canvas-toolbar > .scene-toolbar-group:last-child { flex-basis: 100%; justify-content: space-between; }
-  .explorer-2d .settings-2d { flex: 1; max-width: 500px; grid-template-columns: max-content minmax(80px, 1fr) minmax(160px, 1.5fr); gap: 16px; }
+  .play-3d .canvas-toolbar > .scene-toolbar-group:last-child { flex-basis: 100%; justify-content: space-between; }
+  .play-3d .settings-play-3d { flex: 1; max-width: 500px; grid-template-columns: max-content minmax(80px, 1fr) minmax(160px, 1.5fr); gap: 16px; }
 }
 @media (max-width: 700px) {
-  .explorer-2d .canvas-toolbar { padding: 10px 12px 6px; gap: 6px; }
-  .explorer-2d .canvas-toolbar > .scene-toolbar-group:last-child { flex-wrap: wrap; gap: 4px; }
-  .explorer-2d .settings-2d { flex-basis: 100%; max-width: none; gap: 4px 18px; grid-template-columns: max-content minmax(0, 1fr); }
-  .explorer-2d .settings-2d .model-settings-menu { grid-row: 1 / 3; }
-  .explorer-2d .settings-2d > .parameter { grid-column: 2; }
-  .explorer-2d .scaling-2d { top: auto; bottom: 92px; left: 12px; }
+  .play-3d .canvas-toolbar { padding: 10px 12px 6px; gap: 6px; }
+  .play-3d .canvas-toolbar > .scene-toolbar-group:last-child { flex-wrap: wrap; gap: 4px; }
+  .play-3d .settings-play-3d { flex-basis: 100%; max-width: none; gap: 4px 18px; grid-template-columns: max-content minmax(0, 1fr); }
+  .play-3d .settings-play-3d .model-settings-menu { grid-row: 1 / 3; }
+  .play-3d .settings-play-3d > .parameter { grid-column: 2; }
+  .play-3d .scaling-play-3d { top: auto; bottom: 92px; left: 12px; }
 }
 
-.explorer-2d .objective-picker,
-.explorer-2d .density-picker { position: relative; }
-.explorer-2d .objective-picker > .help,
-.explorer-2d .density-picker > .help { position: static; flex-shrink: 0; }
-.explorer-2d .objective-picker .help-content,
-.explorer-2d .density-picker .help-content {
+.play-3d .objective-picker,
+.play-3d .density-picker { position: relative; }
+.play-3d .objective-picker > .help,
+.play-3d .density-picker > .help { position: static; flex-shrink: 0; }
+.play-3d .objective-picker .help-content,
+.play-3d .density-picker .help-content {
   left: 0;
   right: auto;
   top: calc(100% + 6px);
   width: min(300px, calc(100vw - 72px));
   overflow-wrap: anywhere;
 }
-.explorer-2d .density-picker .help-trigger { width: 20px; height: 20px; }
+.play-3d .density-picker .help-trigger { width: 20px; height: 20px; }
 
-.explorer-2d .view-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-.explorer-2d .objective-height-control { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-radius: 6px; background: var(--surface); color: var(--muted); font-size: var(--type-sm); }
-.explorer-2d .objective-height-control select { width: auto; padding: 4px 6px; font-size: var(--type-sm); }
-.explorer-2d .optimum-2d path { fill: var(--surface); stroke: var(--objective); stroke-width: 2; vector-effect: non-scaling-stroke; }
-.explorer-2d .optimum-2d text { fill: var(--text); font-size: calc(12 * var(--chart-px)); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
-.explorer-2d .optimum-2d:focus { outline: none; }
-.explorer-2d .optimum-2d:focus path { stroke: var(--accent); stroke-width: 3; }
+.play-3d .view-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.play-3d .objective-height-control { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-radius: 6px; background: var(--surface); color: var(--muted); font-size: var(--type-sm); }
+.play-3d .objective-height-control select { width: auto; padding: 4px 6px; font-size: var(--type-sm); }
+.play-3d .optimum-play-3d path { fill: var(--surface); stroke: var(--objective); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.play-3d .optimum-play-3d text { fill: var(--text); font-size: calc(12 * var(--chart-px)); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.play-3d .optimum-play-3d:focus { outline: none; }
+.play-3d .optimum-play-3d:focus path { stroke: var(--accent); stroke-width: 3; }
 
 /* Start with playback, then observe the plot and experiment with the model. */
 .visual-workspace .canvas-controls { position: absolute; top: 12px; left: 24px; right: 24px; z-index: 4; display: flex; align-items: center; gap: 18px; }
@@ -708,27 +708,27 @@ header { height: 64px; padding: 10px 0; border: 0; }
 }
 
 /* Keep plot guidance beside the legend and leave only tick-label space at left. */
-.explorer-1d .chart-scroll { padding-left: 8px; }
-.explorer-1d .plot-tools { padding: 0 56px 0 0; }
-.explorer-1d .plot-guide { position: absolute; top: 4px; right: 24px; z-index: 3; }
-.explorer-1d .plot-guide .help-content { left: auto; right: 0; width: min(380px, calc(100vw - 64px)); max-height: 60dvh; overflow-y: auto; }
+.play-2d .chart-scroll { padding-left: 8px; }
+.play-2d .plot-tools { padding: 0 56px 0 0; }
+.play-2d .plot-guide { position: absolute; top: 4px; right: 24px; z-index: 3; }
+.play-2d .plot-guide .help-content { left: auto; right: 0; width: min(380px, calc(100vw - 64px)); max-height: 60dvh; overflow-y: auto; }
 .plot-guide .line-key { display: flex; padding: 8px 0; }
 .plot-guide-description { display: block; }
 @media (max-width: 700px) {
-  .explorer-1d .chart-scroll { padding-left: 0; }
-  .explorer-1d .plot-tools { padding-right: 44px; }
-  .explorer-1d .plot-guide { right: 12px; }
+  .play-2d .chart-scroll { padding-left: 0; }
+  .play-2d .plot-tools { padding-right: 44px; }
+  .play-2d .plot-guide { right: 12px; }
 }
 
-/* The 2D scene shares the playback/settings layout; only the canvas differs. */
-.explorer-2d .scaling-2d { bottom: 8px; left: auto; right: 20px; }
-.explorer-2d .scaling-content { left: auto; right: 0; }
-.explorer-2d .experiment-settings .scene-toolbar-group { min-width: 0; }
-.explorer-2d .experiment-settings .objective-picker .help-content,
-.explorer-2d .experiment-settings .density-picker .help-content { top: auto; bottom: calc(100% + 8px); }
+/* The Play 3D scene shares the playback/settings layout; only the canvas differs. */
+.play-3d .scaling-play-3d { bottom: 8px; left: auto; right: 20px; }
+.play-3d .scaling-content { left: auto; right: 0; }
+.play-3d .experiment-settings .scene-toolbar-group { min-width: 0; }
+.play-3d .experiment-settings .objective-picker .help-content,
+.play-3d .experiment-settings .density-picker .help-content { top: auto; bottom: calc(100% + 8px); }
 @media (max-width: 700px) {
-  .explorer-2d .scene-stage { flex: none; height: clamp(320px, 50dvh, 480px); }
-  .explorer-2d .scaling-2d { right: 12px; }
+  .play-3d .scene-stage { flex: none; height: clamp(320px, 50dvh, 480px); }
+  .play-3d .scaling-play-3d { right: 12px; }
 }
 
 /* Shared responsive presentation: one control/form tree at every viewport size. */
@@ -758,17 +758,17 @@ header { height: 64px; padding: 10px 0; border: 0; }
   .performance-caption { display: none; }
   .visual-workspace .performance-monitor .comparison { top: auto; bottom: calc(100% + 8px); max-width: calc(100vw - 20px); }
   .visual-workspace .canvas-plot { padding-top: 0; flex: 1; min-height: 0; }
-  .explorer-1d .plot-tools { gap: 0; padding-right: 36px; min-height: 36px; }
-  .canvas-plot .legend, .explorer-2d .canvas-plot .legend { padding: 0 8px; gap: 4px 12px; flex-wrap: wrap; }
+  .play-2d .plot-tools { gap: 0; padding-right: 36px; min-height: 36px; }
+  .canvas-plot .legend, .play-3d .canvas-plot .legend { padding: 0 8px; gap: 4px 12px; flex-wrap: wrap; }
   .canvas-plot .layer { min-height: 36px; gap: 3px; }
   .canvas-plot .swatch { width: 18px; }
   .canvas-plot .acquisition .swatch { width: 28px; }
   .layer-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .layer-short { display: inline; }
-  .explorer-1d .plot-guide { top: 0; right: 6px; }
-  .explorer-1d .plot-guide .help-trigger { height: 36px; }
+  .play-2d .plot-guide { top: 0; right: 6px; }
+  .play-2d .plot-guide .help-trigger { height: 36px; }
   .visual-workspace .chart-scroll { flex: 1; height: auto; min-height: 180px; padding: 0; }
-  .explorer-2d .scene-stage { flex: 1; height: auto; min-height: 180px; }
+  .play-3d .scene-stage { flex: 1; height: auto; min-height: 180px; }
   .responsive-settings { min-height: 44px; border-top: 1px solid var(--border); }
   .visual-workspace .experiment-settings { display: flex; flex-direction: column; align-items: stretch; padding: 8px; border: 0; gap: 16px; }
   .visual-workspace .experiment-settings .config { display: flex; flex-direction: column; align-items: stretch; gap: 16px; max-width: none; }
@@ -779,14 +779,14 @@ header { height: 64px; padding: 10px 0; border: 0; }
   .visual-workspace .experiment-settings .parameter input { height: 36px; }
   .visual-workspace .experiment-settings .bandwidth-controls { grid-template-columns: 110px minmax(0, 1fr); }
   .visual-workspace .experiment-settings select { min-height: 40px; font-size: 16px; }
-  .explorer-2d .view-controls { top: 4px; right: 8px; gap: 4px; }
-  .explorer-2d .view-controls button { min-width: 40px; min-height: 36px; }
-  .explorer-2d .scene-inspection { left: 10px; bottom: 46px; max-width: calc(100% - 20px); }
-  .explorer-2d .optimum-2d text { display: none; }
+  .play-3d .view-controls { top: 4px; right: 8px; gap: 4px; }
+  .play-3d .view-controls button { min-width: 40px; min-height: 36px; }
+  .play-3d .scene-inspection { left: 10px; bottom: 46px; max-width: calc(100% - 20px); }
+  .play-3d .optimum-play-3d text { display: none; }
   .about-page { padding-inline: 16px; }
 }
 @media (max-width: 380px) {
-  .explorer-1d .plot-tools { flex-wrap: wrap; }
+  .play-2d .plot-tools { flex-wrap: wrap; }
   .plot-tools .legend { flex-basis: 100%; }
 }
 
@@ -953,7 +953,7 @@ header { height: 64px; padding: 10px 0; border: 0; }
 /* Keep mobile help panels inside the viewport and circular controls round. */
 @media (max-width: 700px) {
   header .theme-toggle { width: 40px; height: 40px; flex: 0 0 40px; }
-  .explorer-1d .plot-guide .help-trigger { width: 36px; height: 36px; }
+  .play-2d .plot-guide .help-trigger { width: 36px; height: 36px; }
   .visual-workspace .config > .parameter .parameter-label .help-trigger { width: 26px; height: 26px; flex-shrink: 0; }
   .visual-workspace .live-model-controls .parameter { position: relative; }
   .visual-workspace .live-model-controls .parameter-label .help { position: static; }
@@ -1033,7 +1033,7 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
   .page-picker { min-width: 64px; padding-inline: 6px; gap: 6px; }
 }
 
-.canvas-plot [data-guide-target]:not(.scene-2d),
+.canvas-plot [data-guide-target]:not(.scene-play-3d),
 .live-model-controls .parameter:has([data-guide-target]),
 .scene-stage:has([data-guide-target]) {
   outline: 2px dashed var(--accent);
@@ -1042,13 +1042,13 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
 .canvas-plot .lab-guide { pointer-events: none; }
 .canvas-plot .lab-hint-dismiss { pointer-events: auto; }
 @media (forced-colors: active) {
-  .canvas-plot [data-guide-target]:not(.scene-2d),
+  .canvas-plot [data-guide-target]:not(.scene-play-3d),
   .live-model-controls .parameter:has([data-guide-target]),
   .scene-stage:has([data-guide-target]) { outline-color: Highlight; }
 }
 
-.explorer-2d { --constraint-boundary: #24715f; }
-[data-theme="dark"] .explorer-2d { --constraint-boundary: #83dfc4; }
+.play-3d { --constraint-boundary: #24715f; }
+[data-theme="dark"] .play-3d { --constraint-boundary: #83dfc4; }
 .performance-monitor .comparison-values.constrained-values { flex-wrap: nowrap; gap: 10px; }
 .comparison-values .comparison-third i { border-top: 2.5px dotted var(--acquisition); }
 .third-progress-line { fill: none; stroke: var(--acquisition); stroke-width: 2.5; stroke-dasharray: 2 3; }

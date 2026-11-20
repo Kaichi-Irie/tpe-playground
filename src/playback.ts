@@ -1,6 +1,6 @@
 import { advanceHistory } from "./model/history";
 import { getObjective } from "./objectives";
-import { trialLimit, proposeTrial, type SearchConfig, type Proposal, type Trial } from "./tpe";
+import { trialLimit, proposeTrial, type SearchConfig, type Proposal, type Trial } from "./oneParamTpe";
 
 interface Playback {
   step: number;

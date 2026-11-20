@@ -1,8 +1,8 @@
 import { expect, it } from "vitest";
-import { constrainedOptima2D, violation } from "./constraints2D";
-import { findObjectiveOptimum2D, getObjective2D, objectivePresets2D, type ObjectivePreset2D } from "./tpe2d";
+import { twoParamConstrainedOptima, violation } from "./twoParamConstraints";
+import { findTwoParamObjectiveOptimum, getTwoParamObjective, twoParamObjectivePresets, type TwoParamObjectivePreset } from "./twoParamTpe";
 
-for (const preset of Object.keys(constrainedOptima2D) as (keyof typeof constrainedOptima2D)[]) {
+for (const preset of Object.keys(twoParamConstrainedOptima) as (keyof typeof twoParamConstrainedOptima)[]) {
   it(`matches the objective formulas and bounds feasible grid minima for ${preset}`, () => {
     const feasibleGrid: [number, number][] = [];
     for (let i = 0; i <= 400; i++) for (let j = 0; j <= 400; j++) {
@@ -10,9 +10,9 @@ for (const preset of Object.keys(constrainedOptima2D) as (keyof typeof constrain
       if (violation(x1, x2, preset) === 0) feasibleGrid.push([x1, x2]);
     }
     expect(feasibleGrid.length).toBeGreaterThan(0);
-    for (const objective of Object.keys(objectivePresets2D) as ObjectivePreset2D[]) {
-      const { evaluate } = getObjective2D(objective);
-      const optimum = findObjectiveOptimum2D(objective, preset);
+    for (const objective of Object.keys(twoParamObjectivePresets) as TwoParamObjectivePreset[]) {
+      const { evaluate } = getTwoParamObjective(objective);
+      const optimum = findTwoParamObjectiveOptimum(objective, preset);
       expect(violation(optimum.x1, optimum.x2, preset)).toBeLessThanOrEqual(1e-9);
       const value = evaluate(optimum.x1, optimum.x2);
       expect(Math.abs(value - optimum.value) / optimum.value).toBeLessThan(1e-9);

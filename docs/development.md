@@ -63,7 +63,7 @@ The site's References section links to the papers behind the current single-obje
 
 - [src/App.tsx](../src/App.tsx): interactive plots, proposals, playback, and prior controls
 - [src/model/](../src/model/): shared numerical engine, model snapshots, proposal traces and field evaluation
-- [src/tpe.ts](../src/tpe.ts) and [src/tpe2d.ts](../src/tpe2d.ts): page adapters for the common engine
+- [src/tpe.ts](../src/tpe.ts) and [src/twoParamTpe.ts](../src/twoParamTpe.ts): one- and two-parameter adapters for the common engine
 - [Shared model contract](../docs/tpe-model.md): data ownership, group semantics, provenance and extension boundaries
 - [src/tpe.test.ts](../src/tpe.test.ts): numerical and proposal-loop tests
 - [src/main.tsx](../src/main.tsx): React entry point
@@ -81,6 +81,6 @@ Searches run for 200 evaluations.
 
 Each Play 2D objective is shifted by a constant so its minimum is 1. The comparison selector shows either the relative best-so-far error or average regret (cumulative objective gaps divided by evaluation count), on a logarithmic axis.
 
-The 3D explorer switches between multivariate joint kernels and univariate independent axes. Switching keeps observations and historical proposal settings; future proposals use the new mode.
+Play 3D switches between multivariate joint kernels and univariate independent axes. Switching keeps observations and historical proposal settings; future proposals use the new mode.
 
 Play 3D includes Multimodal, Quadratic, and Rosenbrock objectives; changing the objective or generating a new seed restarts the search. Good fraction, bandwidth, weights, prior weight, startup trials, and candidate count preserve observations and change future proposals. Objective contours overlay a faint translucent surface. Linear height preserves relative function heights; optional Log1p height expands the valley bottom without changing optimization. Rosenbrock contours are computed directly from its level-curve equation to resolve the narrow valley. The diamond marks the optimum, numerically estimated for Multimodal. Performance compares against reproducible random search using absolute best-so-far gaps and average regret, supporting objectives with zero minima.

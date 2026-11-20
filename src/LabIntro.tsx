@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePlotSize } from "./usePlotSize";
 import { getObjective, type ObjectivePreset } from "./objectives";
 import { explanationGrid } from "./explanation";
-import type { Trial } from "./tpe";
+import type { Trial } from "./oneParamTpe";
 
 const command = "python tpe.py";
 

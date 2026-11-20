@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { resolveBandwidth, type BandwidthRule } from "./bandwidth";
-import { fitModel1D, runSearch, defaults } from "../tpe";
+import { fitOneParamModel, runSearch, defaults } from "../oneParamTpe";
 import { logDensity } from "./density";
 
 it("matches Scott and robust Silverman formulas with interpolated quartiles", () => {
@@ -37,7 +37,7 @@ it("handles empty, singleton, coincident and nearly coincident observations", ()
 it("fits separate normalized group widths and leaves the prior width unchanged", () => {
   const trials = [-0.1, 0, 0.1, -5, 0, 5].map((x, i) => ({ id: i + 1, x, y: i }));
   for (const bandwidthRule of ["scott", "silverman"] as const) {
-    const fitted = fitModel1D(trials, 1, { ...defaults, gamma: 0.34, bandwidthRule });
+    const fitted = fitOneParamModel(trials, 1, { ...defaults, gamma: 0.34, bandwidthRule });
     const group = fitted.snapshot.groups[0];
     expect(group.good.kernels[0].bandwidths.x).toBeLessThan(group.bad.kernels[0].bandwidths.x);
     for (const density of [group.good, group.bad]) {
@@ -58,8 +58,8 @@ it("fits separate normalized group widths and leaves the prior width unchanged",
 it("clips the singleton-to-two-observation Scott transition at a 10% good split", () => {
   const config = { ...defaults, gamma: 0.1, bandwidthRule: "scott" as const };
   const trials = runSearch(50, 11, 1, config).trials;
-  const before = fitModel1D(trials.slice(0, 10), 1, config).snapshot.groups[0].good;
-  const after = fitModel1D(trials, 1, config).snapshot.groups[0].good;
+  const before = fitOneParamModel(trials.slice(0, 10), 1, config).snapshot.groups[0].good;
+  const after = fitOneParamModel(trials, 1, config).snapshot.groups[0].good;
   const positions = after.kernels.filter((kernel) => kernel.source.kind === "observation").map((kernel) => kernel.center.x);
   expect(before.kernels.filter((kernel) => kernel.source.kind === "observation")).toHaveLength(1);
   expect(positions).toHaveLength(2);
@@ -67,13 +67,13 @@ it("clips the singleton-to-two-observation Scott transition at a 10% good split"
   expect(after.kernels[0].bandwidths.x).toBe(2.5);
 });
 
-it("fits coordinate-wise adaptive widths in both 2D modes, preserving normalization and prior", async () => {
+it("fits coordinate-wise adaptive widths in both two-parameter density modes, preserving normalization and prior", async () => {
   const { fitTpe } = await import("./engine");
-  const { config2D, problem2D } = await import("../tpe2d");
+  const { twoParamConfig, twoParamProblem } = await import("../twoParamTpe");
   const observations = Array.from({ length: 12 }, (_, i) => ({ id: i + 1, params: { x1: i < 6 ? -5 + i * 2 : 0, x2: i < 6 ? 0 : -5 + (i - 6) * 2 }, objectives: [i], constraints: [] }));
   for (const mode of ["multivariate", "univariate"] as const) {
     for (const bandwidthRule of ["scott", "silverman"] as const) {
-      const model = fitTpe(problem2D, observations, { ...config2D(mode), gamma: 0.5, priorWeight: 1, bandwidthRule });
+      const model = fitTpe(twoParamProblem, observations, { ...twoParamConfig(mode), gamma: 0.5, priorWeight: 1, bandwidthRule });
       const goodWidths = Object.assign({}, ...model.snapshot.groups.map((g) => g.good.kernels[0].bandwidths));
       const badWidths = Object.assign({}, ...model.snapshot.groups.map((g) => g.bad.kernels[0].bandwidths));
       expect(goodWidths.x1).toBeGreaterThan(goodWidths.x2);

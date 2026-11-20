@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { findObjectiveMinimum, getObjective, objectivePresets, type ObjectivePreset } from "./objectives";
-import { defaults, fitModel1D, proposeTrial, runSearch } from "./tpe";
+import { defaults, fitOneParamModel, proposeTrial, runSearch } from "./oneParamTpe";
 import { emptyPlayback, movePlayback } from "./playback";
 
 const presets = Object.keys(objectivePresets) as ObjectivePreset[];
@@ -82,8 +82,8 @@ it("adds only constants and preserves rankings and TPE proposals for every weigh
     const after = before.map((trial) => ({ ...trial, y: evaluate(trial.x) }));
     for (const weights of ["uniform", "recency", "ei"] as const) {
       const config = { ...defaults, weights, objectivePreset };
-      expect(fitModel1D(after, 1, config).snapshot.partition.good.map((member) => member.trialId))
-        .toEqual(fitModel1D(before, 1, config).snapshot.partition.good.map((member) => member.trialId));
+      expect(fitOneParamModel(after, 1, config).snapshot.partition.good.map((member) => member.trialId))
+        .toEqual(fitOneParamModel(before, 1, config).snapshot.partition.good.map((member) => member.trialId));
       const oldProposal = proposeTrial(before, 50, 1, config);
       const shiftedProposal = proposeTrial(after, 50, 1, config);
       expect(shiftedProposal.x).toBeCloseTo(oldProposal.x, 11);
