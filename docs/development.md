@@ -63,9 +63,9 @@ The site's References section links to the papers behind the current single-obje
 
 - [src/App.tsx](../src/App.tsx): interactive plots, proposals, playback, and prior controls
 - [src/model/](../src/model/): shared numerical engine, model snapshots, proposal traces and field evaluation
-- [src/tpe.ts](../src/tpe.ts) and [src/twoParamTpe.ts](../src/twoParamTpe.ts): one- and two-parameter adapters for the common engine
+- [src/oneParamTpe.ts](../src/oneParamTpe.ts) and [src/twoParamTpe.ts](../src/twoParamTpe.ts): one- and two-parameter adapters for the common engine
 - [Shared model contract](../docs/tpe-model.md): data ownership, group semantics, provenance and extension boundaries
-- [src/tpe.test.ts](../src/tpe.test.ts): numerical and proposal-loop tests
+- [src/oneParamTpe.test.ts](../src/oneParamTpe.test.ts): numerical and proposal-loop tests
 - [src/main.tsx](../src/main.tsx): React entry point
 - [src/style.css](../src/style.css): responsive styles
 - [src/App.test.tsx](../src/App.test.tsx): smoke test
