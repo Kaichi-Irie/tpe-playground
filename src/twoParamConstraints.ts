@@ -1,4 +1,4 @@
-import type { ObjectivePreset2D } from "./tpe2d";
+import type { TwoParamObjectivePreset } from "./twoParamTpe";
 
 type Coordinate = readonly [x1: number, x2: number];
 type Constraint = (x1: number, x2: number) => number;
@@ -20,7 +20,7 @@ const diskBoundary = Array.from({ length: 97 }, (_, i): Coordinate => {
   return [3 + 0.7 * Math.cos(angle), 3 + 0.7 * Math.sin(angle)];
 });
 
-export const constraintPresets2D = {
+export const twoParamConstraintPresets = {
   none: { label: "None", description: "The whole search domain is feasible.", formula: "", feasibleShare: "100%", constraints: [], boundaries: [] },
   disk: {
     label: "Small disk", description: "A disk of radius 0.7 centered at (3, 3).",
@@ -40,20 +40,20 @@ export const constraintPresets2D = {
   },
 } satisfies Record<string, ConstraintDefinition>;
 
-export type ConstraintPreset2D = keyof typeof constraintPresets2D;
+export type TwoParamConstraintPreset = keyof typeof twoParamConstraintPresets;
 
-export function getConstraint2D(preset: ConstraintPreset2D = "none"): ConstraintDefinition {
-  if (!Object.prototype.hasOwnProperty.call(constraintPresets2D, preset)) throw new Error("Unknown 2D constraint preset.");
-  return constraintPresets2D[preset];
+export function getTwoParamConstraint(preset: TwoParamConstraintPreset = "none"): ConstraintDefinition {
+  if (!Object.prototype.hasOwnProperty.call(twoParamConstraintPresets, preset)) throw new Error("Unknown two-parameter constraint preset.");
+  return twoParamConstraintPresets[preset];
 }
 
-export function violation(x1: number, x2: number, preset: ConstraintPreset2D): number {
-  return getConstraint2D(preset).constraints.reduce((sum, constraint) => sum + Math.max(0, constraint(x1, x2)), 0);
+export function violation(x1: number, x2: number, preset: TwoParamConstraintPreset): number {
+  return getTwoParamConstraint(preset).constraints.reduce((sum, constraint) => sum + Math.max(0, constraint(x1, x2)), 0);
 }
 
 // Constrained references from issue #47. Disk coordinates are refined onto the
 // feasible side of the boundary to preserve the precision of the objective values.
-export const constrainedOptima2D = {
+export const twoParamConstrainedOptima = {
   disk: {
     multimodal: { x1: 2.425204327816748, x2: 2.600487878482530, value: 3.52863724504 },
     quadratic: { x1: 2.820727560240071, x2: 2.323345440906138, value: 2.19735104013 },
@@ -69,4 +69,4 @@ export const constrainedOptima2D = {
     quadratic: { x1: 3, x2: 0, value: 0.45 },
     rosenbrock: { x1: 1.30254287, x2: 1.69745713, value: 9.1602614156e-5 },
   },
-} satisfies Record<Exclude<ConstraintPreset2D, "none">, Record<ObjectivePreset2D, { x1: number; x2: number; value: number }>>;
+} satisfies Record<Exclude<TwoParamConstraintPreset, "none">, Record<TwoParamObjectivePreset, { x1: number; x2: number; value: number }>>;

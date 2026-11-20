@@ -1,15 +1,15 @@
-import { constraintPresets2D, type ConstraintPreset2D } from "./constraints2D";
+import { twoParamConstraintPresets, type TwoParamConstraintPreset } from "./twoParamConstraints";
 import type { DensityMode } from "./model/types";
 import {
   bandwidthRange, candidateCounts, constrainSettings, gammaRange, priorWeights, startupTrialCounts, weightOptions, type ModelSettings,
 } from "./searchSettings";
 
-export const playPageHrefs = { "1d": import.meta.env.BASE_URL, "2d": "#play-3d" } as const;
-const playShareHashes = { "1d": "#play-2d", "2d": playPageHrefs["2d"] } as const;
+export const playPageHrefs = { "play-2d": import.meta.env.BASE_URL, "play-3d": "#play-3d" } as const;
+const playShareHashes = { "play-2d": "#play-2d", "play-3d": playPageHrefs["play-3d"] } as const;
 export type Page = keyof typeof playPageHrefs | "lab" | "about";
 export type ShareExperiment =
-  | { page: "1d"; preset: string }
-  | { page: "2d"; preset: string; mode: DensityMode; constraint: ConstraintPreset2D };
+  | { page: "play-2d"; preset: string }
+  | { page: "play-3d"; preset: string; mode: DensityMode; constraint: TwoParamConstraintPreset };
 
 export type SharedSearch<Preset extends string> = {
   seed: number;
@@ -23,10 +23,10 @@ export function readRoute(hash: string): Route {
   const separator = hash.indexOf("?");
   const path = separator === -1 ? hash : hash.slice(0, separator);
   const params = separator === -1 ? null : new URLSearchParams(hash.slice(separator + 1));
-  if (path === playShareHashes["1d"] || path === playShareHashes["2d"]) {
-    return { page: path === playShareHashes["1d"] ? "1d" : "2d", share: params };
+  if (path === playShareHashes["play-2d"] || path === playShareHashes["play-3d"]) {
+    return { page: path === playShareHashes["play-2d"] ? "play-2d" : "play-3d", share: params };
   }
-  return { page: path === "#lab" ? "lab" : path === "#about" ? "about" : "1d", share: null };
+  return { page: path === "#lab" ? "lab" : path === "#about" ? "about" : "play-2d", share: null };
 }
 
 export function createShareUrl(documentUrl: string, experiment: ShareExperiment, seed: number, settings: ModelSettings) {
@@ -42,7 +42,7 @@ export function createShareUrl(documentUrl: string, experiment: ShareExperiment,
     candidates: String(settings.candidates),
   } satisfies Record<keyof SharedSearch<string>["settings"], string>;
   const params = new URLSearchParams({ seed: String(seed), preset: experiment.preset, ...model });
-  if (experiment.page === "2d") {
+  if (experiment.page === "play-3d") {
     params.set("mode", experiment.mode);
     if (experiment.constraint !== "none") {
       params.set("constraint", experiment.constraint);
@@ -99,17 +99,17 @@ export function readSharedSearch<Preset extends string>(
   };
 }
 
-export function readSharedSearch3D<Preset extends string>(
+export function readPlay3DSharedSearch<Preset extends string>(
   params: URLSearchParams | null,
   defaults: SharedSearch<Preset>,
   presets: Record<Preset, unknown>,
   trialLimit: number,
   domainWidth: number,
-): Omit<SharedSearch<Preset>, "settings"> & { settings: ModelSettings; mode: DensityMode; constraint: ConstraintPreset2D } {
+): Omit<SharedSearch<Preset>, "settings"> & { settings: ModelSettings; mode: DensityMode; constraint: TwoParamConstraintPreset } {
   const search = readSharedSearch(params, defaults, presets, trialLimit, domainWidth);
   const mode = params?.get("mode") === "univariate" ? "univariate" : "multivariate";
   const value = params?.get("constraint");
-  const constraint = value && Object.hasOwn(constraintPresets2D, value) ? value as ConstraintPreset2D : "none";
+  const constraint = value && Object.hasOwn(twoParamConstraintPresets, value) ? value as TwoParamConstraintPreset : "none";
   const settings = constraint === "none" ? search.settings : constrainSettings({
     ...search.settings,
     infeasibleFilling: params?.get("infeasibleFilling") !== "false",

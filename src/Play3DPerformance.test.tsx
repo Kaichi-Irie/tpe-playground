@@ -1,18 +1,18 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import { ProgressComparison2D } from "./ProgressComparison2D";
+import { Play3DPerformance } from "./Play3DPerformance";
 import { ProgressPlot } from "./ProgressPlot";
-import { defaultModelSettings2D, emptyPlayback2D, findObjectiveMinimum2D, movePlayback2D, objectivePresets2D, settings2D } from "./tpe2d";
+import { twoParamDefaultModelSettings, emptyTwoParamPlayback, findTwoParamObjectiveMinimum, moveTwoParamPlayback, twoParamObjectivePresets, twoParamSettings } from "./twoParamTpe";
 
-it("uses a reproducible random baseline sharing startup observations for every 2D objective", () => {
-  for (const objectivePreset of Object.keys(objectivePresets2D) as (keyof typeof objectivePresets2D)[]) {
-    const random = movePlayback2D(emptyPlayback2D(), 200, 42, "multivariate", { startupTrials: settings2D.count, objectivePreset });
-    const search = movePlayback2D(emptyPlayback2D(), 12, 42, "multivariate", { objectivePreset });
+it("uses a reproducible random baseline sharing startup observations for every Play 3D objective", () => {
+  for (const objectivePreset of Object.keys(twoParamObjectivePresets) as (keyof typeof twoParamObjectivePresets)[]) {
+    const random = moveTwoParamPlayback(emptyTwoParamPlayback(), 200, 42, "multivariate", { startupTrials: twoParamSettings.count, objectivePreset });
+    const search = moveTwoParamPlayback(emptyTwoParamPlayback(), 12, 42, "multivariate", { objectivePreset });
     expect(search.trials.slice(0, 10)).toEqual(random.trials.slice(0, 10));
-    const minimum = findObjectiveMinimum2D(objectivePreset);
+    const minimum = findTwoParamObjectiveMinimum(objectivePreset);
     expect(Number.isFinite(minimum)).toBe(true);
     expect(search.trials.every((trial) => trial.value >= minimum - 1e-10)).toBe(true);
-    const html = renderToStaticMarkup(<ProgressComparison2D trials={search.trials} seed={42} objectivePreset={objectivePreset} />);
+    const html = renderToStaticMarkup(<Play3DPerformance trials={search.trials} seed={42} objectivePreset={objectivePreset} />);
     expect(html).toContain("Performance");
     expect(html).toContain("Best so far");
     expect(html).toContain("Average regret");
@@ -25,9 +25,9 @@ it("uses a reproducible random baseline sharing startup observations for every 2
 
 it("shows each constrained run at infinity until its first feasible trial", () => {
   const constraintPreset = "disk";
-  const settings = { ...defaultModelSettings2D, priorWeight: 0 };
-  const run = (count: number) => movePlayback2D(emptyPlayback2D(), count, 42, "multivariate", { ...settings, constraintPreset }).trials;
-  const html = renderToStaticMarkup(<ProgressComparison2D trials={run(17)} seed={42} objectivePreset="multimodal" constraintPreset={constraintPreset} settings={settings} />);
+  const settings = { ...twoParamDefaultModelSettings, priorWeight: 0 };
+  const run = (count: number) => moveTwoParamPlayback(emptyTwoParamPlayback(), count, 42, "multivariate", { ...settings, constraintPreset }).trials;
+  const html = renderToStaticMarkup(<Play3DPerformance trials={run(17)} seed={42} objectivePreset="multimodal" constraintPreset={constraintPreset} settings={settings} />);
   expect(html).toContain('<i aria-hidden="true"></i>Filling on');
   expect(html).toContain('<i aria-hidden="true"></i>Filling off');
   expect(html).toContain('<i aria-hidden="true"></i>Random');
@@ -43,7 +43,7 @@ it("shows each constrained run at infinity until its first feasible trial", () =
   expect(html).toContain(`cy="${infinityY}" r="5" class="random-progress-point"`);
   expect(html).not.toContain(`cy="${infinityY}" r="3" class="tpe-progress-point"`);
 
-  const firstTrialHtml = renderToStaticMarkup(<ProgressComparison2D trials={run(1)} seed={42} objectivePreset="multimodal" constraintPreset={constraintPreset} settings={settings} />);
+  const firstTrialHtml = renderToStaticMarkup(<Play3DPerformance trials={run(1)} seed={42} objectivePreset="multimodal" constraintPreset={constraintPreset} settings={settings} />);
   expect(firstTrialHtml).toContain(">∞</text>");
   expect(firstTrialHtml).not.toMatch(/>[^<]*1e[+-]\d+<\/text>/);
   expect(firstTrialHtml).toContain("tpe-progress-point");

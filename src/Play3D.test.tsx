@@ -1,13 +1,16 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import Explorer2D, { ConstraintSettings2D } from "./Explorer2D";
-import { settings2D } from "./tpe2d";
+import Play3D, { Play3DConstraintSettings } from "./Play3D";
+import { twoParamSettings } from "./twoParamTpe";
 
-it("starts a sequential 2D search with no observations and a preview of its first proposal", () => {
-  const html = renderToStaticMarkup(<Explorer2D />);
+it("starts a sequential Play 3D search with no observations and a preview of its first proposal", () => {
+  const html = renderToStaticMarkup(<Play3D />);
   expect(html).toContain("Trial 0 / 200");
-  expect(html).toContain('aria-label="2D Search seed">0</output>');
-  expect(html).toMatch(/<select id="prior-weight-2d"[^>]*>.*<option value="1" selected="">1<\/option>/);
+  expect(html).toContain('aria-label="Play 3D Trial progress"');
+  expect(html).toContain('aria-label="Play 3D Search seed">0</output>');
+  expect(html).toContain('aria-label="Play 3D Bandwidth rule"');
+  expect(html).not.toMatch(/aria-label="2[D] /);
+  expect(html).toMatch(/<select id="prior-weight-play-3d"[^>]*>.*<option value="1" selected="">1<\/option>/);
   expect(html).toContain("<span>Random start · 1 / 10</span>");
   expect(html).toMatch(/role="tooltip"[^>]*>Initial random exploration · 1 \/ 10\. Uniform random draw/);
   expect(html).toContain('class="model-status" aria-live="polite"');
@@ -18,58 +21,58 @@ it("starts a sequential 2D search with no observations and a preview of its firs
   expect(html).toContain("KDEs appear after 2 observations.");
   expect(html).toContain("Next trial");
   expect(html).toContain("Previous trial");
-  expect(html).toContain('<p id="play-guide-text-2d">Press Play, or step forward with →, to evaluate trials one at a time.</p>');
+  expect(html).toContain('<p id="play-guide-text-play-3d">Press Play, or step forward with →, to evaluate trials one at a time.</p>');
   expect(html).not.toContain('id="lab-guide-text"');
   expect(html).not.toContain("Resample");
   expect(html).toContain("Performance");
   expect(html).toContain("Objective height scale");
   expect(html).toContain("Log1p");
   expect(html).toContain("Estimated optimum ·");
-  expect(html).toContain('class="scene-canvas-2d"');
-  expect(html).toContain("About 2D density model");
+  expect(html).toContain('class="scene-canvas-play-3d"');
+  expect(html).toContain("About Play 3D density model");
   expect(html).toContain("keeping each (x₁, x₂) pair together.");
   for (const label of ["Good fraction", "Bandwidth", "Scott", "Silverman", "settings-dialog", "Prior weight", "Startup trials", "Candidates", "Weights", "Reset model defaults", "Quadratic", "Rosenbrock"]) expect(html).toContain(label);
   expect(html).not.toContain("coming soon");
   expect(html).toContain("Density model");
   expect(html).toContain("Univariate");
-  expect(html).toContain('id="trial-seek-help-2d">Seeking back discards later trials.</span>');
-  expect(html).toContain('aria-describedby="trial-seek-help-2d"');
-  expect(html).not.toContain('class="observation-target-2d');
+  expect(html).toContain('id="trial-seek-help-play-3d">Seeking back discards later trials.</span>');
+  expect(html).toContain('aria-describedby="trial-seek-help-play-3d"');
+  expect(html).not.toContain('class="observation-target-play-3d');
 });
 
 it("describes random-only playback without a TPE start trial", () => {
-  const sharedSettings = new URLSearchParams({ startupTrials: String(settings2D.count) });
-  const html = renderToStaticMarkup(<Explorer2D sharedSettings={sharedSettings} />);
+  const sharedSettings = new URLSearchParams({ startupTrials: String(twoParamSettings.count) });
+  const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} />);
   expect(html).toContain("Every trial in this search is random.");
   expect(html).not.toContain("Uniform random draw until TPE starts");
 });
 
 it("does not build the closed comparison panel", () => {
-  const html = renderToStaticMarkup(<Explorer2D />);
+  const html = renderToStaticMarkup(<Play3D />);
   expect(html).toContain("Performance");
   expect(html).not.toContain('aria-label="Search performance"');
 });
 
 it("starts a shared Play 3D search at trial zero with the linked density mode and settings", () => {
   const sharedSettings = new URLSearchParams("preset=rosenbrock&seed=7&mode=univariate&startupTrials=5&gamma=0.5");
-  const html = renderToStaticMarkup(<Explorer2D sharedSettings={sharedSettings} />);
+  const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} />);
   expect(html).toContain("Trial 0 / 200");
   expect(html).toContain("<span>Random start · 1 / 5</span>");
   expect(html).toMatch(/role="tooltip"[^>]*>Initial random exploration · 1 \/ 5\./);
   expect(html).toContain('value="rosenbrock" selected=""');
   expect(html).toContain('value="univariate" selected=""');
-  expect(html).toContain('aria-label="2D Search seed">7</output>');
+  expect(html).toContain('aria-label="Play 3D Search seed">7</output>');
   expect(html).toContain('aria-valuetext="50 percent"');
   expect(html).toContain("Share link");
 });
 
 it("shows the constraint selector with filling available only for an active preset", () => {
-  const initial = renderToStaticMarkup(<Explorer2D />);
-  expect(initial).toContain('<label for="constraint-preset-2d">Constraint</label>');
+  const initial = renderToStaticMarkup(<Play3D />);
+  expect(initial).toContain('<label for="constraint-preset-play-3d">Constraint</label>');
   expect(initial).toContain('<option value="none" selected="">None</option>');
   expect(initial).not.toContain('type="checkbox"');
 
-  const active = renderToStaticMarkup(<ConstraintSettings2D preset="disk" infeasibleFilling onPresetChange={() => {}} onFillingChange={() => {}} />);
+  const active = renderToStaticMarkup(<Play3DConstraintSettings preset="disk" infeasibleFilling onPresetChange={() => {}} onFillingChange={() => {}} />);
   expect(active).toContain('<option value="disk" selected="">Small disk</option>');
   expect(active).toContain('type="checkbox" checked=""');
   expect(active).toContain('Infeasible filling');
@@ -78,16 +81,16 @@ it("shows the constraint selector with filling available only for an active pres
 
 it("starts a shared constrained Play 3D search with the linked constraint and filling", () => {
   const sharedSettings = new URLSearchParams("constraint=band&infeasibleFilling=false");
-  const html = renderToStaticMarkup(<Explorer2D sharedSettings={sharedSettings} />);
+  const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} />);
   expect(html).toContain("Trial 0 / 200");
   expect(html).toContain('<option value="band" selected="">Thin band</option>');
   expect(html).toContain('<input type="checkbox"/> Infeasible filling');
-  expect(html).not.toContain('id="constraint-hint-text-2d"');
+  expect(html).not.toContain('id="constraint-hint-text-play-3d"');
 });
 
 it("replaces EI weights when a shared link turns a constraint on", () => {
   const sharedSettings = new URLSearchParams("constraint=disk&weights=ei");
-  const html = renderToStaticMarkup(<Explorer2D sharedSettings={sharedSettings} />);
+  const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} />);
   expect(html).toContain('<option value="uniform" selected="">Uniform</option>');
   expect(html).toContain('<option value="ei" disabled="">');
 });

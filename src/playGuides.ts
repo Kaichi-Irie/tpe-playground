@@ -1,5 +1,5 @@
 export type PlayGuideId = "playback" | "gamma" | "bandwidth" | "rotate" | "acquisition";
-type PlayGuidePage = "1d" | "2d";
+type PlayGuidePage = "play-2d" | "play-3d";
 
 export const playGuides: Record<PlayGuideId, { label: string; action: string }> = {
   playback: {
@@ -40,7 +40,7 @@ export function nextPlayGuide(
   if (step === 0 && !seen.has("playback")) return "playback";
   if (step >= 2 && !seen.has("gamma")) return "gamma";
   if (step >= 2 && !seen.has("bandwidth")) return "bandwidth";
-  if (page === "2d" && step >= 2 && !seen.has("rotate")) return "rotate";
+  if (page === "play-3d" && step >= 2 && !seen.has("rotate")) return "rotate";
   if (step >= startupTrials && !acquisitionVisible && !seen.has("acquisition")) return "acquisition";
   return null;
 }

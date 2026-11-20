@@ -1,11 +1,11 @@
 import { expect, it } from "vitest";
-import { createObjectiveView2D } from "./objectiveView2D";
-import { getObjective2D } from "./tpe2d";
+import { createTwoParamObjectiveView } from "./twoParamObjectiveView";
+import { getTwoParamObjective } from "./twoParamTpe";
 
 it("samples the actual minimum and resolves the innermost bowl contours", () => {
   for (const preset of ["quadratic", "multimodal"] as const) {
-    const view = createObjectiveView2D(preset);
-    const objective = getObjective2D(preset);
+    const view = createTwoParamObjectiveView(preset);
+    const objective = getTwoParamObjective(preset);
     const minimum = view.grid.flat().find((point) => point.x1 === view.optimum.x1 && point.x2 === view.optimum.x2);
     expect(minimum?.objective).toBe(view.low);
     for (const level of view.levels.slice(0, 3)) {
@@ -24,11 +24,11 @@ it("samples the actual minimum and resolves the innermost bowl contours", () => 
 });
 
 it("resolves closed Rosenbrock contours around (1, 1) in original function values", () => {
-  const view = createObjectiveView2D("rosenbrock");
+  const view = createTwoParamObjectiveView("rosenbrock");
   expect(view.optimum).toEqual({ x1: 1, x2: 1, value: 0 });
   expect(view.levels[0]).toBe(0.0001);
   for (const segment of view.contours) for (const point of [segment.a, segment.b]) {
-    expect(getObjective2D("rosenbrock").evaluate(point.x1, point.x2)).toBeCloseTo(segment.level, 10);
+    expect(getTwoParamObjective("rosenbrock").evaluate(point.x1, point.x2)).toBeCloseTo(segment.level, 10);
     expect(Math.abs(point.x1)).toBeLessThanOrEqual(5);
     expect(Math.abs(point.x2)).toBeLessThanOrEqual(5);
   }
@@ -47,8 +47,8 @@ it("resolves closed Rosenbrock contours around (1, 1) in original function value
 
 it("keeps both height scales finite, ordered, and anchored at the same optimum", () => {
   for (const preset of ["rosenbrock", "quadratic", "multimodal"] as const) {
-    const view = createObjectiveView2D(preset);
-    expect(getObjective2D(preset).evaluate(view.optimum.x1, view.optimum.x2)).toBe(view.optimum.value);
+    const view = createTwoParamObjectiveView(preset);
+    expect(getTwoParamObjective(preset).evaluate(view.optimum.x1, view.optimum.x2)).toBe(view.optimum.value);
     for (const scale of ["linear", "log"] as const) {
       expect(view.normalize(view.low, scale)).toBe(0);
       expect(view.normalize(view.high, scale)).toBeCloseTo(1, 12);

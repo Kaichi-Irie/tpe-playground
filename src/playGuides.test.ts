@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { completedPlayGuides, loadSeenPlayGuides, nextPlayGuide, saveSeenPlayGuides, type PlayGuideContext, type PlayGuideId } from "./playGuides";
 
-const initial: PlayGuideContext = { page: "1d", step: 0, startupTrials: 10, acquisitionVisible: false, seeking: false };
+const initial: PlayGuideContext = { page: "play-2d", step: 0, startupTrials: 10, acquisitionVisible: false, seeking: false };
 
 describe("Play guide eligibility", () => {
-  it.each(["1d", "2d"] as const)("orders eligible guides on %s", (page) => {
+  it.each(["play-2d", "play-3d"] as const)("orders eligible guides on %s", (page) => {
     const context = { ...initial, page };
     const seen = new Set<PlayGuideId>();
     expect(nextPlayGuide(context, seen)).toBe("playback");
@@ -18,9 +18,9 @@ describe("Play guide eligibility", () => {
 
     seen.add("bandwidth");
     expect(nextPlayGuide({ ...context, step: 1 }, seen)).toBeNull();
-    expect(nextPlayGuide({ ...context, step: 2 }, seen)).toBe(page === "2d" ? "rotate" : null);
-    expect(nextPlayGuide({ ...context, step: 9 }, seen)).toBe(page === "2d" ? "rotate" : null);
-    expect(nextPlayGuide({ ...context, step: 10 }, seen)).toBe(page === "2d" ? "rotate" : "acquisition");
+    expect(nextPlayGuide({ ...context, step: 2 }, seen)).toBe(page === "play-3d" ? "rotate" : null);
+    expect(nextPlayGuide({ ...context, step: 9 }, seen)).toBe(page === "play-3d" ? "rotate" : null);
+    expect(nextPlayGuide({ ...context, step: 10 }, seen)).toBe(page === "play-3d" ? "rotate" : "acquisition");
 
     seen.add("rotate");
     expect(nextPlayGuide({ ...context, step: 9 }, seen)).toBeNull();
@@ -32,7 +32,7 @@ describe("Play guide eligibility", () => {
   });
 
   it("hides guides while seeking and restores eligibility afterwards", () => {
-    const context = { ...initial, page: "2d" as const, step: 2 };
+    const context = { ...initial, page: "play-3d" as const, step: 2 };
     expect(nextPlayGuide({ ...context, seeking: true }, new Set())).toBeNull();
     expect(nextPlayGuide(context, new Set())).toBe("gamma");
   });
@@ -46,7 +46,7 @@ describe("Play guide eligibility", () => {
 });
 
 describe("Play guide session storage", () => {
-  const key = "tpe-play-guides-seen-1d";
+  const key = "tpe-play-guides-seen-play-2d";
   afterEach(() => vi.unstubAllGlobals());
 
   function mockStorage() {
@@ -62,29 +62,29 @@ describe("Play guide session storage", () => {
   it("round-trips retired guides independently of the other Play tab and the Lab", () => {
     const storage = mockStorage();
     storage.setItem("tpe-lab-hints-seen", '["gamma"]');
-    expect(loadSeenPlayGuides("1d")).toEqual(new Set());
-    saveSeenPlayGuides("1d", new Set(["playback", "gamma"]));
-    expect(loadSeenPlayGuides("2d")).toEqual(new Set());
-    saveSeenPlayGuides("2d", new Set(["rotate"]));
-    expect(loadSeenPlayGuides("1d")).toEqual(new Set(["playback", "gamma"]));
-    expect(loadSeenPlayGuides("2d")).toEqual(new Set(["rotate"]));
+    expect(loadSeenPlayGuides("play-2d")).toEqual(new Set());
+    saveSeenPlayGuides("play-2d", new Set(["playback", "gamma"]));
+    expect(loadSeenPlayGuides("play-3d")).toEqual(new Set());
+    saveSeenPlayGuides("play-3d", new Set(["rotate"]));
+    expect(loadSeenPlayGuides("play-2d")).toEqual(new Set(["playback", "gamma"]));
+    expect(loadSeenPlayGuides("play-3d")).toEqual(new Set(["rotate"]));
     expect(storage.getItem("tpe-lab-hints-seen")).toBe('["gamma"]');
   });
 
   it("ignores malformed JSON, non-arrays, and unknown ids", () => {
     const storage = mockStorage();
     storage.setItem(key, "[");
-    expect(loadSeenPlayGuides("1d")).toEqual(new Set());
+    expect(loadSeenPlayGuides("play-2d")).toEqual(new Set());
     storage.setItem(key, '"gamma"');
-    expect(loadSeenPlayGuides("1d")).toEqual(new Set());
+    expect(loadSeenPlayGuides("play-2d")).toEqual(new Set());
     storage.setItem(key, '["gamma","future","toString",null,42]');
-    expect(loadSeenPlayGuides("1d")).toEqual(new Set(["gamma"]));
+    expect(loadSeenPlayGuides("play-2d")).toEqual(new Set(["gamma"]));
   });
 
   it("tolerates blocked reads and writes", () => {
     const blocked = () => { throw new Error("Storage blocked"); };
     vi.stubGlobal("sessionStorage", { getItem: blocked, setItem: blocked });
-    expect(loadSeenPlayGuides("1d")).toEqual(new Set());
-    expect(() => saveSeenPlayGuides("1d", new Set(["playback"]))).not.toThrow();
+    expect(loadSeenPlayGuides("play-2d")).toEqual(new Set());
+    expect(() => saveSeenPlayGuides("play-2d", new Set(["playback"]))).not.toThrow();
   });
 });

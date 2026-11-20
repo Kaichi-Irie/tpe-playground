@@ -4,7 +4,7 @@ import { findObjectiveMinimum, type ObjectivePreset } from "./objectives";
 import { PanelClose } from "./PanelClose";
 import { Help } from "./Help";
 import { ProgressPlot } from "./ProgressPlot";
-import { trialLimit, defaults, runSearch, type Trial } from "./tpe";
+import { trialLimit, defaults, runSearch, type Trial } from "./oneParamTpe";
 
 export const ProgressComparison = memo(function ProgressComparison({ trials, seed, objectivePreset }: { trials: readonly Trial[]; seed: number; objectivePreset: ObjectivePreset }) {
   const minimum = useMemo(() => findObjectiveMinimum(objectivePreset), [objectivePreset]);

@@ -29,8 +29,8 @@ it("renders the density explorer with playback controls and an empty initial his
   expect(html).toContain('aria-label="Trial progress"');
   expect(html).toContain("/ 200");
   expect(html).toContain("Previous trial");
-  expect(html).toMatch(/<button class="play" aria-label="Play"[^>]*data-guide-target="true"[^>]*aria-describedby="play-guide-text-1d"/);
-  expect(html).toContain('<p id="play-guide-text-1d">Press Play, or step forward with →, to evaluate trials one at a time.</p>');
+  expect(html).toMatch(/<button class="play" aria-label="Play"[^>]*data-guide-target="true"[^>]*aria-describedby="play-guide-text-play-2d"/);
+  expect(html).toContain('<p id="play-guide-text-play-2d">Press Play, or step forward with →, to evaluate trials one at a time.</p>');
   expect(html).toContain("Switch to light theme");
   expect(html).toContain("Uniform");
   expect(html).toContain("Recency");
@@ -97,7 +97,7 @@ it("renders About as a named article with parallel section headings", () => {
 });
 
 it("starts a shared Play 2D search at trial zero with the linked settings", () => {
-  const initialRoute = { page: "1d", share: new URLSearchParams("preset=quadratic&seed=0&startupTrials=2&gamma=0.15&constraint=disk") } as const;
+  const initialRoute = { page: "play-2d", share: new URLSearchParams("preset=quadratic&seed=0&startupTrials=2&gamma=0.15&constraint=disk") } as const;
   const html = renderToStaticMarkup(<App initialRoute={initialRoute} />);
   expect(html).toContain("Trial 0 / 200");
   expect(html).toContain("<h3>Random start · 1 / 2</h3>");

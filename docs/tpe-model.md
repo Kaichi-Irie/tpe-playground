@@ -1,8 +1,8 @@
 # Shared TPE model contract
 
 The engine in [src/model](../src/model/) has no React, objective evaluator, DOM,
-plot resolution, or camera dependencies. [tpe.ts](../src/tpe.ts) and
-[tpe2d.ts](../src/tpe2d.ts) adapt the existing page APIs to that engine.
+plot resolution, or camera dependencies. [oneParamTpe.ts](../src/oneParamTpe.ts) and
+[twoParamTpe.ts](../src/twoParamTpe.ts) adapt one- and two-parameter searches to that engine.
 
 ## Data ownership
 
@@ -72,7 +72,7 @@ policies are not implemented.
 
 ## Independent and joint groups
 
-Univariate 2D uses groups `[x1]` and `[x2]`; multivariate uses `[x1, x2]`. Every
+With two parameters, univariate mode uses groups `[x1]` and `[x2]`; multivariate uses `[x1, x2]`. Every
 group owns a good and bad density and selects its own best candidate. The final
 point combines the selected coordinates. Independent mode therefore has two
 sets of scalar candidates, not an invented set of joint candidate points.

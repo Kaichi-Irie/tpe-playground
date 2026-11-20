@@ -1,18 +1,18 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
-import { defaultModelSettings2D, settings2D } from "./tpe2d";
+import { twoParamDefaultModelSettings, twoParamSettings } from "./twoParamTpe";
 
 function renderPanel(status?: string, props: Partial<React.ComponentProps<typeof ModelSettingsPanel>> = {}) {
   return renderToStaticMarkup(
     <ModelSettingsPanel
-      experiment={{ page: "2d", preset: "quadratic", mode: "multivariate", constraint: "none" }}
-      settings={defaultModelSettings2D}
-      defaultSettings={defaultModelSettings2D}
+      experiment={{ page: "play-3d", preset: "quadratic", mode: "multivariate", constraint: "none" }}
+      settings={twoParamDefaultModelSettings}
+      defaultSettings={twoParamDefaultModelSettings}
       onChange={() => {}}
       seed={42}
       onNewSeed={() => {}}
-      trialLimit={settings2D.count}
+      trialLimit={twoParamSettings.count}
       widths={[]}
       domainWidth={10}
       status={status}
@@ -22,10 +22,10 @@ function renderPanel(status?: string, props: Partial<React.ComponentProps<typeof
 }
 
 it("uses the supplied filling default independently of EI availability", () => {
-  const settings = { ...defaultModelSettings2D, infeasibleFilling: false };
+  const settings = { ...twoParamDefaultModelSettings, infeasibleFilling: false };
   const disabledReset = /<button[^>]*disabled=""[^>]*aria-label="Reset model defaults"/;
   expect(renderPanel(undefined, { settings, disableEi: true })).toMatch(disabledReset);
-  const defaultSettings = { ...defaultModelSettings2D, infeasibleFilling: true };
+  const defaultSettings = { ...twoParamDefaultModelSettings, infeasibleFilling: true };
   expect(renderPanel(undefined, { settings, defaultSettings })).not.toMatch(disabledReset);
   expect(renderPanel(undefined, { defaultSettings })).toMatch(disabledReset);
 });
@@ -73,20 +73,20 @@ it("keeps dialog actions in the footer and the seed in Experiment", () => {
 it("marks only the guided slider as the coachmark target", () => {
   const html = renderToStaticMarkup(
     <ModelSettingsPanel
-      experiment={{ page: "2d", preset: "quadratic", mode: "multivariate", constraint: "none" }}
-      settings={defaultModelSettings2D}
-      defaultSettings={defaultModelSettings2D}
+      experiment={{ page: "play-3d", preset: "quadratic", mode: "multivariate", constraint: "none" }}
+      settings={twoParamDefaultModelSettings}
+      defaultSettings={twoParamDefaultModelSettings}
       onChange={() => {}}
       seed={42}
       onNewSeed={() => {}}
-      trialLimit={settings2D.count}
+      trialLimit={twoParamSettings.count}
       widths={[]}
       domainWidth={10}
-      guide={{ id: "gamma", describedBy: "play-guide-text-2d" }}
+      guide={{ id: "gamma", describedBy: "play-guide-text-play-3d" }}
     />,
   );
 
-  expect(html).toMatch(/<input id="gamma"[^>]*data-guide-target="true"[^>]*aria-describedby="play-guide-text-2d"/);
+  expect(html).toMatch(/<input id="gamma"[^>]*data-guide-target="true"[^>]*aria-describedby="play-guide-text-play-3d"/);
   const bandwidth = html.match(/<input id="bandwidth"[^>]*>/)?.[0];
   expect(bandwidth).toBeDefined();
   expect(bandwidth).not.toMatch(/data-guide-target|aria-describedby/);

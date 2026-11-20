@@ -1,20 +1,20 @@
 import { memo, useEffect, useLayoutEffect, useRef } from "react";
-import { measure2D } from "./performance2D";
+import { measurePlay3D } from "./play3dProfiling";
 
-export type SurfaceLayer2D = "objective" | "good" | "bad" | "acquisition";
+export type Play3DSurfaceLayer = "objective" | "good" | "bad" | "acquisition";
 // Plain, depth-sorted drawing commands in SVG viewBox units. Thousands of these
 // are painted into one canvas, so no per-item DOM nodes, layout or style exist.
-export type SceneItem2D = { id: string; depth: number } & (
-  | { kind: "triangle"; layer: SurfaceLayer2D; points: readonly number[]; inspect: () => void; muted?: boolean }
+export type Play3DSceneItem = { id: string; depth: number } & (
+  | { kind: "triangle"; layer: Play3DSurfaceLayer; points: readonly number[]; inspect: () => void; muted?: boolean }
   | { kind: "segment"; points: readonly number[]; inspect: () => void; muted?: boolean }
   | { kind: "boundary"; points: readonly number[] }
   | { kind: "trial"; feasible?: boolean; x: number; y: number; group: "good" | "bad" | "unclassified" }
   | { kind: "proposal"; x: number; y: number; floorX: number; floorY: number }
 );
-export interface ViewBox2D { x: number; y: number; width: number; height: number }
+export interface Play3DViewBox { x: number; y: number; width: number; height: number }
 
-// Matches the former SVG classes (.surface-*, .objective-contour, .observation-2d, .proposal-2d).
-const surfaceStyles: Record<SurfaceLayer2D, { color: string; fill: number; stroke: number }> = {
+// Matches the former SVG classes (.surface-*, .objective-contour, .observation-play-3d, .proposal-play-3d).
+const surfaceStyles: Record<Play3DSurfaceLayer, { color: string; fill: number; stroke: number }> = {
   objective: { color: "--objective", fill: 0.075, stroke: 0 },
   good: { color: "--good", fill: 0.45, stroke: 0.3 },
   bad: { color: "--bad", fill: 0.35, stroke: 0.3 },
@@ -25,13 +25,13 @@ const trialColors = { good: "--good", bad: "--bad", unclassified: "--muted" } as
 const maxPixelRatio = 2;
 
 // Same mapping as SVG's default preserveAspectRatio="xMidYMid meet".
-export function fitViewBox2D(box: ViewBox2D, width: number, height: number) {
+export function fitPlay3DViewBox(box: Play3DViewBox, width: number, height: number) {
   const scale = Math.min(width / box.width, height / box.height);
   return { scale, x: (width - box.width * scale) / 2 - box.x * scale, y: (height - box.height * scale) / 2 - box.y * scale };
 }
 
 // Topmost painted surface triangle or contour under (x, y), in viewBox units.
-export function hitTestScene2D(items: readonly SceneItem2D[], x: number, y: number, tolerance: number) {
+export function hitTestPlay3DScene(items: readonly Play3DSceneItem[], x: number, y: number, tolerance: number) {
   for (let i = items.length - 1; i >= 0; i--) {
     const item = items[i];
     if (item.kind === "triangle") {
@@ -50,9 +50,9 @@ export function hitTestScene2D(items: readonly SceneItem2D[], x: number, y: numb
   return null;
 }
 
-type Floor2D = readonly (readonly [number, number, number, number])[];
+type Play3DFloor = readonly (readonly [number, number, number, number])[];
 
-function drawScene(canvas: HTMLCanvasElement, items: readonly SceneItem2D[], floor: Floor2D, viewBox: ViewBox2D) {
+function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[], floor: Play3DFloor, viewBox: Play3DViewBox) {
   const width = canvas.clientWidth, height = canvas.clientHeight;
   const ctx = canvas.getContext("2d");
   if (!ctx || !width || !height) return;
@@ -61,7 +61,7 @@ function drawScene(canvas: HTMLCanvasElement, items: readonly SceneItem2D[], flo
   if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) { canvas.width = pixelWidth; canvas.height = pixelHeight; }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, pixelWidth, pixelHeight);
-  const fit = fitViewBox2D(viewBox, width, height);
+  const fit = fitPlay3DViewBox(viewBox, width, height);
   ctx.setTransform(ratio * fit.scale, 0, 0, ratio * fit.scale, ratio * fit.x, ratio * fit.y);
   const style = getComputedStyle(canvas);
   const colors = new Map<string, string>();
@@ -136,14 +136,14 @@ function drawScene(canvas: HTMLCanvasElement, items: readonly SceneItem2D[], flo
 
 // One bitmap replaces ~10k SVG paths. Each update costs one redraw instead of
 // thousands of DOM mutations, style/layout passes and retained render objects.
-export const CanvasScene2D = memo(function CanvasScene2D({ items, floor, viewBox }: { items: readonly SceneItem2D[]; floor: Floor2D; viewBox: ViewBox2D }) {
+export const Play3DCanvas = memo(function Play3DCanvas({ items, floor, viewBox }: { items: readonly Play3DSceneItem[]; floor: Play3DFloor; viewBox: Play3DViewBox }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const latest = useRef({ items, floor, viewBox });
   const frame = useRef<number | null>(null);
   useLayoutEffect(() => {
     latest.current = { items, floor, viewBox };
     const element = canvas.current;
-    if (element) measure2D("canvas-draw", () => drawScene(element, items, floor, viewBox));
+    if (element) measurePlay3D("canvas-draw", () => drawScene(element, items, floor, viewBox));
   }, [items, floor, viewBox]);
   useEffect(() => {
     const element = canvas.current;
@@ -168,5 +168,5 @@ export const CanvasScene2D = memo(function CanvasScene2D({ items, floor, viewBox
       frame.current = null;
     };
   }, []);
-  return <canvas ref={canvas} className="scene-canvas-2d" aria-hidden="true" />;
+  return <canvas ref={canvas} className="scene-canvas-play-3d" aria-hidden="true" />;
 });

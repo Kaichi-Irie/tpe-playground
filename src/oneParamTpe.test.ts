@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { getObjective } from "./objectives";
-import { buildView1D, defaults, fitModel1D, proposeTrial, runSearch, splitTrials } from "./tpe";
+import { buildOneParamView, defaults, fitOneParamModel, proposeTrial, runSearch, splitTrials } from "./oneParamTpe";
 
 const { evaluate: objective } = getObjective();
 
@@ -28,7 +28,7 @@ it("selects the highest density ratio from bounded candidates", () => {
   for (let i = 10; i < 50; i++) {
     const proposal = search.proposals[i];
     const grid = proposal.candidates.map(({ x }) => x);
-    const view = buildView1D(search.trials.slice(0, i), grid, 0, defaults);
+    const view = buildOneParamView(search.trials.slice(0, i), grid, 0, defaults);
     expect(view.acquisition[grid.indexOf(proposal.x)]).toBe(Math.max(...view.acquisition));
     for (const [index, candidate] of proposal.candidates.entries()) {
       expect(candidate.x).toBeGreaterThanOrEqual(-5);
@@ -70,7 +70,7 @@ it("uses the prior consistently in densities, acquisition and sequential proposa
   expect(runSearch(42, 17, 1).trials).toEqual(on.trials.slice(0, 17));
   for (let i = 10; i < 50; i++) {
     const history = on.trials.slice(0, i);
-    const model = fitModel1D(history, 1);
+    const model = fitOneParamModel(history, 1);
     const proposal = on.proposals[i];
     expect(proposal).toEqual(proposeTrial(history, 42, 1));
     for (const candidate of proposal.candidates) {
@@ -100,7 +100,7 @@ it("applies slider settings consistently to densities and sequential proposals",
       expect(search.trials.slice(10)).not.toEqual(runSearch(42, 15, priorWeight).trials.slice(10));
       for (let i = 10; i < 15; i++) {
         const history = search.trials.slice(0, i);
-        const model = fitModel1D(history, priorWeight, config);
+        const model = fitOneParamModel(history, priorWeight, config);
         const proposal = search.proposals[i];
         expect(proposal.trace).toEqual(model.propose(42));
       }
@@ -108,19 +108,19 @@ it("applies slider settings consistently to densities and sequential proposals",
   }
   for (const config of [{ gamma: 0, bandwidth: 0.4 }, { gamma: 1, bandwidth: 0.4 }, { gamma: NaN, bandwidth: 0.4 }, { gamma: 0.2, bandwidth: 0 }, { gamma: 0.2, bandwidth: Infinity }]) {
     expect(() => runSearch(42, 0, 0, config)).toThrow();
-    expect(() => fitModel1D([{ id: 1, x: -1, y: 0 }, { id: 2, x: 1, y: 1 }], 0, config)).toThrow();
+    expect(() => fitOneParamModel([{ id: 1, x: -1, y: 0 }, { id: 2, x: 1, y: 1 }], 0, config)).toThrow();
   }
 });
 
 it("weights improvements in the good group and handles ties without changing bad weights", () => {
   const trials = [0, 2, 4, 6].map((y, index) => ({ id: index + 1, x: index - 2, y }));
   const config = { gamma: 0.5, bandwidth: 0.4, weights: "ei" } as const;
-  const view = buildView1D(trials, [0], 0, config);
+  const view = buildOneParamView(trials, [0], 0, config);
   expect(view.threshold).toBe(3);
   expect(view.goodWeights).toEqual([1.5, 0.5]);
   expect(view.badWeights).toEqual([1, 1]);
   const tied = trials.map((trial) => ({ ...trial, y: 2 }));
-  expect(buildView1D(tied, [0], 0, config).goodWeights).toEqual([1, 1]);
+  expect(buildOneParamView(tied, [0], 0, config).goodWeights).toEqual([1, 1]);
   expect(() => runSearch(42, 0, 0, { gamma: 0.2, bandwidth: 0.4, weights: "invalid" as "uniform" })).toThrow();
 });
 
@@ -135,7 +135,7 @@ it("uses every weighting strategy consistently through sequential search", () =>
       if (weights !== "uniform") expect(search.trials.slice(10)).not.toEqual(runSearch(42, 25, priorWeight, { ...config, weights: "uniform" }).trials.slice(10));
       for (let step = 10; step < 25; step++) {
         const history = search.trials.slice(0, step);
-        const model = fitModel1D(history, priorWeight, config);
+        const model = fitOneParamModel(history, priorWeight, config);
         expect(search.proposals[step].trace).toEqual(model.propose(42));
       }
     }

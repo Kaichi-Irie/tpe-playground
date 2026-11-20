@@ -11,7 +11,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test && npm run build",
-    "bench:model": "vite build --ssr benchmarks/model2d.ts --outDir node_modules/.cache/tpe-model-benchmark && node node_modules/.cache/tpe-model-benchmark/model2d.js",
+    "bench:model": "vite build --ssr benchmarks/modelTwoParam.ts --outDir node_modules/.cache/tpe-model-benchmark && node node_modules/.cache/tpe-model-benchmark/modelTwoParam.js",
     "bench:browser": "vite build --config benchmarks/vite.config.ts && vite preview --config benchmarks/vite.config.ts --host 127.0.0.1 --port 4173 --strictPort"
   },
   "dependencies": {

@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { bestSoFar, comparisonTrialAxis, comparisonAxis, comparisonFloor, relativeBestSoFar, averageRegret } from "./comparison";
 import { emptyPlayback, keepObservations, movePlayback } from "./playback";
 import { objectivePresets, type ObjectivePreset } from "./objectives";
-import { defaults, runSearch } from "./tpe";
+import { defaults, runSearch } from "./oneParamTpe";
 
 it("tracks cumulative minima, including ties and negative values, without changing observations", () => {
   const trials = [3, 4, 1, 1, -2, 0].map((y, i) => ({ id: i + 1, x: 0, y }));

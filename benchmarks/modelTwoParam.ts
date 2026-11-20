@@ -1,13 +1,13 @@
 import { fitTpe } from "../src/model/engine";
 import { createFieldEvaluator, evaluateFieldGrid2D } from "../src/model/visualization";
-import { config2D, getObjective2D, observations2D, problem2D, type Trial2D } from "../src/tpe2d";
+import { twoParamConfig, getTwoParamObjective, twoParamObservations, twoParamProblem, type TwoParamTrial } from "../src/twoParamTpe";
 
 // This Node-only entry needs just runtime metadata, not the full Node API types.
 declare const process: { version: string; platform: string; arch: string };
 
 // Keep the seeded observation set used by the recorded benchmark.
-function generateTrials2D(seed: number, count: number): Trial2D[] {
-  const { evaluate } = getObjective2D();
+function generateTwoParamTrials(seed: number, count: number): TwoParamTrial[] {
+  const { evaluate } = getTwoParamObjective();
   let state = seed >>> 0;
   const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return (state + 0.5) / 2 ** 32; };
   return Array.from({ length: count }, (_, i) => {
@@ -17,10 +17,10 @@ function generateTrials2D(seed: number, count: number): Trial2D[] {
 }
 
 const axis = Array.from({ length: 31 }, (_, i) => -5 + i / 3);
-const trials = generateTrials2D(42, 200);
+const trials = generateTwoParamTrials(42, 200);
 console.log({ node: process.version, platform: process.platform, arch: process.arch, seed: 42, observations: 200, bandwidth: 0.65, grid: "31×31" });
 for (const mode of ["multivariate", "univariate"] as const) {
-  const model = fitTpe(problem2D, observations2D(trials), config2D(mode));
+  const model = fitTpe(twoParamProblem, twoParamObservations(trials), twoParamConfig(mode));
   const evaluate = createFieldEvaluator(model, { axes: ["x1", "x2"], projection: { kind: "full" } });
   const operations = [
     () => axis.map((x1) => axis.map((x2) => evaluate({ x1, x2 }))),

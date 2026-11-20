@@ -8,7 +8,7 @@ import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { weightOptions } from "./searchSettings";
 import { playPageHrefs, readRoute, readSharedSearch, type Route, type SharedSearch } from "./shareSearch";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import { trialLimit, buildView1D, prior, searchDefaults, defaults, domain, proposeTrial, proposal1DFromTrace, type Trial } from "./tpe";
+import { trialLimit, buildOneParamView, prior, searchDefaults, defaults, domain, proposeTrial, oneParamProposalFromTrace, type Trial } from "./oneParamTpe";
 
 import { getObjective, objectivePresets, type ObjectivePreset } from "./objectives";
 
@@ -19,7 +19,7 @@ import { emptyPlayback, keepObservations, movePlayback } from "./playback";
 
 const StepExplanation = lazy(() => import("./StepExplanation"));
 
-const Explorer2D = lazy(() => import("./Explorer2D"));
+const Play3D = lazy(() => import("./Play3D"));
 
 const grid = Array.from({ length: 501 }, (_, i) => domain[0] + i / 50);
 
@@ -39,7 +39,7 @@ const defaultSearch: SharedSearch<ObjectivePreset> = {
   settings: { ...defaults, priorWeight: prior.weight, ...searchDefaults },
 };
 
-export default function App({ initialRoute = { page: "1d", share: null } }: { initialRoute?: Route } = {}) {
+export default function App({ initialRoute = { page: "play-2d", share: null } }: { initialRoute?: Route } = {}) {
   const { ref: chartRef, width, height, typeScale } = usePlotSize();
   const W = Math.max(240, width), H = Math.max(96 * typeScale, height);
   const compactChart = W < 600;
@@ -60,7 +60,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
   const [route, setRoute] = useState(() => ({ ...initialRoute, visit: 0 }));
   const { page } = route;
   const [search, setSearch] = useState(() => readSharedSearch(
-    route.page === "1d" ? route.share : null, defaultSearch, objectivePresets, trialLimit, domainWidth,
+    route.page === "play-2d" ? route.share : null, defaultSearch, objectivePresets, trialLimit, domainWidth,
   ));
   const { seed, preset: objectivePreset, settings } = search;
   const { priorWeight, startupTrials, candidates, gamma, weights, bandwidthRule, bandwidth } = settings;
@@ -78,7 +78,7 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
   const syncRoute = useCallback(() => {
     const next = readRoute(window.location.hash);
     setPlaying(false);
-    if (next.share && next.page === "1d") {
+    if (next.share && next.page === "play-2d") {
       searchGeneration.current += 1;
       setSearch(readSharedSearch(next.share, defaultSearch, objectivePresets, trialLimit, domainWidth));
       setPlayback(emptyPlayback());
@@ -130,11 +130,11 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
     setPlayback(keepObservations);
   }
   const [visible, setVisible] = useState({ objective: true, good: true, bad: true, observations: true, acquisition: false });
-  const guide = usePlayGuide<HTMLDivElement>({ page: "1d", step, startupTrials, acquisitionVisible: visible.acquisition, seeking: false }, page === "1d");
+  const guide = usePlayGuide<HTMLDivElement>({ page: "play-2d", step, startupTrials, acquisitionVisible: visible.acquisition, seeking: false }, page === "play-2d");
   const guideAcquisition = guide.active === "acquisition";
   const trials = useMemo(() => playback.trials.slice(0, step), [playback.trials, step]);
-  const model = useMemo(() => buildView1D(trials, grid, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }), [trials, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
-  const proposal = useMemo(() => step === trialLimit ? undefined : playback.proposals[step] ?? (model.fitted && step >= startupTrials ? proposal1DFromTrace(model.fitted.propose(seed)) : proposeTrial(trials, seed, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset })), [step, playback.proposals, model.fitted, trials, seed, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
+  const model = useMemo(() => buildOneParamView(trials, grid, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }), [trials, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
+  const proposal = useMemo(() => step === trialLimit ? undefined : playback.proposals[step] ?? (model.fitted && step >= startupTrials ? oneParamProposalFromTrace(model.fitted.propose(seed)) : proposeTrial(trials, seed, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset })), [step, playback.proposals, model.fitted, trials, seed, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
   const bestValue = trials.length ? Math.min(...trials.map((trial) => trial.y)).toFixed(3) : "—";
   const acquisitionLow = Math.min(0, ...model.acquisition);
   const acquisitionHigh = Math.max(1, ...model.acquisition);
@@ -161,8 +161,8 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
       }} actionSlot={<div className="lab-header-actions" ref={setAlgorithmContainer} />} />
       {(labVisited || page === "lab") && <div hidden={page !== "lab"} className="lab-page"><Suspense fallback={<p>Loading explanation…</p>}><StepExplanation visible={page === "lab"} algorithmContainer={page === "lab" ? algorithmContainer : null} /></Suspense></div>}
       <div hidden={page === "about" || page === "lab"} className="play-page">
-      {page === "2d" ? <Suspense fallback={<p>Loading 3D explorer…</p>}><Explorer2D key={route.visit} sharedSettings={route.share} /></Suspense> : null}
-      <div hidden={page !== "1d"} className="visual-workspace explorer-1d" ref={guide.workspaceRef} onKeyDown={guide.onKeyDown}>
+      {page === "play-3d" ? <Suspense fallback={<p>Loading 3D explorer…</p>}><Play3D key={route.visit} sharedSettings={route.share} /></Suspense> : null}
+      <div hidden={page !== "play-2d"} className="visual-workspace play-2d" ref={guide.workspaceRef} onKeyDown={guide.onKeyDown}>
       <section className="canvas-plot" aria-labelledby="plot-heading">
       <div className="canvas-controls">
       <PlaybackControls step={step} limit={trialLimit} playing={playing} guidePlay={guide.active === "playback"} guideDescribedBy={guide.textId} onMove={moveTo}
@@ -215,8 +215,8 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
         <div className="plot-inspection" data-selected={selected !== null} aria-live="polite">{selected ? `Trial ${selected.id} · x = ${selected.x.toFixed(3)} · f(x) = ${selected.y.toFixed(3)} · ${groupName(selected)}` : null}</div>
         {guide.active && <LabHintBubble textId={guide.textId} message={playGuides[guide.active].action} phase="action" placement="bottom" onDismiss={guide.dismiss} />}
       </section>
-      <ModelSettingsPanel key={page === "1d" ? route.visit : "hidden"}
-        experiment={{ page: "1d", preset: objectivePreset }} settings={settings}
+      <ModelSettingsPanel key={page === "play-2d" ? route.visit : "hidden"}
+        experiment={{ page: "play-2d", preset: objectivePreset }} settings={settings}
         defaultSettings={defaultSearch.settings} guide={guide.settingsGuide}
         onChange={(next) => {
           if (next.gamma !== gamma) guide.retire("gamma");
@@ -275,8 +275,8 @@ export default function App({ initialRoute = { page: "1d", share: null } }: { in
         <h2>Explore the playground</h2>
         <ul className="explanation-steps">
           <li><strong><a href="#lab">Lab</a>.</strong> Follow one TPE decision step by step, from 10 observations to the next trial: split, kernels, densities, candidates, and the choice. Adjust γ, bandwidth, prior, weighting, and the number of candidates along the way, with hints for each control.</li>
-          <li><strong><a href={playPageHrefs["1d"]} onClick={openPlay2D}>Play 2D</a>.</strong> Run TPE on a one-dimensional objective, trial by trial. Watch ℓ(x), g(x), and their ratio change, and compare progress against random search.</li>
-          <li><strong><a href={playPageHrefs["2d"]}>Play 3D</a>.</strong> Run TPE on a two-dimensional surface. Compare multivariate and univariate density models, and add a constraint to see constrained search.</li>
+          <li><strong><a href={playPageHrefs["play-2d"]} onClick={openPlay2D}>Play 2D</a>.</strong> Run TPE on a one-dimensional objective, trial by trial. Watch ℓ(x), g(x), and their ratio change, and compare progress against random search.</li>
+          <li><strong><a href={playPageHrefs["play-3d"]}>Play 3D</a>.</strong> Run TPE on a two-dimensional surface. Compare multivariate and univariate density models, and add a constraint to see constrained search.</li>
         </ul>
         <p>In Play 2D and Play 3D, <strong>Settings → Share link</strong> copies a URL that restarts the same search: objective, seed, settings, and any constraint.</p>
         <p>TPE Playground is a simplified educational implementation: single-objective, with continuous inputs only. <a href="https://github.com/Kaichi-Irie/tpe-playground">View the playground’s source code on GitHub</a>.</p>

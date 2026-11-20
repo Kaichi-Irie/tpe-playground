@@ -8,7 +8,7 @@ import { getObjective } from "./objectives";
 import "./step-explanation.css";
 import { samplingReducer } from "./labSampling";
 import LabIntro from "./LabIntro";
-import { splitTrials } from "./tpe";
+import { splitTrials } from "./oneParamTpe";
 import { LabAudio } from "./labAudio";
 import LabSoundControls from "./LabSoundControls";
 import { labLayout } from "./labLayout";
