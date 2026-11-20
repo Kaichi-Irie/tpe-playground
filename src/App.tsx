@@ -1,4 +1,6 @@
 import { TopBar } from "./TopBar";
+import { ErrorBoundary } from "./ErrorBoundary";
+import { ChunkLoadComplete } from "./chunkReload";
 import { usePlotSize } from "./usePlotSize";
 import { PlaybackControls } from "./PlaybackControls";
 import LabHintBubble from "./LabHintBubble";
@@ -159,9 +161,10 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
         setDark(next);
         try { localStorage.setItem("tpe-theme", next ? "dark" : "light"); } catch { /* Theme still works without storage. */ }
       }} actionSlot={<div className="lab-header-actions" ref={setAlgorithmContainer} />} />
-      {(labVisited || page === "lab") && <div hidden={page !== "lab"} className="lab-page"><Suspense fallback={<p>Loading explanation…</p>}><StepExplanation visible={page === "lab"} algorithmContainer={page === "lab" ? algorithmContainer : null} /></Suspense></div>}
+      <ErrorBoundary routeKey={`${page}:${route.visit}`} onError={() => setLabVisited(false)}>
+      {(labVisited || page === "lab") && <div hidden={page !== "lab"} className="lab-page"><Suspense fallback={<p>Loading explanation…</p>}><StepExplanation visible={page === "lab"} algorithmContainer={page === "lab" ? algorithmContainer : null} />{page === "lab" && <ChunkLoadComplete />}</Suspense></div>}
       <div hidden={page === "about" || page === "lab"} className="play-page">
-      {page === "play-3d" ? <Suspense fallback={<p>Loading 3D explorer…</p>}><Play3D key={route.visit} sharedSettings={route.share} /></Suspense> : null}
+      {page === "play-3d" ? <Suspense fallback={<p>Loading 3D explorer…</p>}><Play3D key={route.visit} sharedSettings={route.share} /><ChunkLoadComplete /></Suspense> : null}
       <div hidden={page !== "play-2d"} className="visual-workspace play-2d" ref={guide.workspaceRef} onKeyDown={guide.onKeyDown}>
       <section className="canvas-plot" aria-labelledby="plot-heading">
       <div className="canvas-controls">
@@ -328,6 +331,8 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
         </ol>
       </section>
       </article>
+      {(page === "play-2d" || page === "about") && <ChunkLoadComplete />}
+      </ErrorBoundary>
       <footer><span>Browser-only computation</span></footer>
     </main>
   );
