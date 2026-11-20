@@ -1,5 +1,23 @@
 import { expect, it } from "vitest";
-import { partitionConstrainedSingleObjective } from "./partition";
+import { partitionConstrainedSingleObjective, weightsFor } from "./partition";
+
+const samples = [0, 2, 4, 6].map((y, index) => ({ id: index + 1, y }));
+const sampleValue = ({ y }: (typeof samples)[number]) => y;
+
+it("assigns recency weights by trial ID in the original input order", () => {
+  expect(weightsFor(samples, sampleValue, "recency")).toEqual([0.4, 0.8, 1.2, 1.6]);
+  expect(weightsFor([...samples].reverse(), sampleValue, "recency")).toEqual([1.6, 1.2, 0.8, 0.4]);
+});
+
+it("weights positive improvements and falls back to uniform weights when none improve", () => {
+  expect(weightsFor(samples, sampleValue, "ei", 0)).toEqual([1, 1, 1, 1]);
+  expect(weightsFor(samples, sampleValue, "ei", 2)).toEqual([4, 0, 0, 0]);
+});
+
+it("requires a finite threshold for EI weights", () => {
+  expect(() => weightsFor(samples, sampleValue, "ei")).toThrow("EI weights need a finite split threshold");
+  expect(() => weightsFor(samples, sampleValue, "ei", Infinity)).toThrow("EI weights need a finite split threshold");
+});
 
 const trial = (id: number, value: number, constraints: number[]) => ({ id, params: {}, objectives: [value], constraints });
 const trials = [
