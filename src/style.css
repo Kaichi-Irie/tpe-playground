@@ -873,6 +873,21 @@ header { height: 64px; padding: 10px 0; border: 0; }
 .settings-dialog .settings-form .seed-settings .parameter-label { display: flex; grid-column: 1 / 3; grid-row: 1; justify-content: start; gap: 12px; margin: 0; }
 .settings-dialog .settings-form .help-trigger { grid-column: 2; grid-row: 1; justify-self: start; width: 44px; height: 44px; }
 .settings-dialog .settings-form .parameter { position: relative; }
+.settings-dialog .settings-form .infeasible-filling {
+  grid-template-columns: minmax(0, max-content) 44px;
+}
+.settings-dialog .infeasible-filling label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.settings-dialog .infeasible-filling input[type="checkbox"] {
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
 /* Help floats over neighboring rows so opening it never resizes the row. */
 .settings-dialog .settings-form .help-content { position: absolute; z-index: 10; top: auto; bottom: calc(100% - 4px); left: 0; right: 0; width: auto; max-width: none; margin: 0; }
 .settings-dialog .settings-form .help-content[data-placement="below"] { top: calc(100% - 4px); bottom: auto; }
@@ -1034,8 +1049,6 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
 
 .explorer-2d { --constraint-boundary: #24715f; }
 [data-theme="dark"] .explorer-2d { --constraint-boundary: #83dfc4; }
-.settings-dialog .infeasible-filling label { min-height: 44px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
-.infeasible-filling input { accent-color: var(--accent); }
 .performance-monitor .comparison-values.constrained-values { flex-wrap: nowrap; gap: 10px; }
 .comparison-values .comparison-third i { border-top: 2.5px dotted var(--acquisition); }
 .third-progress-line { fill: none; stroke: var(--acquisition); stroke-width: 2.5; stroke-dasharray: 2 3; }
