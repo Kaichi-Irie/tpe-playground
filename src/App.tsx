@@ -253,7 +253,7 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
       </ModelSettingsPanel>
     <details className="performance-monitor">
         <summary><span className="performance-caption">Best f(x) <strong title={bestValue}>{bestValue}</strong></span><span>Performance <span aria-hidden="true">⌄</span></span></summary>
-        <ProgressComparison trials={trials} seed={seed} objectivePreset={objectivePreset} />
+        <ProgressComparison trials={trials} proposals={playback.proposals} seed={seed} objectivePreset={objectivePreset} />
       </details>
       </div>
       </div>

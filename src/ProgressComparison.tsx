@@ -1,23 +1,24 @@
 import { memo, useMemo, useState } from "react";
-import { averageRegret, relativeBestSoFar, bestSoFar, bestFeasibleSoFar } from "./comparison";
+import { averageRegret, relativeBestSoFar, bestSoFar, bestFeasibleSoFar, currentRunLabel } from "./comparison";
 import { findObjectiveMinimum, type ObjectivePreset } from "./objectives";
 import { PanelClose } from "./PanelClose";
 import { Help } from "./Help";
 import { ProgressPlot } from "./ProgressPlot";
-import { trialLimit, defaults, runSearch, type Trial } from "./oneParamTpe";
+import { trialLimit, defaults, runSearch, type Proposal, type Trial } from "./oneParamTpe";
 
-export const ProgressComparison = memo(function ProgressComparison({ trials, seed, objectivePreset }: { trials: readonly Trial[]; seed: number; objectivePreset: ObjectivePreset }) {
+export const ProgressComparison = memo(function ProgressComparison({ trials, proposals, seed, objectivePreset }: { trials: readonly Trial[]; proposals: readonly Proposal[]; seed: number; objectivePreset: ObjectivePreset }) {
   const minimum = useMemo(() => findObjectiveMinimum(objectivePreset), [objectivePreset]);
   const randomTrials = useMemo(() => runSearch(seed, trialLimit, 0, { ...defaults, startupTrials: trialLimit, objectivePreset }).trials, [seed, objectivePreset]);
-  return <ComparisonPanel trials={trials} randomTrials={randomTrials} minimum={minimum.y} />;
+  return <ComparisonPanel trials={trials} currentLabel={currentRunLabel(proposals)} randomTrials={randomTrials} minimum={minimum.y} />;
 });
 
 type MetricTrial = Trial & { feasible?: boolean };
 
-export function ComparisonPanel({ trials, randomTrials, minimum, relative = true, approximate = false, constrained }: {
+export function ComparisonPanel({ trials, currentLabel, randomTrials, minimum, relative = true, approximate = false, constrained }: {
   trials: readonly MetricTrial[];
+  currentLabel: string;
   randomTrials: readonly MetricTrial[];
-  constrained?: { currentLabel: string; flippedLabel: string; flippedTrials: readonly MetricTrial[]; feasibleCount: string };
+  constrained?: { flippedLabel: string; flippedTrials: readonly MetricTrial[]; feasibleCount: string };
   minimum: number;
   relative?: boolean;
   approximate?: boolean;
@@ -52,6 +53,6 @@ export function ComparisonPanel({ trials, randomTrials, minimum, relative = true
       tpe={metric === "best" ? bestGap(trials) : averageRegret(trials, minimum)}
       random={metric === "best" ? bestGap(random) : averageRegret(random, minimum)}
       third={constrained && { label: constrained.flippedLabel, values: feasibleGap(constrained.flippedTrials.slice(0, trials.length)) }}
-      currentLabel={constrained?.currentLabel} />
+      currentLabel={currentLabel} />
   </section>;
 }

@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import Play3D, { Play3DConstraintSettings } from "./Play3D";
-import { twoParamSettings } from "./twoParamTpe";
+import * as twoParam from "./twoParamTpe";
 
 it("starts a sequential Play 3D search with no observations and a preview of its first proposal", () => {
   const html = renderToStaticMarkup(<Play3D />);
@@ -41,10 +41,25 @@ it("starts a sequential Play 3D search with no observations and a preview of its
 });
 
 it("describes random-only playback without a TPE start trial", () => {
-  const sharedSettings = new URLSearchParams({ startupTrials: String(twoParamSettings.count) });
+  const sharedSettings = new URLSearchParams({ startupTrials: String(twoParam.twoParamSettings.count) });
   const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} />);
   expect(html).toContain("Every trial in this search is random.");
   expect(html).not.toContain("Uniform random draw until TPE starts");
+});
+
+it("labels unfitted observations as unclassified and describes the random fallback", () => {
+  const settings = { constraintPreset: "disk", startupTrials: 2, priorWeight: 0, infeasibleFilling: false } as const;
+  const playback = twoParam.moveTwoParamPlayback(twoParam.emptyTwoParamPlayback(), 2, 50, "multivariate", settings);
+  const initialPlayback = vi.spyOn(twoParam, "emptyTwoParamPlayback").mockReturnValueOnce(playback);
+  try {
+    const sharedSettings = new URLSearchParams("seed=50&constraint=disk&startupTrials=2&priorWeight=0&infeasibleFilling=false");
+    const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} />);
+    expect(html).toContain('aria-label="Trial 1 · Unclassified · Infeasible');
+    expect(html).toContain('aria-label="Trial 2 · Unclassified · Infeasible');
+    expect(html).toContain("There is no Good group yet. The next trial is a uniform random draw.");
+  } finally {
+    initialPlayback.mockRestore();
+  }
 });
 
 it("does not build the closed comparison panel", () => {

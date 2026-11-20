@@ -1,4 +1,17 @@
 import { trialLimit, type Trial } from "./oneParamTpe";
+import type { ProposalTrace } from "./model/types";
+
+export function currentRunLabel(proposals: readonly { trace: ProposalTrace }[], constrained = false): string {
+  if (proposals.length === 0) return "This run";
+  const tpe = proposals.filter(({ trace }) => trace.method === "tpe");
+  if (tpe.length === 0) return "Random only";
+  if (!constrained) return "TPE";
+  const filling = tpe[0].trace.config.infeasibleFilling ?? true;
+  if (tpe.some(({ trace }) => (trace.config.infeasibleFilling ?? true) !== filling)) {
+    return "This run (mixed settings)";
+  }
+  return filling ? "Filling on" : "Filling off";
+}
 
 // Only evaluated observations contribute; there is no value before trial 1.
 export function bestSoFar(trials: readonly Trial[]): number[] {

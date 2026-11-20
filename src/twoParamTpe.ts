@@ -76,8 +76,8 @@ export function buildTwoParamView(trials: readonly TwoParamTrial[], mode: Densit
   const problem = twoParamProblemForConstraint(settings.constraintPreset);
   const observations = twoParamObservations(trials);
   const config = twoParamConfig(mode, settings);
-  const hasPartition = trials.length >= 2;
-  const fitted = hasPartition && !needsFeasibleGood(problem, observations, config) ? fitTpe(problem, observations, config) : null;
+  const enoughTrialsToFit = trials.length >= 2;
+  const fitted = enoughTrialsToFit && !needsFeasibleGood(problem, observations, config) ? fitTpe(problem, observations, config) : null;
   const partition = fitted?.snapshot.partition;
   const goodIds = new Set(partition?.good.map((member) => member.trialId));
   const feasibleIds = new Set(trials.filter((trial) => trial.violation === 0).map((trial) => trial.id));
@@ -105,7 +105,7 @@ export function buildTwoParamView(trials: readonly TwoParamTrial[], mode: Densit
   };
   let visualization: ReturnType<typeof buildVisualization> | undefined;
   const getVisualization = () => visualization ??= buildVisualization();
-  return { trials, fitted, goodIds, feasibleIds, filledIds, hasPartition, hasDensities: fitted !== null, evaluate,
+  return { trials, fitted, goodIds, feasibleIds, filledIds, hasPartition: fitted !== null, hasDensities: fitted !== null, evaluate,
     get grid() { return getVisualization().grid; },
     get scales() { return getVisualization().scales; },
   };

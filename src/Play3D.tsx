@@ -380,7 +380,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
       status={<div className="proposal">
         <span>{!proposal ? "Search complete" : noFeasibleGood ? `Uniform random · trial ${step + 1}` : proposal.method === "random" ? `Random start · ${step + 1} / ${settings.startupTrials}` : `TPE · trial ${step + 1}`}</span>
         <Help label="Play 3D trial playback">
-          {!proposal ? `Search complete. All ${twoParamSettings.count} trials evaluated.` : noFeasibleGood ? "The Good group has no feasible trials or prior. The next trial is a uniform random draw." : proposal.method === "random"
+          {!proposal ? `Search complete. All ${twoParamSettings.count} trials evaluated.` : noFeasibleGood ? "There is no Good group yet. The next trial is a uniform random draw." : proposal.method === "random"
             ? `Initial random exploration · ${step + 1} / ${settings.startupTrials}. ${settings.startupTrials === twoParamSettings.count ? "Every trial in this search is random." : `Uniform random draw until TPE starts at trial ${settings.startupTrials + 1}.`}`
             : `TPE proposal · trial ${step + 1}. Drew ${settings.candidates} candidate${settings.candidates === 1 ? "" : "s"} from ℓ(x) and picked the largest ℓ(x)/g(x).`}{" "}
           <span id="trial-seek-help-play-3d">Seeking back discards later trials.</span>
@@ -401,7 +401,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
     </ModelSettingsPanel>
     <details className="performance-monitor" onToggle={(event) => setComparisonOpen(event.currentTarget.open)}>
       <summary><span className="performance-caption">Best f(x) <strong title={bestValue}>{bestValue}</strong></span><span>Performance <span aria-hidden="true">⌄</span></span></summary>
-      {comparisonOpen && <Play3DPerformance trials={playback.trials} seed={seed} objectivePreset={objectivePreset} constraintPreset={constraintPreset} mode={mode} settings={settings} />}
+      {comparisonOpen && <Play3DPerformance trials={playback.trials} proposals={playback.proposals} seed={seed} objectivePreset={objectivePreset} constraintPreset={constraintPreset} mode={mode} settings={settings} />}
     </details>
   </section>;
 }
