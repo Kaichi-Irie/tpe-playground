@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#21252b" />
     <script>
       (() => {
@@ -18,12 +19,51 @@
     </script>
     <meta
       name="description"
-      content="An interactive laboratory for the Tree-structured Parzen Estimator. Explore how density models guide optimization."
+      content="Explore the Tree-structured Parzen Estimator (TPE), a Bayesian optimization algorithm used by Optuna, in Play 2D, Play 3D, and Lab."
     />
-    <title>TPE Playground</title>
+    <title>TPE Playground: Interactive Tree-structured Parzen Estimator</title>
+    <link rel="canonical" href="https://kaichi-irie.github.io/tpe-playground/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="TPE Playground" />
+    <meta property="og:title" content="TPE Playground: Interactive Tree-structured Parzen Estimator" />
+    <meta property="og:description" content="Explore the Tree-structured Parzen Estimator (TPE), a Bayesian optimization algorithm used by Optuna, in Play 2D, Play 3D, and Lab." />
+    <meta property="og:url" content="https://kaichi-irie.github.io/tpe-playground/" />
+    <meta property="og:image" content="https://kaichi-irie.github.io/tpe-playground/social-card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="TPE Playground banner with a mascot beside blue and orange density surfaces and a contour plot." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="TPE Playground: Interactive Tree-structured Parzen Estimator" />
+    <meta name="twitter:description" content="Explore the Tree-structured Parzen Estimator (TPE), a Bayesian optimization algorithm used by Optuna, in Play 2D, Play 3D, and Lab." />
+    <meta name="twitter:image" content="https://kaichi-irie.github.io/tpe-playground/social-card.png" />
+    <meta name="twitter:image:alt" content="TPE Playground banner with a mascot beside blue and orange density surfaces and a contour plot." />
+    <style>
+      :where(:root) {
+        background: #f2f3f5;
+        color: #303640;
+      }
+      :where(:root[data-theme="dark"]) {
+        background: #21252b;
+        color: #dce0e8;
+      }
+      .static-intro {
+        max-width: 42rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        font: 1rem/1.6 system-ui, sans-serif;
+      }
+      .static-intro a { color: inherit; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="static-intro">
+        <h1>TPE Playground</h1>
+        <p>The Tree-structured Parzen Estimator (TPE) uses density estimates from past trials to choose what to try next in Bayesian optimization.</p>
+        <p>Loading…</p>
+        <p><a href="https://github.com/Kaichi-Irie/tpe-playground">View the source code on GitHub</a></p>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
