@@ -10,6 +10,14 @@ export function bestSoFar(trials: readonly Trial[]): number[] {
   });
 }
 
+export function bestFeasibleSoFar(trials: readonly { y: number; feasible?: boolean }[]): (number | null)[] {
+  let best: number | null = null;
+  return trials.map(({ y, feasible }) => {
+    if (feasible) best = best === null ? y : Math.min(best, y);
+    return best;
+  });
+}
+
 export const comparisonFloor = 1e-12;
 export function relativeBestSoFar(trials: readonly Trial[], minimum: number): number[] {
   if (!Number.isFinite(minimum) || minimum <= 0) throw new Error("Need a finite positive minimum.");

@@ -9,6 +9,7 @@ import { bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrial
 
 interface Props {
   children?: ReactNode;
+  disableEi?: boolean;
   status?: ReactNode;
   experiment: ShareExperiment;
   settings: ModelSettings;
@@ -25,12 +26,16 @@ interface Props {
   guide?: { id: "gamma" | "bandwidth"; describedBy: string };
 }
 
-export function ModelSettingsPanel({ children, status, experiment, settings, defaultSettings, onChange, seed, onNewSeed, trialLimit, widths, domainWidth, idSuffix = "", labelPrefix = "", className = "", guide }: Props) {
+export function ModelSettingsPanel({ children, status, experiment, settings, defaultSettings, onChange, seed, onNewSeed, trialLimit, widths, domainWidth, idSuffix = "", labelPrefix = "", className = "", guide, disableEi = false }: Props) {
   const { gamma, bandwidth, priorWeight, startupTrials, candidates, weights } = settings;
   const bandwidthRule = settings.bandwidthRule ?? "constant";
   const id = (name: string) => `${name}${idSuffix}`;
   const change = (patch: Partial<ModelSettings>) => onChange({ ...settings, ...patch });
-  const isDefault = (Object.keys(defaultSettings) as (keyof ModelSettings)[]).every((key) => (key === "bandwidthRule" ? bandwidthRule === (defaultSettings.bandwidthRule ?? "constant") : settings[key] === defaultSettings[key]));
+  const isDefault = (Object.keys(defaultSettings) as (keyof ModelSettings)[]).every((key) => {
+    if (key === "bandwidthRule") return bandwidthRule === (defaultSettings.bandwidthRule ?? "constant");
+    if (key === "infeasibleFilling") return (settings.infeasibleFilling ?? true) === defaultSettings.infeasibleFilling;
+    return settings[key] === defaultSettings[key];
+  });
   const weightOption = weightOptions.find((option) => option.value === weights)!;
   const displayedWidth = bandwidthRule === "constant" ? bandwidth : widths[0]?.value;
   const sliderWidth = displayedWidth ?? bandwidth;
@@ -63,10 +68,10 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
             </div>
             <div className="parameter primary-weights">
               <div className="parameter-label">
-                <div><label htmlFor={id("weights")}>Weights</label><Help label="observation weights">{weightOption.description}</Help>
+                <div><label htmlFor={id("weights")}>Weights</label><Help label="observation weights">{weightOption.description}{disableEi && <><br />EI weights need an objective threshold, which is undefined for a constrained split.</>}</Help>
                 </div>
               </div>
-              <select id={id("weights")} value={weights} onChange={(event) => change({ weights: event.target.value as WeightStrategy })}>{weightOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+              <select id={id("weights")} value={weights} onChange={(event) => change({ weights: event.target.value as WeightStrategy })}>{weightOptions.map((option) => <option key={option.value} value={option.value} disabled={disableEi && option.value === "ei"}>{option.label}</option>)}</select>
             </div>
             <div className="parameter">
               <div className="parameter-label">

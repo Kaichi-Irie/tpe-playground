@@ -5,9 +5,10 @@ export type SurfaceLayer2D = "objective" | "good" | "bad" | "acquisition";
 // Plain, depth-sorted drawing commands in SVG viewBox units. Thousands of these
 // are painted into one canvas, so no per-item DOM nodes, layout or style exist.
 export type SceneItem2D = { id: string; depth: number } & (
-  | { kind: "triangle"; layer: SurfaceLayer2D; points: readonly number[]; inspect: () => void }
-  | { kind: "segment"; points: readonly number[]; inspect: () => void }
-  | { kind: "trial"; x: number; y: number; group: "good" | "bad" | "unclassified" }
+  | { kind: "triangle"; layer: SurfaceLayer2D; points: readonly number[]; inspect: () => void; muted?: boolean }
+  | { kind: "segment"; points: readonly number[]; inspect: () => void; muted?: boolean }
+  | { kind: "boundary"; points: readonly number[] }
+  | { kind: "trial"; feasible?: boolean; x: number; y: number; group: "good" | "bad" | "unclassified" }
   | { kind: "proposal"; x: number; y: number; floorX: number; floorY: number }
 );
 export interface ViewBox2D { x: number; y: number; width: number; height: number }
@@ -79,16 +80,23 @@ function drawScene(canvas: HTMLCanvasElement, items: readonly SceneItem2D[], flo
 
   // Consecutive contour segments share one stroke call; surfaces keep one fill
   // per triangle so translucent overlaps accumulate exactly as SVG painted them.
-  let contour = false;
+  let lineStyle: "contour" | "muted" | "boundary" | undefined;
   const flushContour = () => {
-    if (!contour) return;
-    contour = false;
-    ctx.globalAlpha = 0.7; ctx.strokeStyle = color("--objective"); ctx.lineWidth = 1.1 / fit.scale;
+    if (!lineStyle) return;
+    ctx.globalAlpha = lineStyle === "muted" ? 0.28 : lineStyle === "boundary" ? 0.95 : 0.7;
+    ctx.strokeStyle = color(lineStyle === "muted" ? "--neutral-point" : lineStyle === "boundary" ? "--constraint-boundary" : "--objective");
+    ctx.lineWidth = (lineStyle === "boundary" ? 1.8 : 1.1) / fit.scale;
     ctx.stroke();
+    lineStyle = undefined;
   };
   for (const item of items) {
-    if (item.kind === "segment") {
-      if (!contour) { ctx.beginPath(); contour = true; }
+    if (item.kind === "segment" || item.kind === "boundary") {
+      const nextStyle = item.kind === "boundary" ? "boundary" : item.muted ? "muted" : "contour";
+      if (lineStyle !== nextStyle) {
+        flushContour();
+        ctx.beginPath();
+        lineStyle = nextStyle;
+      }
       const [ax, ay, bx, by] = item.points;
       ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
       continue;
@@ -98,9 +106,17 @@ function drawScene(canvas: HTMLCanvasElement, items: readonly SceneItem2D[], flo
       const surface = surfaceStyles[item.layer];
       const [ax, ay, bx, by, cx, cy] = item.points;
       ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.closePath();
-      const value = color(surface.color);
-      ctx.globalAlpha = surface.fill; ctx.fillStyle = value; ctx.fill();
+      const value = color(item.muted ? "--neutral-point" : surface.color);
+      ctx.globalAlpha = item.muted ? 0.035 : surface.fill; ctx.fillStyle = value; ctx.fill();
       if (surface.stroke) { ctx.globalAlpha = surface.stroke; ctx.strokeStyle = value; ctx.lineWidth = 0.35; ctx.stroke(); }
+    } else if (item.kind === "trial" && item.feasible === false) {
+      const { x, y } = item;
+      const r = Math.max(4.5, 2.4 / fit.scale);
+      ctx.beginPath();
+      ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r);
+      ctx.moveTo(x - r, y + r); ctx.lineTo(x + r, y - r);
+      ctx.globalAlpha = 1; ctx.strokeStyle = color("--surface"); ctx.lineWidth = 3 / fit.scale; ctx.stroke();
+      ctx.strokeStyle = color(trialColors[item.group]); ctx.lineWidth = 1.6 / fit.scale; ctx.stroke();
     } else if (item.kind === "trial") {
       ctx.beginPath(); ctx.arc(item.x, item.y, 4.5, 0, 2 * Math.PI);
       ctx.globalAlpha = 1; ctx.fillStyle = color(trialColors[item.group]); ctx.fill();

@@ -44,13 +44,28 @@ runtime. It is not an untrusted file parser or schema migration service.
 
 The current policy supports a single objective (minimize or maximize), fixed
 continuous box domains, fixed bandwidth, uniform/recency/EI weighting, and an
-optional broad prior. Unsupported objective counts and constraints are rejected,
-not silently discarded. Partition thresholds use minimization-oriented values;
-observations always retain their original objective values.
+optional broad prior. Observations retain their original objective values.
+The unconstrained split threshold uses minimization-oriented values.
 
-The ranking and weighting functions are separate. Future constrained/MOTPE
-policies can operate on the same observations and produce partitions/weights;
-they must explicitly define their diagnostic types. Algorithms requiring several
+A constrained problem declares the number of finite constraint values per
+observation. A trial is feasible when every value is at most zero. Its total
+violation is the sum of the positive values. The target Good size is
+`min(n − 1, max(1, ceil(γ·n)))`, counting all trials. Feasible trials rank by
+objective, and ties break by ascending trial ID. With infeasible filling enabled
+(the default), any remaining Good slots go to infeasible trials from lowest to
+highest total violation, with the same tie-break. With filling disabled, Good
+can fall below its target size. All remaining trials go to Bad.
+
+The constrained partition records the target size, feasible IDs, total
+violations, and filled IDs. Its weights can be uniform or recency-based. EI
+requires an objective threshold, so the engine rejects EI for constrained
+problems. When Good is empty, a positive prior weight supplies the only Good
+kernel. Without a prior, proposing falls back to a uniform draw with
+`method: "random"` and `reason: "no-feasible-good"` after startup. There is no
+fitted model in that case.
+
+The ranking and weighting functions are separate. Future MOTPE policies
+must explicitly define their diagnostic types. Algorithms requiring several
 density pairs will need additional field IDs and models, not a fake single split.
 Categorical/conditional spaces, full covariance kernels and arbitrary plug-in
 policies are not implemented.

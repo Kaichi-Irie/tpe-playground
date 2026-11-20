@@ -38,12 +38,14 @@ export function buildExplanation(example: ExplanationExample, settings: Explanat
   const model = fitModel1D(example.trials, settings.priorWeight, {
     ...settings, bandwidthRule: "constant", startupTrials: 2, objectivePreset: example.objectivePreset,
   });
+  const { partition } = model.snapshot;
+  if (partition.kind !== "single-objective") throw new Error("The Lab requires an unconstrained partition.");
   const group = model.snapshot.groups[0];
   const good = createLogDensity(group.good), bad = createLogDensity(group.bad);
   const trace = model.propose(settings.seed);
   if (trace.method !== "tpe") throw new Error("Explanation requires a fitted TPE proposal.");
   return {
-    group, partition: model.snapshot.partition,
+    group, partition,
     logRatios: explanationGrid.map((x) => good({ x }) - bad({ x })),
     goodDensity: explanationGrid.map((x) => Math.exp(good({ x }))),
     badDensity: explanationGrid.map((x) => Math.exp(bad({ x }))),

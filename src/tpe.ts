@@ -72,6 +72,7 @@ export function buildView1D(trials: readonly Trial[], grid: readonly number[], p
   if (trials.length < 2) return { trials, fitted: null, good: [] as Trial[], bad: [] as Trial[], threshold: null, goodWeights: [], badWeights: [], acquisition: [], goodDensity: grid.map(() => 0), badDensity: grid.map(() => 0) };
   const fitted = fitModel1D(trials, priorWeight, config);
   const partition = fitted.snapshot.partition;
+  if (partition.kind !== "single-objective") throw new Error("Play 1D requires an unconstrained partition.");
   const byId = new Map(trials.map((t) => [t.id, t]));
   const field = (field: "good-density" | "bad-density" | "log-ratio") => evaluateField(fitted, { field, axes: ["x"], points: grid.map((x) => ({ x })), projection: { kind: "full" } }).values;
   return { trials, fitted, good: partition.good.map((m) => byId.get(m.trialId)!), bad: partition.bad.map((m) => byId.get(m.trialId)!), threshold: partition.threshold, goodWeights: partition.good.map((m) => m.weight), badWeights: partition.bad.map((m) => m.weight), acquisition: field("log-ratio"), goodDensity: field("good-density"), badDensity: field("bad-density") };

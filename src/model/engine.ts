@@ -1,6 +1,6 @@
 import { resolveBandwidth, validateBandwidthRule } from "./bandwidth";
 import { createDensity, logDensity, sampleDensity } from "./density";
-import { partitionSingleObjective } from "./partition";
+import { partitionConstrainedSingleObjective, partitionSingleObjective, totalViolation } from "./partition";
 import type { Evaluation, GroupModel, GroupTrace, ModelSnapshot, Observation, Point, Problem, ProposalTrace, TpeConfig } from "./types";
 
 export function freezeData<T>(value: T): T {
@@ -23,10 +23,11 @@ export function validateInput(problem: Problem, trials: readonly Observation[], 
   const { bandwidth, gamma, weights, priorWeight, startupTrials, candidates, mode } = config;
   if (!["univariate", "multivariate"].includes(mode) || !["uniform", "recency", "ei"].includes(weights) || !Number.isFinite(bandwidth) || bandwidth <= 0 || !Number.isFinite(gamma) || gamma <= 0 || gamma >= 1 || !Number.isFinite(priorWeight) || priorWeight < 0 || !Number.isInteger(startupTrials) || startupTrials < 2 || startupTrials > 10000 || !Number.isInteger(candidates) || candidates < 1 || candidates > 10000) throw new Error("Invalid TPE configuration.");
   validateBandwidthRule(config.bandwidthRule ?? "constant");
-  // Future policies can consume the same observations; do not silently ignore outcomes.
-  if (problem.directions.length !== 1 || !["minimize", "maximize"].includes(problem.directions[0]) || problem.constraintCount !== 0) throw new Error("Only unconstrained single-objective partitioning is currently supported.");
+  if (problem.directions.length !== 1 || !["minimize", "maximize"].includes(problem.directions[0])) throw new Error("Only single-objective partitioning is currently supported.");
+  if (!Number.isInteger(problem.constraintCount) || problem.constraintCount < 0) throw new Error("Invalid constraint count.");
+  if (problem.constraintCount > 0 && weights === "ei") throw new Error("EI weights are unavailable with constraints.");
   if (!problem.parameters.length || new Set(problem.parameters.map((p) => p.id)).size !== problem.parameters.length || problem.parameters.some((p) => !p.id || !Number.isFinite(p.low) || !Number.isFinite(p.high) || p.low >= p.high || !Number.isFinite(p.high - p.low))) throw new Error("Invalid search space.");
-  if (new Set(trials.map((t) => t.id)).size !== trials.length || trials.some((t) => !Number.isInteger(t.id) || t.id < 0 || t.objectives.length !== 1 || !Number.isFinite(t.objectives[0]) || t.constraints.length !== 0 || Object.keys(t.params).length !== problem.parameters.length || problem.parameters.some((p) => !Number.isFinite(t.params[p.id]) || t.params[p.id] < p.low || t.params[p.id] > p.high))) throw new Error("Invalid observations.");
+  if (new Set(trials.map((t) => t.id)).size !== trials.length || trials.some((t) => !Number.isInteger(t.id) || t.id < 0 || t.objectives.length !== 1 || !Number.isFinite(t.objectives[0]) || t.constraints.length !== problem.constraintCount || !Array.from(t.constraints).every(Number.isFinite) || !Number.isFinite(totalViolation(t.constraints)) || Object.keys(t.params).length !== problem.parameters.length || problem.parameters.some((p) => !Number.isFinite(t.params[p.id]) || t.params[p.id] < p.low || t.params[p.id] > p.high))) throw new Error("Invalid observations.");
 }
 
 export function createRandom(seed: number, trialCount: number) {
@@ -79,7 +80,15 @@ export type FittedTpeModel = ReturnType<typeof restoreModel>;
 
 export function fitTpe(problem: Problem, trials: readonly Observation[], config: TpeConfig): FittedTpeModel {
   validateInput(problem, trials, config);
-  const partition = partitionSingleObjective(trials, config.gamma, config.weights, problem.directions[0]);
+  return fitValidatedTpe(problem, trials, config);
+}
+
+function fitValidatedTpe(problem: Problem, trials: readonly Observation[], config: TpeConfig): FittedTpeModel {
+  const direction = problem.directions[0];
+  const partition = problem.constraintCount
+    ? partitionConstrainedSingleObjective(trials, config.gamma, config.weights, direction, config.infeasibleFilling)
+    : partitionSingleObjective(trials, config.gamma, config.weights, direction);
+  if (!partition.good.length && config.priorWeight === 0) throw new Error("A Good density needs a feasible observation or a prior.");
   const byId = new Map(trials.map((t) => [t.id, t]));
   const parameterGroups = config.mode === "univariate" ? problem.parameters.map((p) => [p]) : [problem.parameters];
   const groups = parameterGroups.map((parameters, i): GroupModel => {
@@ -100,7 +109,13 @@ export function fitTpe(problem: Problem, trials: readonly Observation[], config:
 
 export function proposeTpe(problem: Problem, trials: readonly Observation[], config: TpeConfig, seed: number): ProposalTrace {
   validateInput(problem, trials, config);
+  const startup = trials.length < config.startupTrials;
+  if (!startup && !needsFeasibleGood(problem, trials, config)) return fitValidatedTpe(problem, trials, config).propose(seed);
   const random = createRandom(seed, trials.length);
-  if (trials.length >= config.startupTrials) return fitTpe(problem, trials, config).propose(seed);
-  return freezeData({ version: 1, method: "random", reason: "startup", seed, problem: structuredClone(problem), config: { ...config }, inputTrialIds: trials.map((t) => t.id), historyKey: dataKey(trials.map((t) => [t.id, problem.parameters.map((p) => t.params[p.id]), t.objectives, t.constraints])), selected: Object.fromEntries(problem.parameters.map((p) => [p.id, p.low + random() * (p.high - p.low)])) });
+  return freezeData({ version: 1, method: "random", reason: startup ? "startup" : "no-feasible-good", seed, problem: structuredClone(problem), config: { ...config }, inputTrialIds: trials.map((t) => t.id), historyKey: dataKey(trials.map((t) => [t.id, problem.parameters.map((p) => t.params[p.id]), t.objectives, t.constraints])), selected: Object.fromEntries(problem.parameters.map((p) => [p.id, p.low + random() * (p.high - p.low)])) });
+}
+
+export function needsFeasibleGood(problem: Problem, trials: readonly Observation[], config: TpeConfig): boolean {
+  return problem.constraintCount > 0 && config.infeasibleFilling === false && config.priorWeight === 0
+    && !trials.some((trial) => trial.constraints.every((value) => value <= 0));
 }

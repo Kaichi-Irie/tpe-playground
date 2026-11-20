@@ -1,11 +1,13 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import Explorer2D from "./Explorer2D";
+import Explorer2D, { ConstraintSettings2D } from "./Explorer2D";
 import { settings2D } from "./tpe2d";
 
 it("starts a sequential 2D search with no observations and a preview of its first proposal", () => {
   const html = renderToStaticMarkup(<Explorer2D />);
   expect(html).toContain("Trial 0 / 200");
+  expect(html).toContain('aria-label="2D Search seed">0</output>');
+  expect(html).toMatch(/<select id="prior-weight-2d"[^>]*>.*<option value="1" selected="">1<\/option>/);
   expect(html).toContain("<span>Random start · 1 / 10</span>");
   expect(html).toMatch(/role="tooltip"[^>]*>Initial random exploration · 1 \/ 10\. Uniform random draw/);
   expect(html).toContain('class="model-status" aria-live="polite"');
@@ -59,4 +61,17 @@ it("starts a shared Play 3D search at trial zero with the linked density mode an
   expect(html).toContain('aria-label="2D Search seed">7</output>');
   expect(html).toContain('aria-valuetext="50 percent"');
   expect(html).toContain("Share link");
+});
+
+it("shows the constraint selector with filling available only for an active preset", () => {
+  const initial = renderToStaticMarkup(<Explorer2D />);
+  expect(initial).toContain('<label for="constraint-preset-2d">Constraint</label>');
+  expect(initial).toContain('<option value="none" selected="">None</option>');
+  expect(initial).not.toContain('type="checkbox"');
+
+  const active = renderToStaticMarkup(<ConstraintSettings2D preset="disk" infeasibleFilling onPresetChange={() => {}} onFillingChange={() => {}} />);
+  expect(active).toContain('<option value="disk" selected="">Small disk</option>');
+  expect(active).toContain('type="checkbox" checked=""');
+  expect(active).toContain('Infeasible filling');
+  expect(active).toContain('1.5%');
 });

@@ -1,3 +1,4 @@
+import { getConstraint2D, violation, type ConstraintPreset2D } from "./constraints2D";
 import { objectiveContours, type ContourPoint, type ContourSegment } from "./contours";
 import { findObjectiveOptimum2D, getObjective2D, type ObjectivePreset2D } from "./tpe2d";
 
@@ -11,7 +12,7 @@ function refineAxis(axis: number[], optimum: number): number[] {
     .filter((value) => value >= -5 && value <= 5).sort((a, b) => a - b);
 }
 
-export function createObjectiveView2D(preset: ObjectivePreset2D) {
+export function createObjectiveView2D(preset: ObjectivePreset2D, constraintPreset: ConstraintPreset2D = "none") {
   const objective = getObjective2D(preset);
   const optimum = findObjectiveOptimum2D(preset);
   // For Rosenbrock, follow the valley rather than interpolating straight across
@@ -42,8 +43,15 @@ export function createObjectiveView2D(preset: ObjectivePreset2D) {
     ? [0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30, 60]
     : [...[0.0001, 0.0003, 0.001].map((fraction) => low + fraction * range),
       ...Array.from({ length: 16 }, (_, i) => low + ((i + 1) / 17) ** 2 * range)];
-  const contours = preset === "rosenbrock" ? rosenbrockContours(levels) : objectiveContours(grid, levels);
-  return { grid, optimum, low, high, softening, levels, contours, normalize };
+  const rawContours = preset === "rosenbrock" ? rosenbrockContours(levels) : objectiveContours(grid, levels);
+  const feasible = constraintPreset === "none" ? undefined : (x1: number, x2: number) => violation(x1, x2, constraintPreset) === 0;
+  const contours = rawContours.map((segment) => ({
+    ...segment, muted: feasible && !feasible((segment.a.x1 + segment.b.x1) / 2, (segment.a.x2 + segment.b.x2) / 2),
+  }));
+  const boundaries = getConstraint2D(constraintPreset).boundaries.map((line) => line.map(([x1, x2]) => ({
+    x1, x2, objective: objective.evaluate(x1, x2),
+  })));
+  return { grid, optimum: constraintPreset === "none" ? optimum : findObjectiveOptimum2D(preset, constraintPreset), low, high, softening, levels, contours, boundaries, feasible, normalize };
 }
 
 // Exact level curves: x₂ = x₁² ± sqrt((1000 f − (1 − x₁)²) / 100).

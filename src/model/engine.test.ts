@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import legacy from "./fixtures/legacy-trajectories.json";
 import { createDensity, logDensity } from "./density";
-import { fitTpe, proposeTpe, restoreModel } from "./engine";
+import { fitTpe, proposeTpe, restoreModel, validateInput } from "./engine";
 import { evaluateField } from "./visualization";
 import { buildView1D, config1D, defaults, observations1D, problem1D, runSearch } from "../tpe";
 import { buildDemo2D, config2D, emptyPlayback2D, movePlayback2D, observations2D, problem2D, proposeTrial2D } from "../tpe2d";
@@ -13,14 +13,15 @@ const config = { ...config2D(), gamma: 0.5, bandwidth: 0.5, startupTrials: 2 };
 describe("shared TPE model", () => {
   it("preserves pre-refactor seeded 1D and joint 2D trajectories", () => {
     const one = runSearch(42, 30, 1).trials;
-    const two = movePlayback2D(emptyPlayback2D(), 30).trials;
+    const two = movePlayback2D(emptyPlayback2D(), 30, 42, "multivariate", { priorWeight: 0 }).trials;
     one.forEach((t, i) => { expect(t.x).toBeCloseTo(legacy.one[i].x, 12); expect(t.y).toBeCloseTo(legacy.one[i].y, 12); });
     two.forEach((t, i) => { expect(t.x1).toBeCloseTo(legacy.two[i].x1, 12); expect(t.x2).toBeCloseTo(legacy.two[i].x2, 12); });
   });
 
   it("keeps independent cross peaks and joint paired peaks distinct", () => {
-    const joint = fitTpe(problem2D, trials, config);
-    const independent = fitTpe(problem2D, trials, { ...config, mode: "univariate" });
+    const settings = { ...config, priorWeight: 0 };
+    const joint = fitTpe(problem2D, trials, settings);
+    const independent = fitTpe(problem2D, trials, { ...settings, mode: "univariate" });
     const at = [{ x1: -2, x2: -2 }, { x1: -2, x2: 2 }];
     const j = joint.evaluate(at), u = independent.evaluate(at);
     expect(j[0].logL - j[1].logL).toBeGreaterThan(20);
@@ -98,7 +99,7 @@ describe("visualization contract", () => {
   });
 
   it("distinguishes slices from normalized marginals and marginal density ratios", () => {
-    const model = fitTpe(problem2D, trials, config);
+    const model = fitTpe(problem2D, trials, { ...config, priorWeight: 0 });
     const points = Array.from({ length: 1000 }, (_, i) => ({ x1: -10 + (i + 0.5) * 0.02 }));
     const marginal = evaluateField(model, { field: "good-density", axes: ["x1"], points, projection: { kind: "marginal" } });
     expect(marginal.values.reduce((s, v) => s + v * 0.02, 0)).toBeCloseTo(1, 8);
@@ -132,5 +133,39 @@ describe("visualization contract", () => {
     const back = movePlayback2D(next, 10);
     expect(back.proposals).toHaveLength(10);
     expect(movePlayback2D(back, 12)).toEqual(joint);
+  });
+});
+
+describe("constrained TPE", () => {
+  const problem = { ...problem2D, constraintCount: 2 };
+  const infeasible = trials.map((trial) => ({ ...trial, constraints: [-0.5, 1] }));
+
+  it("validates every constraint and rejects EI even during startup", () => {
+    expect(() => validateInput(problem, infeasible, config)).not.toThrow();
+    for (const constraints of [[], [0], [0, 1, 2], [NaN, 0], [0, Infinity], [-Infinity, 0]]) {
+      expect(() => validateInput(problem, [{ ...infeasible[0], constraints }], config)).toThrow("Invalid observations");
+    }
+    expect(() => validateInput(problem, [], { ...config, weights: "ei" })).toThrow("EI weights");
+  });
+
+  it("uses the startup RNG and records the fallback when Good is empty without a prior", () => {
+    const settings = { ...config, infeasibleFilling: false, priorWeight: 0 };
+    const fallback = proposeTpe(problem, infeasible, settings, 42);
+    const startup = proposeTpe(problem, infeasible, { ...settings, startupTrials: 10 }, 42);
+    expect(startup).toMatchObject({ method: "random", reason: "startup" });
+    expect(fallback).toMatchObject({ method: "random", reason: "no-feasible-good", selected: startup.selected });
+    expect(() => fitTpe(problem, infeasible, settings)).toThrow("Good density");
+  });
+
+  it("fits a prior-only Good density and proposes with TPE when the prior is enabled", () => {
+    const settings = { ...config, infeasibleFilling: false, priorWeight: 0.5, bandwidthRule: "scott" } as const;
+    const fitted = fitTpe(problem, infeasible, settings);
+    expect(fitted.snapshot.partition.good).toEqual([]);
+    expect(fitted.snapshot.groups[0].good.kernels).toEqual([{
+      source: { kind: "prior" }, center: { x1: 0, x2: 0 }, bandwidths: { x1: 10, x2: 10 },
+      observationWeight: 0.5, mixtureWeight: 1,
+    }]);
+    expect(proposeTpe(problem, infeasible, settings, 42)).toEqual(fitted.propose(42));
+    expect(fitted.propose(42).method).toBe("tpe");
   });
 });
