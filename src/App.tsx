@@ -1,4 +1,6 @@
 import { TopBar } from "./TopBar";
+import { ErrorBoundary } from "./ErrorBoundary";
+import { ChunkLoadComplete } from "./chunkReload";
 import { usePlotSize } from "./usePlotSize";
 import { PlaybackControls } from "./PlaybackControls";
 import LabHintBubble from "./LabHintBubble";
@@ -34,7 +36,7 @@ function initialTheme(): boolean {
 
 const domainWidth = domain[1] - domain[0];
 const defaultSearch: SharedSearch<ObjectivePreset> = {
-  seed: 50,
+  seed: 0,
   preset: "multimodal",
   settings: { ...defaults, priorWeight: prior.weight, ...searchDefaults },
 };
@@ -133,6 +135,7 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
   const guide = usePlayGuide<HTMLDivElement>({ page: "play-2d", step, startupTrials, acquisitionVisible: visible.acquisition, seeking: false }, page === "play-2d");
   const guideAcquisition = guide.active === "acquisition";
   const trials = useMemo(() => playback.trials.slice(0, step), [playback.trials, step]);
+  const proposals = useMemo(() => playback.proposals.slice(0, step), [playback.proposals, step]);
   const model = useMemo(() => buildOneParamView(trials, grid, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }), [trials, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
   const proposal = useMemo(() => step === trialLimit ? undefined : playback.proposals[step] ?? (model.fitted && step >= startupTrials ? oneParamProposalFromTrace(model.fitted.propose(seed)) : proposeTrial(trials, seed, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset })), [step, playback.proposals, model.fitted, trials, seed, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
   const bestValue = trials.length ? Math.min(...trials.map((trial) => trial.y)).toFixed(3) : "—";
@@ -159,9 +162,10 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
         setDark(next);
         try { localStorage.setItem("tpe-theme", next ? "dark" : "light"); } catch { /* Theme still works without storage. */ }
       }} actionSlot={<div className="lab-header-actions" ref={setAlgorithmContainer} />} />
-      {(labVisited || page === "lab") && <div hidden={page !== "lab"} className="lab-page"><Suspense fallback={<p>Loading explanation…</p>}><StepExplanation visible={page === "lab"} algorithmContainer={page === "lab" ? algorithmContainer : null} /></Suspense></div>}
+      <ErrorBoundary routeKey={`${page}:${route.visit}`} onError={() => setLabVisited(false)}>
+      {(labVisited || page === "lab") && <div hidden={page !== "lab"} className="lab-page"><Suspense fallback={<p>Loading explanation…</p>}><StepExplanation visible={page === "lab"} algorithmContainer={page === "lab" ? algorithmContainer : null} />{page === "lab" && <ChunkLoadComplete />}</Suspense></div>}
       <div hidden={page === "about" || page === "lab"} className="play-page">
-      {page === "play-3d" ? <Suspense fallback={<p>Loading 3D explorer…</p>}><Play3D key={route.visit} sharedSettings={route.share} /></Suspense> : null}
+      {page === "play-3d" ? <Suspense fallback={<p>Loading 3D explorer…</p>}><Play3D key={route.visit} sharedSettings={route.share} /><ChunkLoadComplete /></Suspense> : null}
       <div hidden={page !== "play-2d"} className="visual-workspace play-2d" ref={guide.workspaceRef} onKeyDown={guide.onKeyDown}>
       <section className="canvas-plot" aria-labelledby="plot-heading">
       <div className="canvas-controls">
@@ -250,7 +254,7 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
       </ModelSettingsPanel>
     <details className="performance-monitor">
         <summary><span className="performance-caption">Best f(x) <strong title={bestValue}>{bestValue}</strong></span><span>Performance <span aria-hidden="true">⌄</span></span></summary>
-        <ProgressComparison trials={trials} seed={seed} objectivePreset={objectivePreset} />
+        <ProgressComparison trials={trials} proposals={proposals} randomOnly={startupTrials >= trialLimit} seed={seed} objectivePreset={objectivePreset} />
       </details>
       </div>
       </div>
@@ -328,6 +332,8 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
         </ol>
       </section>
       </article>
+      {(page === "play-2d" || page === "about") && <ChunkLoadComplete />}
+      </ErrorBoundary>
       <footer><span>Browser-only computation</span></footer>
     </main>
   );
