@@ -68,7 +68,7 @@ const rawMinima = Object.fromEntries((Object.keys(rawPresets) as ObjectivePreset
 ])) as Record<ObjectivePreset, { x: number; y: number }>;
 
 // Add a constant only: preserve each landscape and its objective ranking.
-export function objective(x: number): number {
+function objective(x: number): number {
   return rawObjective(x) - rawMinima.multimodal.y + 1;
 }
 

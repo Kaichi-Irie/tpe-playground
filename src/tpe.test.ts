@@ -1,5 +1,8 @@
 import { expect, it } from "vitest";
-import { observationWeights, splitModel, createModelDensity, createAcquisition, createKde, generateTrials, objective, splitTrials, proposeTrial, runSearch } from "./tpe";
+import { getObjective } from "./objectives";
+import { buildView1D, defaults, fitModel1D, proposeTrial, runSearch, splitTrials } from "./tpe";
+
+const { evaluate: objective } = getObjective();
 
 it("switches from startup to sequential TPE with reproducible prefixes", () => {
   const search = runSearch(42);
@@ -16,21 +19,22 @@ it("switches from startup to sequential TPE with reproducible prefixes", () => {
   expect(runSearch(42, 0)).toEqual({ trials: [], proposals: [] });
   for (const count of [-1, 1.5, NaN, Infinity, 10001]) expect(() => runSearch(42, count)).toThrow();
   expect(() => runSearch(NaN)).toThrow();
+  for (const weight of [-1, NaN, Infinity]) expect(() => runSearch(42, 0, weight)).toThrow();
   expect(() => proposeTrial([{ id: 1, x: 6, y: 0 }], 42)).toThrow();
 });
 
 it("selects the highest density ratio from bounded candidates", () => {
   const search = runSearch(42);
   for (let i = 10; i < 50; i++) {
-    const { good, bad } = splitTrials(search.trials.slice(0, i), 0.2);
-    const density = (trials: typeof good) => createKde(trials.map((t) => t.x), { bandwidth: 0.4, weights: trials.map(() => 1) });
-    const l = density(good), g = density(bad);
     const proposal = search.proposals[i];
-    for (const candidate of proposal.candidates) {
+    const grid = proposal.candidates.map(({ x }) => x);
+    const view = buildView1D(search.trials.slice(0, i), grid, 0, defaults);
+    expect(view.acquisition[grid.indexOf(proposal.x)]).toBe(Math.max(...view.acquisition));
+    for (const [index, candidate] of proposal.candidates.entries()) {
       expect(candidate.x).toBeGreaterThanOrEqual(-5);
       expect(candidate.x).toBeLessThanOrEqual(5);
-      expect(candidate.logRatio).toBeCloseTo(Math.log(l(candidate.x)) - Math.log(g(candidate.x)), 9);
-      expect(l(proposal.x) / g(proposal.x)).toBeGreaterThanOrEqual(l(candidate.x) / g(candidate.x) * (1 - 1e-12));
+      expect(candidate.logRatio).toBeCloseTo(Math.log(view.goodDensity[index] / view.badDensity[index]), 9);
+      expect(view.acquisition[index]).toBe(candidate.logRatio);
     }
   }
 });
@@ -46,78 +50,16 @@ it("handles repeated boundary observations and widely separated densities", () =
   }
 });
 
-it("generates reproducible, bounded, noise-free observations", () => {
-  const trials = generateTrials(42);
-  expect(trials).toHaveLength(50);
-  expect(trials).toEqual(generateTrials(42));
-  expect(trials).not.toEqual(generateTrials(43));
-  expect(trials.every((t) => t.x >= -5 && t.x <= 5 && t.y === objective(t.x))).toBe(true);
-});
-it("splits by objective rank without mutating the input", () => {
-  const trials = generateTrials(42), copy = [...trials];
-  const { good, bad, threshold } = splitTrials(trials, 0.2);
-  expect(good).toHaveLength(10); expect(bad).toHaveLength(40);
-  expect(Math.max(...good.map((t) => t.y))).toBeLessThan(threshold);
-  expect(Math.min(...bad.map((t) => t.y))).toBeGreaterThan(threshold);
-  expect(trials).toEqual(copy);
-  expect(splitTrials(trials, 0.001).good).toHaveLength(1);
-  expect(splitTrials(trials, 0.999).bad).toHaveLength(1);
-  expect(() => splitTrials(trials, 0)).toThrow();
-  expect(() => splitTrials([], 0.2)).toThrow();
-  const ties = [{ id: 2, x: 1, y: 0 }, { id: 1, x: 0, y: 0 }];
-  expect(splitTrials(ties, 0.5).good[0].id).toBe(1);
-});
-it("evaluates normalized Gaussian mixtures with explicit weights", () => {
-  const kde = createKde([0], { bandwidth: 1, weights: [1] });
-  expect(kde(0)).toBeCloseTo(1 / Math.sqrt(2 * Math.PI), 12);
-  expect(kde(-1)).toBe(kde(1));
-  const weighted = createKde([0, 2], { bandwidth: 1, weights: [2, 0] });
-  expect(weighted(1)).toBeCloseTo(kde(1), 12);
-  const mixture = createKde([-1, 1], { bandwidth: 0.4, weights: [1, 3] });
-  const integral = Array.from({ length: 2000 }, (_, i) => mixture(-10 + (i + 0.5) * 0.01) * 0.01).reduce((a, b) => a + b, 0);
-  expect(integral).toBeCloseTo(1, 8);
-  expect(() => createKde([0], { bandwidth: 0, weights: [1] })).toThrow();
-  expect(() => createKde([0], { bandwidth: 1, weights: [0] })).toThrow();
-  expect(() => createKde([0], { bandwidth: 1, weights: [-1] })).toThrow();
-  expect(() => createKde([0], { bandwidth: 1, weights: [] })).toThrow();
-});
-
-it("keeps a reproducible history and builds finite densities at every split step", () => {
-  const history = generateTrials(42);
-  for (let step = 2; step <= 50; step++) {
-    const observed = history.slice(0, step);
-    expect(generateTrials(42, step)).toEqual(observed);
-    const { good, bad } = splitTrials(observed, 0.2);
-    expect(good.length + bad.length).toBe(step);
-    expect([...good, ...bad].every((t) => t.id <= step)).toBe(true);
-    for (const group of [good, bad]) {
-      const kde = createKde(group.map((t) => t.x), { bandwidth: 0.4, weights: group.map(() => 1) });
-      for (const x of [-5, 0, 5]) {
-        expect(Number.isFinite(kde(x))).toBe(true);
-        expect(kde(x)).toBeGreaterThanOrEqual(0);
-      }
-    }
-  }
-});
-
-it("normalizes a broad prior with observation-equivalent weight", () => {
-  const samples = [{ id: 1, x: 1, y: 0 }, { id: 2, x: -1, y: 0 }];
-  const density = createModelDensity(samples, 1);
-  const observed = createKde([1, -1], { bandwidth: 0.4, weights: [1, 1] });
-  const broad = createKde([0], { bandwidth: 10, weights: [1] });
-  for (const x of [-5, -1, 0, 1, 5]) {
-    expect(density(x)).toBeCloseTo((2 * observed(x) + broad(x)) / 3, 12);
-    expect(createModelDensity(samples, 0)(x)).toBeCloseTo(observed(x), 12);
-    expect(createModelDensity([], 1)(x)).toBeCloseTo(broad(x), 12);
-  }
-  let integral = 0;
-  for (let x = -100; x < 100; x += 0.01) integral += density(x + 0.005) * 0.01;
-  expect(integral).toBeCloseTo(1, 8);
-  for (const weight of [-1, NaN, Infinity]) {
-    expect(() => createModelDensity(samples, weight)).toThrow();
-    expect(() => runSearch(42, 0, weight)).toThrow();
-  }
-  expect(() => createModelDensity([], 0)).toThrow();
+it("splits the Lab history by rank and breaks ties by observation ID", () => {
+  const history = [{ id: 2, x: 1, y: 0 }, { id: 1, x: 0, y: 0 }, { id: 3, x: -1, y: 2 }];
+  const before = structuredClone(history);
+  const { good, bad } = splitTrials(history, 0.5);
+  expect(good.map(({ id }) => id)).toEqual([1, 2]);
+  expect(bad.map(({ id }) => id)).toEqual([3]);
+  expect(splitTrials(history, 0.001).good).toHaveLength(1);
+  expect(splitTrials(history, 0.999).bad).toHaveLength(1);
+  expect(() => splitTrials(history, 0)).toThrow();
+  expect(history).toEqual(before);
 });
 
 it("uses the prior consistently in densities, acquisition and sequential proposals", () => {
@@ -128,17 +70,15 @@ it("uses the prior consistently in densities, acquisition and sequential proposa
   expect(runSearch(42, 17, 1).trials).toEqual(on.trials.slice(0, 17));
   for (let i = 10; i < 50; i++) {
     const history = on.trials.slice(0, i);
-    const { good, bad } = splitTrials(history, 0.2);
-    const l = createModelDensity(good, 1), g = createModelDensity(bad, 1);
-    const acquisition = createAcquisition(history, 1);
+    const model = fitModel1D(history, 1);
     const proposal = on.proposals[i];
     expect(proposal).toEqual(proposeTrial(history, 42, 1));
     for (const candidate of proposal.candidates) {
       expect(candidate.x).toBeGreaterThanOrEqual(-5);
       expect(candidate.x).toBeLessThanOrEqual(5);
-      expect(candidate.logRatio).toBeCloseTo(Math.log(l(candidate.x) / g(candidate.x)), 10);
-      expect(acquisition(candidate.x)).toBe(candidate.logRatio);
-      expect(acquisition(proposal.x)).toBeGreaterThanOrEqual(candidate.logRatio);
+      const [atCandidate, atSelected] = model.evaluate([{ x: candidate.x }, { x: proposal.x }]);
+      expect(candidate.logRatio).toBe(atCandidate.score);
+      expect(atSelected.score).toBeGreaterThanOrEqual(candidate.logRatio);
     }
   }
 });
@@ -160,63 +100,28 @@ it("applies slider settings consistently to densities and sequential proposals",
       expect(search.trials.slice(10)).not.toEqual(runSearch(42, 15, priorWeight).trials.slice(10));
       for (let i = 10; i < 15; i++) {
         const history = search.trials.slice(0, i);
-        const { good, bad } = splitTrials(history, config.gamma);
-        const l = createModelDensity(good, priorWeight, config.bandwidth);
-        const g = createModelDensity(bad, priorWeight, config.bandwidth);
-        const acquisition = createAcquisition(history, priorWeight, config);
+        const model = fitModel1D(history, priorWeight, config);
         const proposal = search.proposals[i];
-        expect(proposal).toEqual(proposeTrial(history, 42, priorWeight, config));
-        for (const candidate of proposal.candidates) {
-          expect(candidate.x).toBeGreaterThanOrEqual(-5);
-          expect(candidate.x).toBeLessThanOrEqual(5);
-          expect(candidate.logRatio).toBeCloseTo(Math.log(l(candidate.x)) - Math.log(g(candidate.x)), 9);
-          expect(acquisition(proposal.x)).toBeGreaterThanOrEqual(candidate.logRatio);
-        }
+        expect(proposal.trace).toEqual(model.propose(42));
       }
-      const density = createModelDensity(search.trials.slice(0, 2), priorWeight, config.bandwidth);
-      let integral = 0;
-      for (let x = -100; x < 100; x += 0.01) integral += density(x + 0.005) * 0.01;
-      expect(integral).toBeCloseTo(1, 8);
     }
   }
   for (const config of [{ gamma: 0, bandwidth: 0.4 }, { gamma: 1, bandwidth: 0.4 }, { gamma: NaN, bandwidth: 0.4 }, { gamma: 0.2, bandwidth: 0 }, { gamma: 0.2, bandwidth: Infinity }]) {
     expect(() => runSearch(42, 0, 0, config)).toThrow();
-    expect(() => createAcquisition(generateTrials(42), 0, config)).toThrow();
+    expect(() => fitModel1D([{ id: 1, x: -1, y: 0 }, { id: 2, x: 1, y: 1 }], 0, config)).toThrow();
   }
-  expect(() => createModelDensity(generateTrials(42), 0, -1)).toThrow();
 });
-
 
 it("weights improvements in the good group and handles ties without changing bad weights", () => {
   const trials = [0, 2, 4, 6].map((y, index) => ({ id: index + 1, x: index - 2, y }));
-  const model = splitModel(trials, { gamma: 0.5, bandwidth: 0.4, weights: "ei" });
-  expect(model.threshold).toBe(3);
-  expect(model.goodWeights).toEqual([1.5, 0.5]);
-  expect(model.badWeights).toEqual([1, 1]);
-  expect(observationWeights(trials, "recency")).toEqual([0.4, 0.8, 1.2, 1.6]);
-  expect(observationWeights([...trials].reverse(), "recency")).toEqual([1.6, 1.2, 0.8, 0.4]);
-  expect(observationWeights(trials, "ei", 0)).toEqual([1, 1, 1, 1]);
+  const config = { gamma: 0.5, bandwidth: 0.4, weights: "ei" } as const;
+  const view = buildView1D(trials, [0], 0, config);
+  expect(view.threshold).toBe(3);
+  expect(view.goodWeights).toEqual([1.5, 0.5]);
+  expect(view.badWeights).toEqual([1, 1]);
   const tied = trials.map((trial) => ({ ...trial, y: 2 }));
-  expect(splitModel(tied, { gamma: 0.5, bandwidth: 0.4, weights: "ei" }).goodWeights).toEqual([1, 1]);
-  expect(observationWeights(trials, "ei", 2)).toEqual([4, 0, 0, 0]);
-  expect(() => observationWeights(trials, "ei")).toThrow();
-  expect(() => observationWeights(trials, "ei", Infinity)).toThrow();
+  expect(buildView1D(tied, [0], 0, config).goodWeights).toEqual([1, 1]);
   expect(() => runSearch(42, 0, 0, { gamma: 0.2, bandwidth: 0.4, weights: "invalid" as "uniform" })).toThrow();
-});
-
-it("normalizes weighted model densities and rejects invalid weights", () => {
-  const samples = [{ id: 1, x: -1, y: 0 }, { id: 2, x: 1, y: 1 }];
-  const observed = createKde([-1, 1], { bandwidth: 0.4, weights: [1.5, 0.5] });
-  const broad = createKde([0], { bandwidth: 10, weights: [1] });
-  const density = createModelDensity(samples, 1, 0.4, [1.5, 0.5]);
-  for (const x of [-5, -1, 0, 1, 5]) expect(density(x)).toBeCloseTo((2 * observed(x) + broad(x)) / 3, 12);
-  let integral = 0;
-  for (let x = -100; x < 100; x += 0.01) integral += density(x + 0.005) * 0.01;
-  expect(integral).toBeCloseTo(1, 8);
-  for (const weights of [[], [0, 0], [-1, 2], [NaN, 1], [Infinity, 1]]) {
-    expect(() => createModelDensity(samples, 0, 0.4, weights)).toThrow();
-  }
-  expect(createModelDensity(samples, 0, 0.4, [1, 0])(1)).toBeCloseTo(createKde([-1], { bandwidth: 0.4, weights: [1] })(1), 12);
 });
 
 it("uses every weighting strategy consistently through sequential search", () => {
@@ -230,16 +135,8 @@ it("uses every weighting strategy consistently through sequential search", () =>
       if (weights !== "uniform") expect(search.trials.slice(10)).not.toEqual(runSearch(42, 25, priorWeight, { ...config, weights: "uniform" }).trials.slice(10));
       for (let step = 10; step < 25; step++) {
         const history = search.trials.slice(0, step);
-        const model = splitModel(history, config);
-        const l = createModelDensity(model.good, priorWeight, config.bandwidth, model.goodWeights);
-        const g = createModelDensity(model.bad, priorWeight, config.bandwidth, model.badWeights);
-        const proposal = search.proposals[step];
-        for (const candidate of proposal.candidates) {
-          expect(candidate.x).toBeGreaterThanOrEqual(-5);
-          expect(candidate.x).toBeLessThanOrEqual(5);
-          expect(candidate.logRatio).toBeCloseTo(Math.log(l(candidate.x)) - Math.log(g(candidate.x)), 9);
-          expect(createAcquisition(history, priorWeight, config)(proposal.x)).toBeGreaterThanOrEqual(candidate.logRatio);
-        }
+        const model = fitModel1D(history, priorWeight, config);
+        expect(search.proposals[step].trace).toEqual(model.propose(42));
       }
     }
   }
@@ -283,18 +180,5 @@ it("rejects invalid search settings even for an empty search", () => {
     const config = { gamma: 0.2, bandwidth: 0.4, candidates };
     expect(() => runSearch(42, 0, 1, config)).toThrow();
     expect(() => proposeTrial([], 42, 1, config)).toThrow();
-  }
-});
-
-it("normalizes fractional and larger prior weights", () => {
-  const samples = generateTrials(42, 2);
-  const observed = createModelDensity(samples, 0);
-  const broad = createModelDensity([], 1);
-  for (const weight of [0, 0.1, 0.5, 5]) {
-    const density = createModelDensity(samples, weight);
-    for (const x of [-5, 0, 5]) expect(density(x)).toBeCloseTo((2 * observed(x) + weight * broad(x)) / (2 + weight), 12);
-    let integral = 0;
-    for (let x = -100; x < 100; x += 0.01) integral += density(x + 0.005) * 0.01;
-    expect(integral).toBeCloseTo(1, 8);
   }
 });

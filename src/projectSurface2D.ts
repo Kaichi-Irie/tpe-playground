@@ -9,7 +9,7 @@ interface SurfaceTriangle2D {
   inspect: () => void;
   muted?: boolean;
 }
-export interface PreparedSurface2D {
+interface PreparedSurface2D {
   vertices: SurfaceVertex2D[];
   triangles: SurfaceTriangle2D[];
   layer: SurfaceLayer2D;

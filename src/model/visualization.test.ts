@@ -3,12 +3,12 @@ import { logDensity } from "./density";
 import { fitTpe } from "./engine";
 import type { Point } from "./types";
 import { createFieldEvaluator, evaluateFieldGrid2D, type Projection } from "./visualization";
-import { config2D, generateTrials2D, observations2D, problem2D } from "../tpe2d";
+import { config2D, emptyPlayback2D, movePlayback2D, observations2D, problem2D } from "../tpe2d";
 
 describe("shared visualization evaluation", () => {
   it("matches point evaluation on Cartesian grids, including narrow peaks, tails and reversed axes", () => {
     for (const mode of ["multivariate", "univariate"] as const) for (const bandwidthRule of ["constant", "scott", "silverman"] as const) for (const priorWeight of [0, 0.5]) {
-      const model = fitTpe(problem2D, observations2D(generateTrials2D(42, 40)), config2D(mode, { bandwidth: 0.01, bandwidthRule, priorWeight, weights: "ei" }));
+      const model = fitTpe(problem2D, observations2D(movePlayback2D(emptyPlayback2D(), 40, 42, mode, { startupTrials: 40 }).trials), config2D(mode, { bandwidth: 0.01, bandwidthRule, priorWeight, weights: "ei" }));
       const evaluate = createFieldEvaluator(model, { axes: ["x1", "x2"], projection: { kind: "full" } });
       for (const [xId, yId] of [["x1", "x2"], ["x2", "x1"]]) {
         const xs = [-1000, -5, -0.91, 0, 5, 1000], ys = [-5, -0.12, 0, 5];
@@ -22,7 +22,7 @@ describe("shared visualization evaluation", () => {
   });
   for (const mode of ["multivariate", "univariate"] as const) {
     it(`preserves full, slice and marginal fields for ${mode} models`, () => {
-      const model = fitTpe(problem2D, observations2D(generateTrials2D(42, 20)), config2D(mode, { priorWeight: 0.5, bandwidthRule: "scott" }));
+      const model = fitTpe(problem2D, observations2D(movePlayback2D(emptyPlayback2D(), 20, 42, mode, { startupTrials: 20 }).trials), config2D(mode, { priorWeight: 0.5, bandwidthRule: "scott" }));
       const requests: { axes: string[]; projection: Projection }[] = [
         { axes: ["x1", "x2"], projection: { kind: "full" } },
         { axes: ["x1"], projection: { kind: "slice", fixed: { x2: 0 } } },

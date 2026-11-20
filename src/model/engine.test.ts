@@ -3,8 +3,9 @@ import legacy from "./fixtures/legacy-trajectories.json";
 import { createDensity, logDensity } from "./density";
 import { fitTpe, proposeTpe, restoreModel, validateInput } from "./engine";
 import { evaluateField } from "./visualization";
-import { buildView1D, config1D, defaults, observations1D, problem1D, runSearch } from "../tpe";
-import { buildDemo2D, config2D, emptyPlayback2D, movePlayback2D, observations2D, problem2D, proposeTrial2D } from "../tpe2d";
+import { emptyPlayback, movePlayback } from "../playback";
+import { buildView1D, defaults, proposeTrial } from "../tpe";
+import { buildDemo2D, config2D, emptyPlayback2D, movePlayback2D, problem2D, proposeTrial2D } from "../tpe2d";
 import type { Observation } from "./types";
 
 const trials: Observation[] = [[-2, -2], [2, 2], [-3, 3], [3, -3]].map(([x1, x2], i) => ({ id: i + 1, params: { x1, x2 }, objectives: [i], constraints: [] }));
@@ -12,8 +13,10 @@ const config = { ...config2D(), gamma: 0.5, bandwidth: 0.5, startupTrials: 2 };
 
 describe("shared TPE model", () => {
   it("preserves pre-refactor seeded 1D and joint 2D trajectories", () => {
-    const one = runSearch(42, 30, 1).trials;
-    const two = movePlayback2D(emptyPlayback2D(), 30, 42, "multivariate", { priorWeight: 0 }).trials;
+    const one = movePlayback(emptyPlayback(), legacy.one.length, 42, 1, defaults).trials;
+    const two = movePlayback2D(emptyPlayback2D(), legacy.two.length, 42, "multivariate", { priorWeight: 0 }).trials;
+    expect(one).toHaveLength(30);
+    expect(two).toHaveLength(30);
     one.forEach((t, i) => { expect(t.x).toBeCloseTo(legacy.one[i].x, 12); expect(t.y).toBeCloseTo(legacy.one[i].y, 12); });
     two.forEach((t, i) => { expect(t.x1).toBeCloseTo(legacy.two[i].x1, 12); expect(t.x2).toBeCloseTo(legacy.two[i].x2, 12); });
   });
@@ -83,10 +86,11 @@ describe("shared TPE model", () => {
 
 describe("visualization contract", () => {
   it("shares scores and membership with the proposal model in both pages", () => {
-    const past = runSearch(42, 10, 1).trials;
+    const past = movePlayback(emptyPlayback(), 10, 42, 1, defaults).trials;
     const view = buildView1D(past, [0, 1], 1, defaults);
-    const core = fitTpe(problem1D, observations1D(past), config1D(defaults, 1));
-    expect(view.acquisition).toEqual(core.evaluate([{ x: 0 }, { x: 1 }]).map((v) => v.score));
+    const proposal1D = proposeTrial(past, 42, 1, defaults);
+    expect(view.fitted!.propose(42)).toEqual(proposal1D.trace);
+    expect(view.acquisition).toEqual(view.fitted!.evaluate([{ x: 0 }, { x: 1 }]).map((v) => v.score));
     for (const mode of ["univariate", "multivariate"] as const) {
       const state = movePlayback2D(emptyPlayback2D(), 12, 42, mode);
       const view2D = buildDemo2D(state.trials, mode);

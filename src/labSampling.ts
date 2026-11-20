@@ -1,4 +1,4 @@
-export type SamplingAction =
+type SamplingAction =
   | { type: "roll" | "rollRest"; limit: number }
   | { type: "resize"; limit: number; reveal: boolean }
   | { type: "reset"; revealed?: number };

@@ -77,7 +77,7 @@ Scott uses `s n^(-1/5)`. Silverman uses the robust rule `0.9 min(s, IQR/1.34) n^
 
 Changing settings or resetting defaults preserves evaluated observations and affects future proposals; densities, acquisition, and candidate sampling use the selected settings.
 
-Searches run for 200 evaluations. In Play 2D, Resample cycles through ten seeds per objective. Changing objectives uses the same position in the new objective’s seed list.
+Searches run for 200 evaluations.
 
 Each Play 2D objective is shifted by a constant so its minimum is 1. The comparison selector shows either the relative best-so-far error or average regret (cumulative objective gaps divided by evaluation count), on a logarithmic axis.
 

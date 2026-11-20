@@ -1,4 +1,3 @@
-import { createDensity, createLogDensity } from "./model/density";
 import { fitTpe, needsFeasibleGood, proposeTpe } from "./model/engine";
 import { totalViolation } from "./model/partition";
 import { constrainedOptima2D, getConstraint2D, type ConstraintPreset2D } from "./constraints2D";
@@ -10,7 +9,7 @@ export type { DensityMode } from "./model/types";
 export interface Trial2D { id: number; x1: number; x2: number; value: number; constraints: number[]; violation: number }
 export const settings2D = { bandwidth: 0.65, gamma: 0.25, count: 200, seed: 0, startupTrials: 10, candidates: 24 };
 
-export function objective2D(x1: number, x2: number): number {
+function objective2D(x1: number, x2: number): number {
   return 0.12 * (x1 - 0.7) ** 2 + 0.18 * (x2 + 0.5) ** 2 + Math.sin(1.4 * x1) * Math.cos(1.1 * x2) + 1.2;
 }
 
@@ -57,16 +56,6 @@ export function findObjectiveMinimum2D(preset: ObjectivePreset2D, constraintPres
   return findObjectiveOptimum2D(preset, constraintPreset).value;
 }
 
-export function generateTrials2D(seed = settings2D.seed, count = settings2D.count): Trial2D[] {
-  if (!Number.isInteger(seed) || !Number.isInteger(count) || count < 2 || count > 10000) throw new Error("Invalid seed or observation count.");
-  let state = seed >>> 0;
-  const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return (state + 0.5) / 2 ** 32; };
-  return Array.from({ length: count }, (_, i) => {
-    const x1 = random() * 10 - 5, x2 = random() * 10 - 5;
-    return { id: i + 1, x1, x2, value: objective2D(x1, x2), constraints: [], violation: 0 };
-  });
-}
-
 export const problem2D: Problem = { id: "2d", parameters: [{ id: "x1", low: -5, high: 5 }, { id: "x2", low: -5, high: 5 }], directions: ["minimize"], constraintCount: 0 };
 function problemForConstraint2D(preset: ConstraintPreset2D = "none"): Problem {
   return preset === "none" ? problem2D : { ...problem2D, id: `2d-${preset}`, constraintCount: getConstraint2D(preset).constraints.length };
@@ -82,13 +71,7 @@ export const config2D = (mode: DensityMode = "multivariate", settings: SearchSet
   return constraintPreset && constraintPreset !== "none" ? { ...config, infeasibleFilling: infeasibleFilling ?? true } : config;
 };
 
-export function createJointKDE(samples: readonly Trial2D[], bandwidth: number) {
-  const density = createDensity(problem2D.parameters, observations2D(samples), bandwidth, samples.map(() => 1));
-  const evaluate = createLogDensity(density);
-  return { logDensity: (x1: number, x2: number) => evaluate({ x1, x2 }), density: (x1: number, x2: number) => Math.exp(evaluate({ x1, x2 })) };
-}
-
-export function buildDemo2D(trials: readonly Trial2D[] = generateTrials2D(), mode: DensityMode = "multivariate", settings: SearchSettings2D = {}) {
+export function buildDemo2D(trials: readonly Trial2D[], mode: DensityMode = "multivariate", settings: SearchSettings2D = {}) {
   const objective = getObjective2D(settings.objectivePreset);
   const problem = problemForConstraint2D(settings.constraintPreset);
   const observations = observations2D(trials);
@@ -129,8 +112,8 @@ export function buildDemo2D(trials: readonly Trial2D[] = generateTrials2D(), mod
 }
 
 
-export interface Candidate2D { x1: number; x2: number; logRatio: number }
-export interface Proposal2D { method: "random" | "tpe"; x1: number; x2: number; candidates: Candidate2D[]; trace: ProposalTrace }
+interface Candidate2D { x1: number; x2: number; logRatio: number }
+interface Proposal2D { method: "random" | "tpe"; x1: number; x2: number; candidates: Candidate2D[]; trace: ProposalTrace }
 export interface Playback2D { trials: Trial2D[]; proposals: Proposal2D[] }
 export const emptyPlayback2D = (): Playback2D => ({ trials: [], proposals: [] });
 
