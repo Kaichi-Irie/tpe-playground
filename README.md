@@ -4,16 +4,14 @@
 
 <img src="src/assets/fuwatane.webp" width="150" align="right" alt="tippy, the TPE Playground mascot holding red and blue crayons">
 
-An interactive playground for understanding the Tree-structured Parzen Estimator (TPE).
-Runs entirely in your browser.
+An interactive playground for understanding the Tree-structured Parzen Estimator (TPE), the default sampler in [Optuna](https://optuna.org/).
+Watch TPE split past trials into good and bad groups, model each group with a density, and choose the next point where good is most likely relative to bad.
+The implementation is simplified for learning and runs entirely in your browser.
 
-- **Lab**: follow one TPE decision step by step: split, kernels, densities, candidates, and the choice.
-- **Play 2D**: run TPE on a one-dimensional objective and compare it with random search.
-- **Play 3D**: run TPE on a two-dimensional surface, compare multivariate and univariate density models, and add constraints.
-
-TPE Playground is a simplified, single-objective implementation for learning. Constraints follow Optuna's joint approach: feasible trials rank first, and infeasible trials with the smallest violation can fill the rest of the good group, so one density pair models objective and feasibility together ([Watanabe & Irie, 2026](https://arxiv.org/abs/2606.09889)).
-
-In Play 2D or Play 3D, use **Settings → Share link** to copy the objective, seed, and model and search settings. When a Play 3D constraint is active, the link also includes its preset and the **Infeasible filling** setting. The link stays in the address bar, and reloading starts a fresh run at trial 0 with the linked settings and seed. Edits stay in the current run. To share those edits, use **Share link** again to copy a new URL.
+- **Lab**: follow one TPE decision step by step, from the split to the chosen point.
+- **Play 2D**: run TPE on a one-dimensional function and compare it with random search.
+- **Play 3D**: run TPE on a two-dimensional surface, with multivariate or univariate densities and optional constraints.
+- **Share link**: copy a URL that reproduces your objective, seed, and settings.
 
 ## Future work
 
