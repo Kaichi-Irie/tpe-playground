@@ -1,3 +1,4 @@
+import { constraintPresets2D, type ConstraintPreset2D } from "./constraints2D";
 import type { DensityMode } from "./model/types";
 import {
   bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrialCounts, weightOptions, type ModelSettings,
@@ -6,7 +7,9 @@ import {
 export const playPageHrefs = { "1d": import.meta.env.BASE_URL, "2d": "#play-3d" } as const;
 const playShareHashes = { "1d": "#play-2d", "2d": playPageHrefs["2d"] } as const;
 export type Page = keyof typeof playPageHrefs | "lab" | "about";
-export type ShareExperiment = { page: "1d"; preset: string } | { page: "2d"; preset: string; mode: DensityMode };
+export type ShareExperiment =
+  | { page: "1d"; preset: string }
+  | { page: "2d"; preset: string; mode: DensityMode; constraint: ConstraintPreset2D };
 
 export type SharedSearch<Preset extends string> = {
   seed: number;
@@ -53,9 +56,27 @@ export function createShareUrl(documentUrl: string, experiment: ShareExperiment,
     candidates: String(settings.candidates),
   } satisfies Record<keyof SharedSearch<string>["settings"], string>;
   const params = new URLSearchParams({ v: "2", seed: String(seed), preset: experiment.preset, ...model });
-  if (experiment.page === "2d") params.set("mode", experiment.mode);
+  if (experiment.page === "2d") {
+    params.set("mode", experiment.mode);
+    if (experiment.constraint !== "none") {
+      params.set("constraint", experiment.constraint);
+      params.set("infeasibleFilling", String(settings.infeasibleFilling ?? true));
+    }
+  }
   url.hash = `${playShareHashes[experiment.page]}?${params}`;
   return url.href;
+}
+
+export function readSharedConstraint(params: URLSearchParams | null): {
+  constraint: ConstraintPreset2D;
+  infeasibleFilling: boolean | undefined;
+} {
+  const value = params?.get("constraint");
+  const constraint = value && Object.hasOwn(constraintPresets2D, value) ? value as ConstraintPreset2D : "none";
+  return {
+    constraint,
+    infeasibleFilling: constraint === "none" ? undefined : params?.get("infeasibleFilling") !== "false",
+  };
 }
 
 function decimal(value: string | null): number {

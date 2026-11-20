@@ -10,7 +10,7 @@ Runs entirely in your browser.
 
 Currently a simplified, single-objective, unconstrained TPE implementation for learning.
 
-In Play 2D or Play 3D, use **Settings → Share link** to copy the objective, seed, and model and search settings. The link stays in the address bar, and reloading starts a fresh run at trial 0 with the linked settings and seed. Edits stay in the current run. To share those edits, use **Share link** again to copy a new URL.
+In Play 2D or Play 3D, use **Settings → Share link** to copy the objective, seed, and model and search settings. When a Play 3D constraint is active, the link also includes its preset and the **Infeasible filling** setting. The link stays in the address bar, and reloading starts a fresh run at trial 0 with the linked settings and seed. Edits stay in the current run. To share those edits, use **Share link** again to copy a new URL.
 
 ## Planned
 

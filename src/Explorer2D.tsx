@@ -13,7 +13,7 @@ import { playGuides } from "./playGuides";
 import { usePlayGuide } from "./usePlayGuide";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { Help } from "./Help";
-import { readSharedSearch, type SharedSearch } from "./shareSearch";
+import { readSharedConstraint, readSharedSearch, type SharedSearch } from "./shareSearch";
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { buildDemo2D, defaultModelSettings2D, getObjective2D, objectivePresets2D, emptyPlayback2D, movePlayback2D, proposeTrial2D, proposal2DFromTrace, settings2D, type DensityMode, type ObjectivePreset2D, type ModelSettings2D } from "./tpe2d";
 
@@ -37,7 +37,16 @@ const defaultSearch: SharedSearch<ObjectivePreset2D> = {
 };
 
 export default function Explorer2D({ sharedSettings = null }: { sharedSettings?: URLSearchParams | null } = {}) {
-  const [initialSearch] = useState(() => readSharedSearch(sharedSettings, defaultSearch, objectivePresets2D, settings2D.count, domainWidth));
+  const [initialSearch] = useState(() => {
+    const search = readSharedSearch(sharedSettings, defaultSearch, objectivePresets2D, settings2D.count, domainWidth);
+    const { constraint, infeasibleFilling } = readSharedConstraint(sharedSettings);
+    const settings: ModelSettings2D = constraint === "none" ? search.settings : {
+      ...search.settings,
+      infeasibleFilling,
+      weights: search.settings.weights === "ei" ? "uniform" : search.settings.weights,
+    };
+    return { ...search, constraint, settings };
+  });
   const { ref: sceneRef, width: sceneWidth, height: sceneHeight, typeScale } = usePlotSize();
   const compact = sceneWidth < 640;
   const [playback, setPlayback] = useState(emptyPlayback2D);
@@ -52,7 +61,7 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
   const [mode, setMode] = useState<DensityMode>(() => sharedSettings?.get("mode") === "univariate" ? "univariate" : "multivariate");
   const [settings, setSettings] = useState<ModelSettings2D>(initialSearch.settings);
   const [objectivePreset, setObjectivePreset] = useState(initialSearch.preset);
-  const [constraintPreset, setConstraintPreset] = useState<ConstraintPreset2D>("none");
+  const [constraintPreset, setConstraintPreset] = useState(initialSearch.constraint);
   const [constraintHint, setConstraintHint] = useState(false);
   const [constraintHintSeen, setConstraintHintSeen] = useState(() => {
     try { return globalThis.sessionStorage?.getItem(constraintHintKey) === "1"; } catch { return false; }
@@ -373,7 +382,7 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     {guide.active && <LabHintBubble textId={guide.textId} message={playGuides[guide.active].action} phase="action" placement="bottom" onDismiss={guide.dismiss} />}
     </div>
 
-    <ModelSettingsPanel experiment={{ page: "2d", preset: objectivePreset, mode }} className="settings-2d" idSuffix="-2d" labelPrefix="2D " defaultSettings={constrained ? constrainedModelDefaults : defaultModelSettings2D} trialLimit={settings2D.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} disableEi={constrained} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); restart(); }}
+    <ModelSettingsPanel experiment={{ page: "2d", preset: objectivePreset, mode, constraint: constraintPreset }} className="settings-2d" idSuffix="-2d" labelPrefix="2D " defaultSettings={constrained ? constrainedModelDefaults : defaultModelSettings2D} trialLimit={settings2D.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} disableEi={constrained} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); restart(); }}
       status={<div className="proposal">
         <span>{!proposal ? "Search complete" : noFeasibleGood ? `Uniform random · trial ${step + 1}` : proposal.method === "random" ? `Random start · ${step + 1} / ${settings.startupTrials}` : `TPE · trial ${step + 1}`}</span>
         <Help label="2D trial playback">
