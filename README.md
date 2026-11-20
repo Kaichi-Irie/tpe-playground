@@ -11,7 +11,7 @@ The implementation is simplified for learning and runs entirely in your browser.
 - **Lab**: follow one TPE decision step by step, from the split to the chosen point.
 - **Play 2D**: run TPE on a one-dimensional function and compare it with random search.
 - **Play 3D**: run TPE on a two-dimensional surface, with multivariate or univariate densities and optional constraints.
-- **Share link**: copy a URL that reproduces your objective, seed, and settings.
+- **Share link**: copy a URL that reproduces your objective, seed, and settings. Links made with v1.0.0 or later keep working in future versions.
 
 ## Future work
 
