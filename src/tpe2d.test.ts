@@ -1,44 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { buildDemo2D, createJointKDE, generateTrials2D, emptyPlayback2D, movePlayback2D, proposeTrial2D, settings2D, objective2D, getObjective2D, objectivePresets2D } from "./tpe2d";
+import { buildDemo2D, emptyPlayback2D, movePlayback2D, proposeTrial2D, settings2D, getObjective2D, objectivePresets2D } from "./tpe2d";
 
 const sample = (x1: number, x2: number) => ({ id: 1, x1, x2, value: 0, constraints: [], violation: 0 });
 
-describe("joint 2D KDE", () => {
-  it("normalizes on the plane, including kernels centered at the viewing boundary", () => {
-    const kde = createJointKDE([sample(-5, 5), sample(0, 0)], 0.65);
-    let integral = 0;
-    const step = 0.1;
-    for (let x = -9 + step / 2; x < 9; x += step) for (let y = -9 + step / 2; y < 9; y += step) integral += kde.density(x, y) * step * step;
-    expect(integral).toBeCloseTo(1, 6);
-    expect(kde.density(-5, 5)).toBeGreaterThan(0);
-  });
-  it("preserves paired observations instead of creating marginal cross peaks", () => {
-    const kde = createJointKDE([sample(-2, -2), sample(2, 2)], 0.5);
-    expect(kde.density(-2, -2)).toBeGreaterThan(kde.density(-2, 2) * 1000);
-    expect(kde.density(0, 0)).toBeCloseTo(Math.exp(kde.logDensity(0, 0)), 12);
-    expect(Number.isFinite(kde.logDensity(100, 100))).toBe(true);
-  });
-  it("rejects invalid inputs", () => {
-    expect(() => createJointKDE([], 1)).toThrow();
-    for (const h of [0, -1, Infinity, NaN]) expect(() => createJointKDE([sample(0, 0)], h)).toThrow();
-    expect(() => createJointKDE([sample(NaN, 0)], 1)).toThrow();
-    expect(() => createJointKDE([sample(0, 0)], 1).density(Infinity, 0)).toThrow();
-    expect(() => generateTrials2D(1, 1)).toThrow();
-  });
-  it("reproduces trials and supplies finite surfaces with shared density scales", () => {
-    expect(generateTrials2D()).toEqual(generateTrials2D());
-    expect(generateTrials2D(43)).not.toEqual(generateTrials2D());
-    const model = buildDemo2D();
-    expect(model.goodIds.size).toBe(50);
-    expect(model.scales.good).toEqual(model.scales.bad);
-    for (const row of model.grid) for (const p of row) {
-      expect(Object.values(p).every(Number.isFinite)).toBe(true);
-      expect(p.acquisition).toBeCloseTo(Math.log(p.good / p.bad), 10);
-    }
-  });
-});
+const { evaluate: objective2D } = getObjective2D();
 
 describe("2D sequential search", () => {
+  it("supplies finite surfaces with shared density scales", () => {
+    const trials = movePlayback2D(emptyPlayback2D(), 200).trials;
+    const model = buildDemo2D(trials);
+    expect(model.goodIds.size).toBe(50);
+    expect(model.scales.good).toEqual(model.scales.bad);
+    for (const row of model.grid) for (const point of row) {
+      expect(Object.values(point).every(Number.isFinite)).toBe(true);
+      expect(point.acquisition).toBeCloseTo(Math.log(point.good / point.bad), 10);
+    }
+  });
+
   it("starts empty and keeps early surfaces finite until a split is possible", () => {
     for (const trials of [[], [sample(0, 0)]]) {
       const model = buildDemo2D(trials);
@@ -137,7 +115,6 @@ describe("2D objective presets", () => {
     }
     expect(getObjective2D("quadratic").evaluate(1.5, -1)).toBe(0);
     expect(getObjective2D("rosenbrock").evaluate(1, 1)).toBe(0);
-    expect(getObjective2D().evaluate(1, 2)).toBe(objective2D(1, 2));
   });
 });
 

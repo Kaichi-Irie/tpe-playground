@@ -24,7 +24,7 @@ export function relativeBestSoFar(trials: readonly Trial[], minimum: number): nu
   return bestSoFar(trials).map((value) => Math.max(0, value - minimum) / minimum);
 }
 
-export function cumulativeRegret(trials: readonly Trial[], minimum: number): number[] {
+function cumulativeRegret(trials: readonly Trial[], minimum: number): number[] {
   if (!Number.isFinite(minimum)) throw new Error("Need a finite minimum.");
   let total = 0;
   return trials.map((trial) => {
@@ -53,11 +53,6 @@ export function comparisonAxis(upperValue: number, floor = comparisonFloor) {
   for (let exponent = lowerExponent; exponent < upperExponent; exponent += stride) ticks.push(10 ** exponent);
   ticks.push(10 ** upperExponent);
   return { normalize, ticks };
-}
-
-export function formatComparisonValue(value: number): string {
-  if (value === 0) return "0";
-  return Math.abs(value) < 0.001 ? value.toExponential(3) : value.toPrecision(6);
 }
 
 // Keep early history readable without rescaling the horizontal axis every trial.

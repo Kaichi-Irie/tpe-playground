@@ -1,6 +1,6 @@
 export type LabHintId = "gamma" | "bandwidth" | "prior" | "weights" | "candidates";
 
-export interface LabHint {
+interface LabHint {
   label: string;
   /** First phase: what to touch and what visibly changes. */
   action: string;
@@ -38,7 +38,7 @@ export const labHints: Record<LabHintId, LabHint> = {
 
 export const labHintIds = Object.keys(labHints) as LabHintId[];
 
-export interface HintContext {
+interface HintContext {
   stage: number;
   /** A guided task (tapping kernels) still needs the learner's attention. */
   taskPending: boolean;

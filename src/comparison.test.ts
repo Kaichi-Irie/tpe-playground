@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { bestSoFar, comparisonTrialAxis, comparisonAxis, comparisonFloor, relativeBestSoFar, cumulativeRegret, averageRegret, formatComparisonValue } from "./comparison";
+import { bestSoFar, comparisonTrialAxis, comparisonAxis, comparisonFloor, relativeBestSoFar, averageRegret } from "./comparison";
 import { emptyPlayback, keepObservations, movePlayback } from "./playback";
 import { objectivePresets, type ObjectivePreset } from "./objectives";
 import { defaults, runSearch } from "./tpe";
@@ -41,25 +41,21 @@ it("compares only the displayed history after stepping back and branching with e
 });
 
 
-it("computes the relative best-so-far and cumulative regret from observed trials", () => {
+it("computes the relative best-so-far and average regret from observed trials", () => {
   const trials = [6, 8, 3, 2].map((y, index) => ({ id: index + 1, x: 0, y }));
   expect(relativeBestSoFar(trials, 2)).toEqual([2, 2, 0.5, 0]);
-  expect(cumulativeRegret(trials, 2)).toEqual([4, 10, 11, 11]);
   expect(() => relativeBestSoFar(trials, 0)).toThrow();
   expect(averageRegret(trials, 2)).toEqual([4, 5, 11 / 3, 11 / 4]);
-  expect(cumulativeRegret(trials, 0)).toEqual([6, 14, 17, 19]);
+  expect(averageRegret(trials, 0)).toEqual([6, 7, 17 / 3, 19 / 4]);
   expect(relativeBestSoFar([], 1)).toEqual([]);
-  expect(cumulativeRegret([], 0)).toEqual([]);
   expect(averageRegret([], 1)).toEqual([]);
   expect(averageRegret(trials.slice(0, 2), 2)).toEqual([4, 5]);
   expect(relativeBestSoFar(trials.slice(0, 2), 2)).toEqual([2, 2]);
-  expect(cumulativeRegret(trials.slice(0, 2), 2)).toEqual([4, 10]);
-  expect(formatComparisonValue(1e-9)).toBe("1.000e-9");
   for (const minimum of [NaN, Infinity]) {
     expect(() => relativeBestSoFar(trials, minimum)).toThrow();
-    expect(() => cumulativeRegret(trials, minimum)).toThrow();
+    expect(() => averageRegret(trials, minimum)).toThrow();
   }
-  expect(() => cumulativeRegret([{ id: 1, x: 0, y: NaN }], 0)).toThrow();
+  expect(() => averageRegret([{ id: 1, x: 0, y: NaN }], 0)).toThrow();
   expect(relativeBestSoFar([{ id: 1, x: 0, y: 2 - 1e-16 }], 2)).toEqual([0]);
 });
 

@@ -1,5 +1,5 @@
 export type PlayGuideId = "playback" | "gamma" | "bandwidth" | "rotate" | "acquisition";
-export type PlayGuidePage = "1d" | "2d";
+type PlayGuidePage = "1d" | "2d";
 
 export const playGuides: Record<PlayGuideId, { label: string; action: string }> = {
   playback: {

@@ -1,15 +1,14 @@
 import { expect, it } from "vitest";
 import { emptyPlayback, keepObservations, movePlayback } from "./playback";
-import { createModelDensity, defaults, proposeTrial, runSearch, splitTrials } from "./tpe";
+import { buildView1D, defaults, proposeTrial, runSearch } from "./tpe";
 
 it("preserves evaluated points while bandwidth changes densities and future proposals", () => {
   const before = movePlayback(emptyPlayback(), 15, 42, 1, defaults);
   const snapshot = structuredClone(before);
   const edited = keepObservations(before);
   const config = { ...defaults, bandwidth: 0.1 };
-  const good = splitTrials(edited.trials, config.gamma).good;
-  const x = good[0].x;
-  expect(createModelDensity(good, 1, config.bandwidth)(x)).not.toBe(createModelDensity(good, 1, defaults.bandwidth)(x));
+  const grid = [-5, 0, 5];
+  expect(buildView1D(edited.trials, grid, 1, config).goodDensity).not.toEqual(buildView1D(edited.trials, grid, 1, defaults).goodDensity);
   const next = movePlayback(edited, 16, 42, 1, config);
   expect(next.trials.slice(0, 15)).toEqual(snapshot.trials);
   expect(next.proposals[15]).toEqual(proposeTrial(snapshot.trials, 42, 1, config));

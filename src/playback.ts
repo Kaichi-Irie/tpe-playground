@@ -2,7 +2,7 @@ import { advanceHistory } from "./model/history";
 import { getObjective } from "./objectives";
 import { trialLimit, proposeTrial, type SearchConfig, type Proposal, type Trial } from "./tpe";
 
-export interface Playback {
+interface Playback {
   step: number;
   trials: Trial[];
   proposals: Proposal[];

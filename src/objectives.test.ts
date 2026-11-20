@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
-import { findObjectiveMinimum, getObjective, objective, objectivePresets, type ObjectivePreset } from "./objectives";
-import { defaults, proposeTrial, runSearch, splitModel } from "./tpe";
+import { findObjectiveMinimum, getObjective, objectivePresets, type ObjectivePreset } from "./objectives";
+import { defaults, fitModel1D, proposeTrial, runSearch } from "./tpe";
 import { emptyPlayback, movePlayback } from "./playback";
 
 const presets = Object.keys(objectivePresets) as ObjectivePreset[];
@@ -21,7 +21,6 @@ it("keeps every objective finite and within the shared plot axes, including boun
       expect(y).toBeLessThanOrEqual(8);
     }
   }
-  expect(getObjective().evaluate).toBe(objective);
   expect(getObjective("quadratic").evaluate(1.5)).toBe(1);
   expect(getObjective("boundary").evaluate(-5)).toBe(1);
   const narrow = getObjective("narrow").evaluate;
@@ -83,7 +82,8 @@ it("adds only constants and preserves rankings and TPE proposals for every weigh
     const after = before.map((trial) => ({ ...trial, y: evaluate(trial.x) }));
     for (const weights of ["uniform", "recency", "ei"] as const) {
       const config = { ...defaults, weights, objectivePreset };
-      expect(splitModel(after, config).good.map((trial) => trial.id)).toEqual(splitModel(before, config).good.map((trial) => trial.id));
+      expect(fitModel1D(after, 1, config).snapshot.partition.good.map((member) => member.trialId))
+        .toEqual(fitModel1D(before, 1, config).snapshot.partition.good.map((member) => member.trialId));
       const oldProposal = proposeTrial(before, 50, 1, config);
       const shiftedProposal = proposeTrial(after, 50, 1, config);
       expect(shiftedProposal.x).toBeCloseTo(oldProposal.x, 11);

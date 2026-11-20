@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 /** Design size of --chart-base: chart text and label geometry are authored at 1×. */
-export const chartBaseDesignPx = 14.4;
+const chartBaseDesignPx = 14.4;
 
 // The chart's type factor comes from the CSS token, so text and the geometry
 // around it (pills, label offsets) grow together.

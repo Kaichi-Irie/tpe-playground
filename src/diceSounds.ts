@@ -1,7 +1,6 @@
 // Instrument-inspired synthesis, not a recording: a low claves tap played as
 // C4 → E4 (a just major third, in the Lab's C major), 75 ms between attacks.
 const dice = { frequency: 261.63, notes: [1, 1.25], spacing: 0.075, ratios: [1, 2.4, 4.6], levels: [1, 0.25, 0.08], decay: 0.027, attack: 0.0015 } as const;
-export const diceNotes = dice.notes.map((ratio) => dice.frequency * ratio);
 
 export function renderDice(sampleRate: number): Float32Array {
   const preset = dice;

@@ -1,9 +1,20 @@
 import { fitTpe } from "../src/model/engine";
 import { createFieldEvaluator, evaluateFieldGrid2D } from "../src/model/visualization";
-import { config2D, generateTrials2D, observations2D, problem2D } from "../src/tpe2d";
+import { config2D, getObjective2D, observations2D, problem2D, type Trial2D } from "../src/tpe2d";
 
 // This Node-only entry needs just runtime metadata, not the full Node API types.
 declare const process: { version: string; platform: string; arch: string };
+
+// Keep the seeded observation set used by the recorded benchmark.
+function generateTrials2D(seed: number, count: number): Trial2D[] {
+  const { evaluate } = getObjective2D();
+  let state = seed >>> 0;
+  const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return (state + 0.5) / 2 ** 32; };
+  return Array.from({ length: count }, (_, i) => {
+    const x1 = random() * 10 - 5, x2 = random() * 10 - 5;
+    return { id: i + 1, x1, x2, value: evaluate(x1, x2), constraints: [], violation: 0 };
+  });
+}
 
 const axis = Array.from({ length: 31 }, (_, i) => -5 + i / 3);
 const trials = generateTrials2D(42, 200);

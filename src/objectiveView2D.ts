@@ -56,7 +56,7 @@ export function createObjectiveView2D(preset: ObjectivePreset2D, constraintPrese
 
 // Exact level curves: x₂ = x₁² ± sqrt((1000 f − (1 − x₁)²) / 100).
 // Sampling these branches avoids losing tiny closed contours to a coarse grid.
-export function rosenbrockContours(levels: readonly number[]): ContourSegment[] {
+function rosenbrockContours(levels: readonly number[]): ContourSegment[] {
   const segments: ContourSegment[] = [];
   for (const level of levels) {
     if (!Number.isFinite(level) || level <= 0) continue;
