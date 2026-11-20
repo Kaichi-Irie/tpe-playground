@@ -111,9 +111,6 @@ const storageKey = "tpe-lab-hints-seen";
 
 export function loadSeenHints(): Set<LabHintId> {
   try {
-    localStorage.removeItem(storageKey);
-  } catch { /* The legacy key is independent of the current tab's storage. */ }
-  try {
     const parsed: unknown = JSON.parse(sessionStorage.getItem(storageKey) ?? "[]");
     return new Set(Array.isArray(parsed) ? parsed.filter((id): id is LabHintId => typeof id === "string" && id in labHints) : []);
   } catch {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildDemo2D, createJointKDE, generateTrials2D, emptyPlayback2D, movePlayback2D, proposeTrial2D, settings2D, objective2D, getObjective2D, objectivePresets2D } from "./tpe2d";
 
 const sample = (x1: number, x2: number) => ({ id: 1, x1, x2, value: 0, constraints: [], violation: 0 });
+
 describe("joint 2D KDE", () => {
   it("normalizes on the plane, including kernels centered at the viewing boundary", () => {
     const kde = createJointKDE([sample(-5, 5), sample(0, 0)], 0.65);

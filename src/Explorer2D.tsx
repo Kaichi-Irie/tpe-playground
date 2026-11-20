@@ -13,7 +13,8 @@ import { playGuides } from "./playGuides";
 import { usePlayGuide } from "./usePlayGuide";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { Help } from "./Help";
-import { readSharedConstraint, readSharedSearch, type SharedSearch } from "./shareSearch";
+import { constrainSettings } from "./searchSettings";
+import { readSharedSearch3D, type SharedSearch } from "./shareSearch";
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { buildDemo2D, defaultModelSettings2D, getObjective2D, objectivePresets2D, emptyPlayback2D, movePlayback2D, proposeTrial2D, proposal2DFromTrace, settings2D, type DensityMode, type ObjectivePreset2D, type ModelSettings2D } from "./tpe2d";
 
@@ -37,16 +38,9 @@ const defaultSearch: SharedSearch<ObjectivePreset2D> = {
 };
 
 export default function Explorer2D({ sharedSettings = null }: { sharedSettings?: URLSearchParams | null } = {}) {
-  const [initialSearch] = useState(() => {
-    const search = readSharedSearch(sharedSettings, defaultSearch, objectivePresets2D, settings2D.count, domainWidth);
-    const { constraint, infeasibleFilling } = readSharedConstraint(sharedSettings);
-    const settings: ModelSettings2D = constraint === "none" ? search.settings : {
-      ...search.settings,
-      infeasibleFilling,
-      weights: search.settings.weights === "ei" ? "uniform" : search.settings.weights,
-    };
-    return { ...search, constraint, settings };
-  });
+  const [initialSearch] = useState(() => readSharedSearch3D(
+    sharedSettings, defaultSearch, objectivePresets2D, settings2D.count, domainWidth,
+  ));
   const { ref: sceneRef, width: sceneWidth, height: sceneHeight, typeScale } = usePlotSize();
   const compact = sceneWidth < 640;
   const [playback, setPlayback] = useState(emptyPlayback2D);
@@ -58,7 +52,7 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     setSeekTarget(null);
   }
   useEffect(() => () => seekController.current?.abort(), []);
-  const [mode, setMode] = useState<DensityMode>(() => sharedSettings?.get("mode") === "univariate" ? "univariate" : "multivariate");
+  const [mode, setMode] = useState(initialSearch.mode);
   const [settings, setSettings] = useState<ModelSettings2D>(initialSearch.settings);
   const [objectivePreset, setObjectivePreset] = useState(initialSearch.preset);
   const [constraintPreset, setConstraintPreset] = useState(initialSearch.constraint);
@@ -72,7 +66,7 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     setConstraintPreset(preset);
     if (preset === "none") setConstraintHint(false);
     else {
-      if (settings.weights === "ei") setSettings({ ...settings, weights: "uniform" });
+      setSettings(constrainSettings);
       if (!constraintHintSeen) {
         setConstraintHintSeen(true);
         setConstraintHint(true);
