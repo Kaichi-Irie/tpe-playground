@@ -177,8 +177,8 @@ describe("2D constraints", () => {
     }
   });
 
-  it("reproduces first feasible disk trials with and without filling for the default seed", () => {
-    const run = (infeasibleFilling: boolean) => movePlayback2D(emptyPlayback2D(), 200, 42, "multivariate", { constraintPreset: "disk", infeasibleFilling });
+  it("reproduces first feasible disk trials with seed 42 and prior weight 0", () => {
+    const run = (infeasibleFilling: boolean) => movePlayback2D(emptyPlayback2D(), 200, 42, "multivariate", { constraintPreset: "disk", priorWeight: 0, infeasibleFilling });
     const on = run(true).trials.find((trial) => trial.violation === 0)?.id;
     const off = run(false).trials.find((trial) => trial.violation === 0)?.id;
     expect(on).toBe(17);

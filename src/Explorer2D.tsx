@@ -29,6 +29,7 @@ const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(ma
 
 const domainWidth = 10;
 const constraintHintKey = "tpe-play-2d-constraint-hint-seen";
+const constrainedModelDefaults = { ...defaultModelSettings2D, infeasibleFilling: true };
 const defaultSearch: SharedSearch<ObjectivePreset2D> = {
   seed: settings2D.seed,
   preset: "multimodal",
@@ -372,8 +373,8 @@ export default function Explorer2D({ sharedSettings = null }: { sharedSettings?:
     {guide.active && <LabHintBubble textId={guide.textId} message={playGuides[guide.active].action} phase="action" placement="bottom" onDismiss={guide.dismiss} />}
     </div>
 
-    <ModelSettingsPanel experiment={{ page: "2d", preset: objectivePreset, mode }} className="settings-2d" idSuffix="-2d" labelPrefix="2D " defaultSettings={defaultModelSettings2D} trialLimit={settings2D.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} disableEi={constrained} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); restart(); }}
-      status={<div className={constrained ? "proposal canvas-status" : "proposal"}>
+    <ModelSettingsPanel experiment={{ page: "2d", preset: objectivePreset, mode }} className="settings-2d" idSuffix="-2d" labelPrefix="2D " defaultSettings={constrained ? constrainedModelDefaults : defaultModelSettings2D} trialLimit={settings2D.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} disableEi={constrained} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); restart(); }}
+      status={<div className="proposal">
         <span>{!proposal ? "Search complete" : noFeasibleGood ? `Uniform random · trial ${step + 1}` : proposal.method === "random" ? `Random start · ${step + 1} / ${settings.startupTrials}` : `TPE · trial ${step + 1}`}</span>
         <Help label="2D trial playback">
           {!proposal ? `Search complete. All ${settings2D.count} trials evaluated.` : noFeasibleGood ? "The Good group has no feasible trials or prior. The next trial is a uniform random draw." : proposal.method === "random"

@@ -8,7 +8,7 @@ import type { DensityMode, Observation, Problem, ProposalTrace, TpeConfig } from
 export type { DensityMode } from "./model/types";
 
 export interface Trial2D { id: number; x1: number; x2: number; value: number; constraints: number[]; violation: number }
-export const settings2D = { bandwidth: 0.65, gamma: 0.25, count: 200, seed: 42, startupTrials: 10, candidates: 24 };
+export const settings2D = { bandwidth: 0.65, gamma: 0.25, count: 200, seed: 0, startupTrials: 10, candidates: 24 };
 
 export function objective2D(x1: number, x2: number): number {
   return 0.12 * (x1 - 0.7) ** 2 + 0.18 * (x2 + 0.5) ** 2 + Math.sin(1.4 * x1) * Math.cos(1.1 * x2) + 1.2;
@@ -74,7 +74,7 @@ function problemForConstraint2D(preset: ConstraintPreset2D = "none"): Problem {
 export const observations2D = (trials: readonly Trial2D[]): Observation[] => trials.map((t) => ({ id: t.id, params: { x1: t.x1, x2: t.x2 }, objectives: [t.value], constraints: t.constraints }));
 export type ModelSettings2D = Omit<TpeConfig, "mode">;
 export type SearchSettings2D = Partial<ModelSettings2D> & { objectivePreset?: ObjectivePreset2D; constraintPreset?: ConstraintPreset2D };
-export const defaultModelSettings2D: ModelSettings2D = { bandwidthRule: "constant", bandwidth: settings2D.bandwidth, gamma: settings2D.gamma, weights: "uniform", priorWeight: 0, startupTrials: settings2D.startupTrials, candidates: settings2D.candidates };
+export const defaultModelSettings2D: ModelSettings2D = { bandwidthRule: "constant", bandwidth: settings2D.bandwidth, gamma: settings2D.gamma, weights: "uniform", priorWeight: 1, startupTrials: settings2D.startupTrials, candidates: settings2D.candidates };
 export const config2D = (mode: DensityMode = "multivariate", settings: SearchSettings2D = {}): TpeConfig => {
   const { objectivePreset: _objectivePreset, constraintPreset, ...modelSettings } = settings;
   const { infeasibleFilling, ...config } = { ...defaultModelSettings2D, ...modelSettings, mode };

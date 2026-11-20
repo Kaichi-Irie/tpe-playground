@@ -13,14 +13,15 @@ const config = { ...config2D(), gamma: 0.5, bandwidth: 0.5, startupTrials: 2 };
 describe("shared TPE model", () => {
   it("preserves pre-refactor seeded 1D and joint 2D trajectories", () => {
     const one = runSearch(42, 30, 1).trials;
-    const two = movePlayback2D(emptyPlayback2D(), 30).trials;
+    const two = movePlayback2D(emptyPlayback2D(), 30, 42, "multivariate", { priorWeight: 0 }).trials;
     one.forEach((t, i) => { expect(t.x).toBeCloseTo(legacy.one[i].x, 12); expect(t.y).toBeCloseTo(legacy.one[i].y, 12); });
     two.forEach((t, i) => { expect(t.x1).toBeCloseTo(legacy.two[i].x1, 12); expect(t.x2).toBeCloseTo(legacy.two[i].x2, 12); });
   });
 
   it("keeps independent cross peaks and joint paired peaks distinct", () => {
-    const joint = fitTpe(problem2D, trials, config);
-    const independent = fitTpe(problem2D, trials, { ...config, mode: "univariate" });
+    const settings = { ...config, priorWeight: 0 };
+    const joint = fitTpe(problem2D, trials, settings);
+    const independent = fitTpe(problem2D, trials, { ...settings, mode: "univariate" });
     const at = [{ x1: -2, x2: -2 }, { x1: -2, x2: 2 }];
     const j = joint.evaluate(at), u = independent.evaluate(at);
     expect(j[0].logL - j[1].logL).toBeGreaterThan(20);
@@ -98,7 +99,7 @@ describe("visualization contract", () => {
   });
 
   it("distinguishes slices from normalized marginals and marginal density ratios", () => {
-    const model = fitTpe(problem2D, trials, config);
+    const model = fitTpe(problem2D, trials, { ...config, priorWeight: 0 });
     const points = Array.from({ length: 1000 }, (_, i) => ({ x1: -10 + (i + 0.5) * 0.02 }));
     const marginal = evaluateField(model, { field: "good-density", axes: ["x1"], points, projection: { kind: "marginal" } });
     expect(marginal.values.reduce((s, v) => s + v * 0.02, 0)).toBeCloseTo(1, 8);
@@ -148,7 +149,7 @@ describe("constrained TPE", () => {
   });
 
   it("uses the startup RNG and records the fallback when Good is empty without a prior", () => {
-    const settings = { ...config, infeasibleFilling: false };
+    const settings = { ...config, infeasibleFilling: false, priorWeight: 0 };
     const fallback = proposeTpe(problem, infeasible, settings, 42);
     const startup = proposeTpe(problem, infeasible, { ...settings, startupTrials: 10 }, 42);
     expect(startup).toMatchObject({ method: "random", reason: "startup" });

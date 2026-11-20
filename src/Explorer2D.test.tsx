@@ -6,6 +6,8 @@ import { settings2D } from "./tpe2d";
 it("starts a sequential 2D search with no observations and a preview of its first proposal", () => {
   const html = renderToStaticMarkup(<Explorer2D />);
   expect(html).toContain("Trial 0 / 200");
+  expect(html).toContain('aria-label="2D Search seed">0</output>');
+  expect(html).toMatch(/<select id="prior-weight-2d"[^>]*>.*<option value="1" selected="">1<\/option>/);
   expect(html).toContain("<span>Random start · 1 / 10</span>");
   expect(html).toMatch(/role="tooltip"[^>]*>Initial random exploration · 1 \/ 10\. Uniform random draw/);
   expect(html).toContain('class="model-status" aria-live="polite"');

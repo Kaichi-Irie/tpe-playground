@@ -31,7 +31,11 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
   const bandwidthRule = settings.bandwidthRule ?? "constant";
   const id = (name: string) => `${name}${idSuffix}`;
   const change = (patch: Partial<ModelSettings>) => onChange({ ...settings, ...patch });
-  const isDefault = (!disableEi || settings.infeasibleFilling !== false) && (Object.keys(defaultSettings) as (keyof ModelSettings)[]).every((key) => (key === "bandwidthRule" ? bandwidthRule === (defaultSettings.bandwidthRule ?? "constant") : settings[key] === defaultSettings[key]));
+  const isDefault = (Object.keys(defaultSettings) as (keyof ModelSettings)[]).every((key) => {
+    if (key === "bandwidthRule") return bandwidthRule === (defaultSettings.bandwidthRule ?? "constant");
+    if (key === "infeasibleFilling") return (settings.infeasibleFilling ?? true) === defaultSettings.infeasibleFilling;
+    return settings[key] === defaultSettings[key];
+  });
   const weightOption = weightOptions.find((option) => option.value === weights)!;
   const displayedWidth = bandwidthRule === "constant" ? bandwidth : widths[0]?.value;
   const sliderWidth = displayedWidth ?? bandwidth;

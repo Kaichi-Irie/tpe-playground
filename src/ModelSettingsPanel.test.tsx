@@ -3,7 +3,7 @@ import { expect, it } from "vitest";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { defaultModelSettings2D, settings2D } from "./tpe2d";
 
-function renderPanel(status?: string) {
+function renderPanel(status?: string, props: Partial<React.ComponentProps<typeof ModelSettingsPanel>> = {}) {
   return renderToStaticMarkup(
     <ModelSettingsPanel
       experiment={{ page: "2d", preset: "quadratic", mode: "multivariate" }}
@@ -16,9 +16,19 @@ function renderPanel(status?: string) {
       widths={[]}
       domainWidth={10}
       status={status}
+      {...props}
     />,
   );
 }
+
+it("uses the supplied filling default independently of EI availability", () => {
+  const settings = { ...defaultModelSettings2D, infeasibleFilling: false };
+  const disabledReset = /<button[^>]*disabled=""[^>]*aria-label="Reset model defaults"/;
+  expect(renderPanel(undefined, { settings, disableEi: true })).toMatch(disabledReset);
+  const defaultSettings = { ...defaultModelSettings2D, infeasibleFilling: true };
+  expect(renderPanel(undefined, { settings, defaultSettings })).not.toMatch(disabledReset);
+  expect(renderPanel(undefined, { defaultSettings })).toMatch(disabledReset);
+});
 
 it("renders playback status between Settings and the live controls when provided", () => {
   const html = renderPanel("Random start");

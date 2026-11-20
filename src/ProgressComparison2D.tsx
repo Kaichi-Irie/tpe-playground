@@ -1,11 +1,11 @@
 import { memo, useMemo } from "react";
 import type { ConstraintPreset2D } from "./constraints2D";
 import { ComparisonPanel } from "./ProgressComparison";
-import { emptyPlayback2D, findObjectiveMinimum2D, movePlayback2D, settings2D, type DensityMode, type ModelSettings2D, type ObjectivePreset2D, type Trial2D } from "./tpe2d";
+import { defaultModelSettings2D, emptyPlayback2D, findObjectiveMinimum2D, movePlayback2D, settings2D, type DensityMode, type ModelSettings2D, type ObjectivePreset2D, type Trial2D } from "./tpe2d";
 
 const asMetricTrials = (values: readonly Trial2D[]) => values.map((trial) => ({ id: trial.id, x: trial.x1, y: trial.value, feasible: trial.violation === 0 }));
 
-export const ProgressComparison2D = memo(function ProgressComparison2D({ trials, seed, objectivePreset, constraintPreset = "none", mode = "multivariate", settings }: {
+export const ProgressComparison2D = memo(function ProgressComparison2D({ trials, seed, objectivePreset, constraintPreset = "none", mode = "multivariate", settings = defaultModelSettings2D }: {
   trials: readonly Trial2D[];
   seed: number;
   objectivePreset: ObjectivePreset2D;
@@ -17,10 +17,10 @@ export const ProgressComparison2D = memo(function ProgressComparison2D({ trials,
   const randomTrials = useMemo(() => asMetricTrials(movePlayback2D(emptyPlayback2D(), settings2D.count, seed, "multivariate", {
     startupTrials: settings2D.count, objectivePreset, constraintPreset,
   }).trials), [seed, objectivePreset, constraintPreset]);
-  const filling = settings?.infeasibleFilling ?? true;
+  const { bandwidth, bandwidthRule = "constant", gamma, weights, priorWeight, startupTrials, candidates, infeasibleFilling: filling = true } = settings;
   const flippedTrials = useMemo(() => constraintPreset === "none" ? null : asMetricTrials(movePlayback2D(emptyPlayback2D(), settings2D.count, seed, mode, {
-    ...settings, objectivePreset, constraintPreset, infeasibleFilling: !filling,
-  }).trials), [seed, mode, settings, objectivePreset, constraintPreset, filling]);
+    bandwidth, bandwidthRule, gamma, weights, priorWeight, startupTrials, candidates, objectivePreset, constraintPreset, infeasibleFilling: !filling,
+  }).trials), [seed, mode, bandwidth, bandwidthRule, gamma, weights, priorWeight, startupTrials, candidates, objectivePreset, constraintPreset, filling]);
   const currentTrials = asMetricTrials(trials);
   const constrained = flippedTrials ? {
     currentLabel: filling ? "Filling on" : "Filling off",
