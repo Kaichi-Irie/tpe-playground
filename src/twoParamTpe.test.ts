@@ -132,7 +132,7 @@ describe("two-parameter objective presets", () => {
 });
 
 it("replays adaptive two-parameter searches deterministically and branches without rewriting observations", () => {
-  for (const mode of ["multivariate", "univariate"] as const) for (const bandwidthRule of ["scott", "silverman"] as const) {
+  for (const mode of ["multivariate", "univariate"] as const) for (const bandwidthRule of ["scott"] as const) {
     const settings = { bandwidthRule, startupTrials: 2 };
     const initial = moveTwoParamPlayback(emptyTwoParamPlayback(), 12, 42, mode, settings);
     expect(initial).toEqual(moveTwoParamPlayback(emptyTwoParamPlayback(), 12, 42, mode, settings));

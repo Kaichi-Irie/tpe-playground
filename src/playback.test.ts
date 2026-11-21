@@ -67,7 +67,7 @@ it("preserves observations when changing search settings or prior strength", () 
 
 it("preserves history when switching automatic rules and overriding with a constant width", () => {
   let state = movePlayback(emptyPlayback(), 15, 42, 1, defaults);
-  for (const bandwidthRule of ["scott", "silverman", "constant"] as const) {
+  for (const bandwidthRule of ["scott", "constant"] as const) {
     const before = structuredClone(state);
     const config = { ...defaults, bandwidthRule, bandwidth: 0.25 };
     state = movePlayback(keepObservations(state), state.step + 1, 42, 1, config);

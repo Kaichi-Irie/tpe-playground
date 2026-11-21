@@ -1,20 +1,18 @@
 import { expect, it } from "vitest";
-import { neighborBandwidths, resolveBandwidth, type BandwidthRule } from "./bandwidth";
+import { isBandwidthRule, optunaBandwidths, resolveBandwidth, type BandwidthRule } from "./bandwidth";
 import { fitOneParamModel, runSearch, defaults } from "../oneParamTpe";
 import { logDensity } from "./density";
 
-it("matches Scott and robust Silverman formulas with interpolated quartiles", () => {
+it("matches the Scott formula", () => {
   const samples = [0, 1, 2, 3, 4];
   const sd = Math.sqrt(2.5);
   expect(resolveBandwidth(samples, "scott", 0.4, 4)).toBeCloseTo(sd * 5 ** -0.2, 12);
-  expect(resolveBandwidth(samples, "silverman", 0.4, 4)).toBeCloseTo(0.9 * (2 / 1.34) * 5 ** -0.2, 12);
-  const outlier = [0, 1, 2, 3, 100];
-  expect(resolveBandwidth(outlier, "silverman", 0.4, 100)).toBeLessThan(resolveBandwidth(outlier, "scott", 0.4, 100));
+  expect(isBandwidthRule("silverman")).toBe(false);
   expect(samples).toEqual([0, 1, 2, 3, 4]);
 });
 
 it("handles empty, singleton, coincident and nearly coincident observations", () => {
-  for (const rule of ["scott", "silverman"] as const) {
+  for (const rule of ["scott"] as const) {
     for (const samples of [[], [0], [2, 2, 2], [0, 0, 0, 0, 1], [0, 1e-12]]) {
       const width = resolveBandwidth(samples, rule, 0.4, 10);
       expect(Number.isFinite(width)).toBe(true);
@@ -36,7 +34,7 @@ it("handles empty, singleton, coincident and nearly coincident observations", ()
 
 it("fits separate normalized group widths and leaves the prior width unchanged", () => {
   const trials = [-0.1, 0, 0.1, -5, 0, 5].map((x, i) => ({ id: i + 1, x, y: i }));
-  for (const bandwidthRule of ["scott", "silverman"] as const) {
+  for (const bandwidthRule of ["scott"] as const) {
     const fitted = fitOneParamModel(trials, 1, { ...defaults, gamma: 0.34, bandwidthRule });
     const group = fitted.snapshot.groups[0];
     expect(group.good.kernels[0].bandwidths.x).toBeLessThan(group.bad.kernels[0].bandwidths.x);
@@ -72,7 +70,7 @@ it("fits coordinate-wise adaptive widths in both two-parameter density modes, pr
   const { twoParamConfig, twoParamProblem } = await import("../twoParamTpe");
   const observations = Array.from({ length: 12 }, (_, i) => ({ id: i + 1, params: { x1: i < 6 ? -5 + i * 2 : 0, x2: i < 6 ? 0 : -5 + (i - 6) * 2 }, objectives: [i], constraints: [] }));
   for (const mode of ["multivariate", "univariate"] as const) {
-    for (const bandwidthRule of ["scott", "silverman"] as const) {
+    for (const bandwidthRule of ["scott"] as const) {
       const model = fitTpe(twoParamProblem, observations, { ...twoParamConfig(mode), gamma: 0.5, priorWeight: 1, bandwidthRule });
       const goodWidths = Object.assign({}, ...model.snapshot.groups.map((g) => g.good.kernels[0].bandwidths));
       const badWidths = Object.assign({}, ...model.snapshot.groups.map((g) => g.bad.kernels[0].bandwidths));
@@ -96,20 +94,20 @@ it("fits coordinate-wise adaptive widths in both two-parameter density modes, pr
 });
 
 it("uses box gaps for singletons and only the mutual gap for two observations", () => {
-  expect(neighborBandwidths([], -5, 5, true)).toEqual([]);
-  expect(neighborBandwidths([2], -5, 5, false)).toEqual([7]);
-  expect(neighborBandwidths([-5], -5, 5, true)).toEqual([10]);
-  expect(neighborBandwidths([1, -3], -5, 5, true)).toEqual([4, 4]);
-  expect(neighborBandwidths([5, -5], -5, 5, true)).toEqual([10, 10]);
+  expect(optunaBandwidths([], -5, 5, true)).toEqual([]);
+  expect(optunaBandwidths([2], -5, 5, false)).toEqual([7]);
+  expect(optunaBandwidths([-5], -5, 5, true)).toEqual([10]);
+  expect(optunaBandwidths([1, -3], -5, 5, true)).toEqual([4, 4]);
+  expect(optunaBandwidths([5, -5], -5, 5, true)).toEqual([10, 10]);
 });
 
-it("returns clipped neighbor widths in input order, with and without the prior", () => {
+it("returns clipped Optuna widths in input order, with and without the prior", () => {
   const centers = [2, -1, 0, 0.5, 1];
-  expect(neighborBandwidths(centers, -5, 5, true)).toEqual([10 / 7, 10 / 7, 10 / 7, 10 / 7, 10 / 7]);
-  expect(neighborBandwidths(centers, -5, 5, false)).toEqual(Array(5).fill(10 / 6));
-  expect(neighborBandwidths([1, -5, 5, 0], -5, 5, true)).toEqual([4, 5, 4, 5]);
-  expect(neighborBandwidths([0, 0], -5, 5, true)).toEqual([2.5, 2.5]);
-  expect(neighborBandwidths([0, 0], -5, 5, false)).toEqual([10 / 3, 10 / 3]);
-  expect(neighborBandwidths([0, -4, 0, 5], -5, 5, true)).toEqual([4, 4, 5, 5]);
-  expect(neighborBandwidths(Array(200).fill(0), -5, 5, true)).toEqual(Array(200).fill(0.1));
+  expect(optunaBandwidths(centers, -5, 5, true)).toEqual([10 / 7, 10 / 7, 10 / 7, 10 / 7, 10 / 7]);
+  expect(optunaBandwidths(centers, -5, 5, false)).toEqual(Array(5).fill(10 / 6));
+  expect(optunaBandwidths([1, -5, 5, 0], -5, 5, true)).toEqual([4, 5, 4, 5]);
+  expect(optunaBandwidths([0, 0], -5, 5, true)).toEqual([2.5, 2.5]);
+  expect(optunaBandwidths([0, 0], -5, 5, false)).toEqual([10 / 3, 10 / 3]);
+  expect(optunaBandwidths([0, -4, 0, 5], -5, 5, true)).toEqual([4, 4, 5, 5]);
+  expect(optunaBandwidths(Array(200).fill(0), -5, 5, true)).toEqual(Array(200).fill(0.1));
 });

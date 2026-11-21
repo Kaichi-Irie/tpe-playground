@@ -421,7 +421,7 @@ export function Play3DConstraintSettings({ preset, infeasibleFilling, onPresetCh
       <div className="parameter-label"><label htmlFor="constraint-preset-play-3d">Constraint</label>
         <Help label="Play 3D constraint preset"><strong>{definition.label}</strong><br />
           {definition.description}<br />{definition.formula && <>{definition.formula}<br /></>}
-          About {definition.feasibleShare} of the domain is feasible. Changing the constraint restarts the search.
+          {preset !== "none" && <>About {definition.feasibleShare} of the domain is feasible. </>}Changing the constraint restarts the search.
         </Help>
       </div>
       <select id="constraint-preset-play-3d" value={preset} onChange={(event) => onPresetChange(event.target.value as TwoParamConstraintPreset)}>

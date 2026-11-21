@@ -46,7 +46,7 @@ export function ShareSearchLink({ experiment, seed, settings }: Props) {
       <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         {copied ? <path d="m5 12 4 4L19 6" /> : <path d="M8 9H5v12h14V9h-3M12 15V3m-4 4 4-4 4 4" />}
       </svg>
-      {copied ? "Link copied" : "Share link"}
+      {copied ? "Copied" : <>Share<span className="share-search-link-word"> link</span></>}
     </button>
   </>;
 }

@@ -1,4 +1,4 @@
-import { neighborBandwidths, resolveBandwidth, validateBandwidthRule } from "./bandwidth";
+import { optunaBandwidths, resolveBandwidth, validateBandwidthRule } from "./bandwidth";
 import { createDensity, logDensity, sampleDensity } from "./density";
 import { randomSample, validateRandomSeed } from "./numpyRandom";
 import { partitionConstrainedSingleObjective, partitionSingleObjective, totalViolation, validateWeightStrategy } from "./partition";
@@ -92,9 +92,9 @@ function fitValidatedTpe(problem: Problem, trials: readonly Observation[], confi
       const result = createDensity(parameters, samples, config.bandwidth, members.map((m) => m.weight), config.priorWeight);
       const rule = config.bandwidthRule ?? "constant";
       const includePrior = config.priorWeight > 0;
-      if (rule === "neighbor") {
+      if (rule === "optuna") {
         // Every coordinate gets its own widths, with each joint kernel keeping its trial index.
-        const widths = parameters.map((parameter) => neighborBandwidths(
+        const widths = parameters.map((parameter) => optunaBandwidths(
           samples.map((sample) => sample.params[parameter.id]), parameter.low, parameter.high, includePrior,
         ));
         return { ...result, kernels: result.kernels.map((kernel, index) => kernel.source.kind === "observation"

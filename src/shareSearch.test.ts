@@ -7,7 +7,7 @@ import { twoParamDefaultModelSettings, emptyTwoParamPlayback, moveTwoParamPlayba
 
 const pageUrl = "https://kaichi-irie.github.io/tpe-playground/?tracking=123#about";
 const legacyPlay2DUrl = "https://kaichi-irie.github.io/tpe-playground/#play-2d?seed=7&preset=boundary&gamma=0.15&bandwidth=0.73&bandwidthRule=scott&weights=ei&priorWeight=2&startupTrials=5&candidates=8";
-const legacyPlay3DUrl = "https://kaichi-irie.github.io/tpe-playground/#play-3d?seed=99&preset=rosenbrock&gamma=0.35&bandwidth=0.82&bandwidthRule=silverman&weights=ei&priorWeight=0.5&startupTrials=20&candidates=64&mode=univariate";
+const legacyPlay3DUrl = "https://kaichi-irie.github.io/tpe-playground/#play-3d?seed=99&preset=rosenbrock&gamma=0.35&bandwidth=0.82&bandwidthRule=optuna&weights=ei&priorWeight=0.5&startupTrials=20&candidates=64&mode=univariate";
 const legacyConstrainedPlay3DUrl = "https://kaichi-irie.github.io/tpe-playground/#play-3d?seed=17&preset=quadratic&gamma=0.30&bandwidth=0.55&bandwidthRule=constant&weights=recency&priorWeight=0&startupTrials=2&candidates=4&mode=multivariate&constraint=band&infeasibleFilling=false";
 const play2DDefaults: SharedSearch<ObjectivePreset> = {
   seed: 0, preset: "multimodal", settings: { ...defaults, ...searchDefaults, priorWeight: prior.weight },
@@ -44,7 +44,7 @@ describe("share links", () => {
     expect(decodePlay3D(route.share)).toStrictEqual({
       seed: 99, preset: "rosenbrock", mode: "univariate", constraint: "none",
       settings: {
-        gamma: 0.35, bandwidth: 0.82, bandwidthRule: "silverman", weights: "ei",
+        gamma: 0.35, bandwidth: 0.82, bandwidthRule: "optuna", weights: "ei",
         priorWeight: 0.5, startupTrials: 20, candidates: 64,
       },
     });
@@ -172,7 +172,7 @@ describe("share links", () => {
       Array.from({ length: Math.round((max - min) / step) + 1 }, (_, i) => Math.round((min + i * step) * 100) / 100);
     checkSetting("gamma", hundredths(gammaRange.min, gammaRange.max, gammaRange.step));
     checkSetting("bandwidth", hundredths(bandwidthRange.min, 10, bandwidthRange.step));
-    checkSetting("bandwidthRule", ["constant", "scott", "silverman", "neighbor"]);
+    checkSetting("bandwidthRule", ["constant", "scott", "optuna"]);
     checkSetting("weights", weightOptions.map(({ value }) => value));
     checkSetting("priorWeight", priorWeights);
     checkSetting("startupTrials", startupTrialCounts(trialLimit));
@@ -228,7 +228,7 @@ describe("Optuna share alias", () => {
   it("overrides model parameters with the preset over each page's defaults", () => {
     const params = new URLSearchParams("seed=17&preset=quadratic&tpe=optuna&mode=univariate&constraint=band&infeasibleFilling=false&gamma=0.3&bandwidth=0.73&bandwidthRule=constant&weights=ei&priorWeight=0&startupTrials=2&candidates=4");
     const preset = {
-      gamma: 0.1, bandwidthRule: "neighbor", weights: "optuna", priorWeight: 1,
+      gamma: 0.1, bandwidthRule: "optuna", weights: "optuna", priorWeight: 1,
       startupTrials: 10, candidates: 24, infeasibleFilling: true,
     };
     expect(decodePlay3D(params)).toEqual({
@@ -240,11 +240,11 @@ describe("Optuna share alias", () => {
     });
   });
 
-  it("ignores unknown aliases and accepts standalone Neighbor and Optuna weights", () => {
-    const params = new URLSearchParams("mode=univariate&tpe=unknown&gamma=0.35&bandwidthRule=neighbor&weights=optuna");
+  it("ignores unknown aliases and accepts the standalone Optuna bandwidth rule and weights", () => {
+    const params = new URLSearchParams("mode=univariate&tpe=unknown&gamma=0.35&bandwidthRule=optuna&weights=optuna");
     expect(decodePlay3D(params)).toEqual({
       ...play3DDefaults, mode: "univariate", constraint: "none",
-      settings: { ...play3DDefaults.settings, gamma: 0.35, bandwidthRule: "neighbor", weights: "optuna" },
+      settings: { ...play3DDefaults.settings, gamma: 0.35, bandwidthRule: "optuna", weights: "optuna" },
     });
   });
 
