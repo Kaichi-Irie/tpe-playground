@@ -1,9 +1,23 @@
 import { expect, it } from "vitest";
+import katex from "katex";
+import { twoParamConstraintPresets } from "./twoParamConstraints";
+import { twoParamObjectivePresets } from "./twoParamTpe";
 import { findObjectiveMinimum, getObjective, objectivePresets, type ObjectivePreset } from "./objectives";
 import { defaults, fitOneParamModel, proposeTrial, runSearch } from "./oneParamTpe";
 import { emptyPlayback, movePlayback } from "./playback";
 
 const presets = Object.keys(objectivePresets) as ObjectivePreset[];
+
+it("typesets every objective and constraint formula with KaTeX", () => {
+  const formulas = [
+    ...presets.map((preset) => getObjective(preset).formula),
+    ...Object.values(twoParamObjectivePresets).map(({ formula }) => formula),
+    ...Object.values(twoParamConstraintPresets).map(({ formula }) => formula).filter(Boolean),
+  ];
+  for (const tex of formulas) {
+    expect(() => katex.renderToString(tex, { displayMode: true, throwOnError: true })).not.toThrow();
+  }
+});
 
 it("shows each preset formula without a long numeric offset", () => {
   for (const preset of presets) {

@@ -13,6 +13,7 @@ import { playGuides } from "./playGuides";
 import { usePlayGuide } from "./usePlayGuide";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { Help } from "./Help";
+import { HelpMath } from "./HelpMath";
 import { constrainSettings } from "./searchSettings";
 import { readPlay3DSharedSearch, type SharedSearch } from "./shareSearch";
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
@@ -393,7 +394,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
       <h2 id="play-3d-heading" className="sr-only">Explore two dimensions</h2>
       <div className="scene-toolbar-group">
         <div className="objective-picker parameter">
-          <div className="parameter-label"><label htmlFor="objective-preset-play-3d">Objective</label><Help label="Play 3D objective preset"><strong>{objectiveDefinition.label}</strong><br />{objectiveDefinition.description}<br />Minimize over [−5, 5]².<br />{objectiveDefinition.formula}<br />Changing it restarts the search.</Help></div><select id="objective-preset-play-3d" value={objectivePreset} onChange={(event) => { setObjectivePreset(event.target.value as TwoParamObjectivePreset); restart(); }}>{(Object.keys(twoParamObjectivePresets) as TwoParamObjectivePreset[]).map((preset) => <option key={preset} value={preset}>{twoParamObjectivePresets[preset].label}</option>)}</select>
+          <div className="parameter-label"><label htmlFor="objective-preset-play-3d">Objective</label><Help label="Play 3D objective preset"><strong>{objectiveDefinition.label}</strong><br />{objectiveDefinition.description} Minimize over <HelpMath inline tex="[-5,5]^2" />:<HelpMath tex={objectiveDefinition.formula} />Changing it restarts the search.</Help></div><select id="objective-preset-play-3d" value={objectivePreset} onChange={(event) => { setObjectivePreset(event.target.value as TwoParamObjectivePreset); restart(); }}>{(Object.keys(twoParamObjectivePresets) as TwoParamObjectivePreset[]).map((preset) => <option key={preset} value={preset}>{twoParamObjectivePresets[preset].label}</option>)}</select>
         </div>
       </div>
       <Play3DConstraintSettings preset={constraintPreset} infeasibleFilling={settings.infeasibleFilling ?? true} onPresetChange={changeConstraint}
@@ -420,7 +421,7 @@ export function Play3DConstraintSettings({ preset, infeasibleFilling, onPresetCh
     <div className="parameter constraint-picker">
       <div className="parameter-label"><label htmlFor="constraint-preset-play-3d">Constraint</label>
         <Help label="Play 3D constraint preset"><strong>{definition.label}</strong><br />
-          {definition.description}<br />{definition.formula && <>{definition.formula}<br /></>}
+          {definition.description}{definition.formula && <> Feasible when:<HelpMath tex={definition.formula} /></>}{preset === "none" && <br />}
           {preset !== "none" && <>About {definition.feasibleShare} of the domain is feasible. </>}Changing the constraint restarts the search.
         </Help>
       </div>
@@ -430,7 +431,7 @@ export function Play3DConstraintSettings({ preset, infeasibleFilling, onPresetCh
     </div>
     {preset !== "none" && <div className="parameter infeasible-filling">
       <label><input type="checkbox" checked={infeasibleFilling} onChange={(event) => onFillingChange(event.target.checked)} /> Infeasible filling</label>
-      <Help label="infeasible filling">Good takes feasible trials first. With filling on, the least-violating infeasible trials fill open slots. With filling off, Good can fall short of its target size.</Help>
+      <Help label="infeasible filling">Good takes feasible trials first. With filling on, the least-violating infeasible trials, those closest to the feasible region, fill open slots. With filling off, Good can fall short of its target size.</Help>
     </div>}
   </>;
 }

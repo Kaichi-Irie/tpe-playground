@@ -32,8 +32,8 @@ export const startupTrialCounts = (trialLimit: number) => [2, 5, 10, 20, 30, 50,
 export const gammaRange = { min: 0.05, max: 0.5, step: 0.05 };
 export const bandwidthRange = { min: 0.01, step: 0.01 };
 export const weightOptions = [
-  { value: "uniform", label: "Uniform", description: "Every observation counts equally." },
-  { value: "recency", label: "Recency", description: "rᵢ is the trial-order rank within the group, so newer observations count more." },
-  { value: "optuna", label: "Optuna", description: "n is the group size, m = n − 25 and rᵢ the trial-order rank. The newest 25 get weight 1; older ones ramp up from 1/n. The prior keeps its set weight." },
-  { value: "ei", label: "EI weights", description: "y* is the split threshold. Good observations count more the further they fall below it; Bad ones count equally." },
+  { value: "uniform", label: "Uniform" },
+  { value: "recency", label: "Recency" },
+  { value: "optuna", label: "Optuna" },
+  { value: "ei", label: "EI weights" },
 ] as const;

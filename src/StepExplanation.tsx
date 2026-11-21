@@ -16,6 +16,7 @@ import { usePlotSize } from "./usePlotSize";
 import { clearSeenHints, completedTaskGuides, guidePlacement, labHintIds, labHints, loadSeenHints, nextLabGuide, saveSeenHints, taskGuideIds, taskGuides, type LabHintId, type LabTaskGuideId } from "./labHints";
 import LabHintBubble, { labHintElementId } from "./LabHintBubble";
 import { Help } from "./Help";
+import { HelpMath } from "./HelpMath";
 
 const stages = ["Unknown objective", "Observe", "Split", "Model inputs", "Kernels", "Density", "Sample", "Choose", "Evaluate"];
 const journeyStops = [0, 1, 2, 4, 5, 6, 7, 8];
@@ -230,10 +231,8 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
     unweighted: explanationGrid.map((x) => kernelContribution({ ...kernel, mixtureWeight: 1 }, x)),
   }))), [data]);
   const path = (values: readonly number[], base: number, scale: number, center = 0, spread = 1) => values.map((v, i) => `${i ? "L" : "M"}${sx(mix(center, explanationGrid[i], spread)).toFixed(2)},${(base - v * scale).toFixed(2)}`).join(" ");
-  const weightMath = settings.weights === "uniform"
-    ? String.raw`w_i=\frac{1}{n+\alpha},\quad w_0=\frac{\alpha}{n+\alpha}`
-    : settings.weights === "recency" ? String.raw`w_i\propto\operatorname{rank}_{\mathrm{time}}(i),\quad w_0=\frac{\alpha}{n+\alpha}` : String.raw`w_i\propto\max(0,y^*-y_i)\; (\mathrm{Good}),\quad w_i=\frac{1}{n+\alpha}\; (\mathrm{Bad})`;
-  const weightDescription = settings.weights === "uniform" ? "n = observations in this group" : settings.weights === "recency" ? "Within each group: newer observations weigh more" : "Larger improvement weighs more; uniform if all improvements are zero";
+  // List every option so the learner can compare them without switching.
+  const weightMath = String.raw`\begin{array}{ll}\text{Uniform}&w_i\propto 1\\[2pt]\text{Recency}&w_i\propto r_i\\[2pt]\text{Improvement}&w_i\propto\max(0,\,y^*-y_i)\end{array}`;
   const messages = [
     "Minimize y using a black-box function.",
     rounds > 0 ? "New observation added. Split the data again." : initialComplete ? "Tap the grid to split Good and Bad." : "Pick a point x. Observe its value.",
@@ -826,7 +825,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         {stage === 4 && <Range hint="bandwidth" infoDisabled={infoDisabled} hinted={activeHint === "bandwidth"} name="Bandwidth" symbol="h" value={settings.bandwidth} min={0.2} max={1.5} step={0.05} onChange={(bandwidth) => { noteControlUsed("bandwidth"); change({ bandwidth }); }} />}
         {stage === 5 && <><Range audio={audio} hint="prior" infoDisabled={infoDisabled} hinted={activeHint === "prior"} name="Prior" symbol="α" value={settings.priorWeight} min={0} max={10} step={0.25} onChange={(priorWeight) => { noteControlUsed("prior"); change({ priorWeight }); }} />
           <label className="journey-weight">Weighting <select aria-label="Weighting" data-guide-target={activeHint === "weights" || undefined} aria-describedby={activeHint === "weights" ? labHintElementId : undefined} value={settings.weights} onChange={(e) => { noteControlUsed("weights"); change({ weights: e.target.value as ExplanationSettings["weights"] }); }}><option value="uniform">Uniform</option><option value="recency">Recency</option><option value="ei">Improvement</option></select></label>
-          <LabInfo id="weights" disabled={infoDisabled}><span className="journey-weight-note">{weightDescription}</span><JourneyMath tex={weightMath} /></LabInfo></>}
+          <LabInfo id="weights" disabled={infoDisabled}><span className="journey-weight-note"><HelpMath inline tex="r_i" /> is the trial-order rank in the group and <HelpMath inline tex="y^*" /> the split. Improvement applies to Good; Bad stays uniform. With the prior's <HelpMath inline tex={String.raw`w_0=\alpha/(n+\alpha)`} />, each group's weights sum to 1.</span><JourneyMath tex={weightMath} /></LabInfo></>}
         {(stage === 6 || stage === 7) && <><Range hint="candidates" infoDisabled={infoDisabled} hinted={activeHint === "candidates"} name="Candidates" symbol="M" value={settings.candidates} min={1} max={explanationCandidateLimit} step={1} onChange={(candidates) => { noteControlUsed("candidates"); change({ candidates }); }} /><button className="journey-icon" aria-label="Resample candidates" title="Resample candidates" onClick={() => { if (controlDisabled) return; change({ seed: settings.seed + 1 }); }}>↻</button></>}
       </fieldset>
     </div>

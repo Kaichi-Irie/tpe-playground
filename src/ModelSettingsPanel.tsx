@@ -8,14 +8,13 @@ import { ShareSearchLink } from "./ShareSearchLink";
 import type { ShareExperiment } from "./shareSearch";
 import { applyOptunaPreset, bandwidthRange, candidateCounts, gammaRange, matchesOptunaPreset, priorWeights, startupTrialCounts, weightOptions, type ModelSettings } from "./searchSettings";
 
-const bandwidthRuleMath = String.raw`\begin{aligned}\text{Constant}&:\ h\\\text{Scott}&:\ s\,n^{-1/5}\\\text{Optuna}&:\ \max(x_i-x_{i-1},\,x_{i+1}-x_i)\end{aligned}`;
+const bandwidthRuleMath = String.raw`\begin{array}{ll}\text{Constant}&h\\[2pt]\text{Scott}&s\,n^{-1/5}\\[2pt]\text{Optuna}&\max(x_i-x_{i-1},\,x_{i+1}-x_i)\end{array}`;
 
-const weightMath: Record<WeightStrategy, string> = {
-  uniform: String.raw`w_i=1`,
-  recency: String.raw`w_i\propto r_i`,
-  optuna: String.raw`w_i=\begin{cases}\dfrac1n+\dfrac{r_i-1}{m-1}\Bigl(1-\dfrac1n\Bigr), & r_i<m\\[8pt]1, & r_i\ge m\end{cases}`,
-  ei: String.raw`w_i\propto\max(0,\,y^*-y_i)`,
-};
+const weightMath = String.raw`\begin{array}{ll}\text{Uniform}&w_i=1\\[2pt]\text{Recency}&w_i\propto r_i\\[2pt]\text{Optuna}&w_i=\min\!\Bigl(1,\ \dfrac1n+\dfrac{r_i-1}{m-1}\Bigl(1-\dfrac1n\Bigr)\Bigr)\\[8pt]\text{EI}&w_i\propto\max(0,\,y^*-y_i)\end{array}`;
+
+const priorMath = String.raw`\begin{aligned}\ell(x)&\propto\textstyle\sum_{i\in\mathrm{Good}}w_i\,k_i(x)+\alpha\,p_0(x)\\g(x)&\propto\textstyle\sum_{i\in\mathrm{Bad}}w_i\,k_i(x)+\alpha\,p_0(x)\end{aligned}`;
+
+const m = (tex: string) => <HelpMath inline tex={tex} />;
 
 const bandwidthLabels: Record<BandwidthRule, string> = {
   constant: "Constant",
@@ -52,7 +51,6 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
     if (key === "infeasibleFilling") return (settings.infeasibleFilling ?? true) === defaultSettings.infeasibleFilling;
     return settings[key] === defaultSettings[key];
   });
-  const weightOption = weightOptions.find((option) => option.value === weights)!;
   const widthSummaries = bandwidthRule === "constant" ? [] : widths.filter(({ values }) => values.length > 0).map(({ label, values }) => {
     const sorted = [...values].sort((a, b) => a - b);
     const middle = (sorted.length - 1) / 2;
@@ -89,21 +87,21 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
       <fieldset className="settings-fields"><legend>Model</legend>
             <div className="parameter">
               <div className="parameter-label">
-                <div><label htmlFor={id("bandwidth-rule")}>Bandwidth rule</label><Help label="bandwidth rule">Kernel width h for each group and coordinate:<HelpMath tex={bandwidthRuleMath} />n is the group size and s its standard deviation. Optuna takes the larger gap to the neighboring observations. Automatic widths are clipped to a positive range and narrow as observations accumulate.</Help>
+                <div><label htmlFor={id("bandwidth-rule")}>Bandwidth rule</label><Help label="bandwidth rule">Kernel width {m("h")} for each group and coordinate:<HelpMath tex={bandwidthRuleMath} />{m("n")} is the group size and {m("s")} its standard deviation. Optuna takes the larger gap to the neighboring observations. Automatic widths are clipped to a positive range and narrow as observations accumulate.</Help>
                 </div>
               </div>
               <select className="bandwidth-rule-select" id={id("bandwidth-rule")} aria-label={`${labelPrefix}Bandwidth rule`} value={bandwidthRule} onChange={(event) => change({ bandwidthRule: event.target.value as BandwidthRule })}>{bandwidthRules.map((rule) => <option key={rule} value={rule}>{bandwidthLabels[rule]}</option>)}</select>
             </div>
             <div className="parameter primary-weights">
               <div className="parameter-label">
-                <div><label htmlFor={id("weights")}>Weights</label><Help label="observation weights"><strong>{weightOption.label}</strong><HelpMath tex={weightMath[weights]} />{weightOption.description}{disableEi && <><br />EI weights need an objective threshold, which is undefined for a constrained split.</>}</Help>
+                <div><label htmlFor={id("weights")}>Weights</label><Help label="observation weights">Weight {m("w_i")} of each observation kernel within its group:<HelpMath tex={weightMath} />{m("r_i")} is the trial-order rank in the group (newest is {m("n")}), {m("m=n-25")} and {m("y^*")} the split threshold. EI applies to Good; Bad counts equally.{disableEi && <><br />EI weights need an objective threshold, which is undefined for a constrained split.</>}</Help>
                 </div>
               </div>
               <select id={id("weights")} value={weights} onChange={(event) => change({ weights: event.target.value as WeightStrategy })}>{weightOptions.map((option) => <option key={option.value} value={option.value} disabled={disableEi && option.value === "ei"}>{option.label}</option>)}</select>
             </div>
             <div className="parameter">
               <div className="parameter-label">
-                <div><label htmlFor={id("prior-weight")}>Prior weight</label><Help label="Gaussian prior"><HelpMath tex={String.raw`\ell(x)\propto\sum_{i\in\mathrm{Good}}w_i\,k_i(x)+\alpha\,p_0(x)`} />Adds one broad Gaussian p₀ (mean 0, σ = 10) to each KDE so unexplored regions keep some density. Weight α = 1 counts as one observation; 0 turns it off.{experiment.page === "play-3d" && experiment.constraint !== "none" && " The prior can be the only Good kernel."}</Help>
+                <div><label htmlFor={id("prior-weight")}>Prior weight</label><Help label="Gaussian prior">Mixes one broad Gaussian {m("p_0")} ({m(String.raw`\mu=0,\ \sigma=10`)}) into both KDEs so unexplored regions keep some density. Its weight {m(String.raw`\alpha`)} is on the same scale as an observation weight {m("w_i")}, so {m(String.raw`\alpha=1`)} counts like one more observation and 0 turns it off.{experiment.page === "play-3d" && experiment.constraint !== "none" && " The prior can be the only Good kernel."}<HelpMath tex={priorMath} /></Help>
                 </div>
               </div>
               <select id={id("prior-weight")} value={priorWeight} onChange={(event) => change({ priorWeight: Number(event.target.value) })}>{priorWeights.map((weight) => <option key={weight} value={weight}>{weight === 0 ? "0 · Off" : weight}</option>)}</select>
@@ -119,7 +117,7 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
             </div>
             <div className="parameter">
               <div className="parameter-label">
-                <div><label htmlFor={id("candidates")}>Candidates</label><Help label="candidate count"><HelpMath tex={String.raw`x_{\mathrm{next}}=\underset{z_1,\ldots,z_M\sim\ell}{\arg\max}\ \frac{\ell(z_j)}{g(z_j)}`} />{experiment.page === "play-3d" && experiment.mode === "univariate"
+                <div><label htmlFor={id("candidates")}>Candidates</label><Help label="candidate count">{experiment.page === "play-3d" && experiment.mode === "univariate"
                   ? "Draws this many candidates per coordinate from ℓ and picks the highest ℓ/g for each."
                   : "Draws this many candidates from ℓ per trial and picks the highest ℓ/g."} More candidates exploit more, without extra evaluations.</Help>
                 </div>
@@ -134,7 +132,7 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
         <div className="parameter-label">
           <div><label htmlFor={id("gamma")}>Good fraction <span>γ</span></label><Help label="good fraction">{experiment.page === "play-3d" && experiment.constraint !== "none"
             ? "Sets the target size of Good. Feasible trials rank first by objective. Infeasible filling uses the least-violating trials to fill empty slots."
-            : <><HelpMath tex={String.raw`|\mathrm{Good}|=\min(\lceil\gamma n\rceil,\,n-1)`} />Good targets {Math.round(gamma * 100)}% of observations, rounded up, and leaves at least one trial in Bad. Lower γ focuses Good on fewer, better points.</>}</Help>
+            : <>Good targets {Math.round(gamma * 100)}% of observations, rounded up, and leaves at least one trial in Bad. Lower γ focuses Good on fewer, better points.</>}</Help>
           </div>
           <output htmlFor={id("gamma")}>{Math.round(gamma * 100)}%</output>
         </div>
@@ -142,7 +140,7 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
       </div>
       <div className="parameter bandwidth-settings">
         <div className="parameter-label">
-          <div><label htmlFor={id("bandwidth")}>Bandwidth <span>h</span></label><Help label="bandwidth"><HelpMath tex={String.raw`k_i(x)=\mathcal N_{\mathrm{box}}(x\mid x_i,\,h^2)`} />Width of each Gaussian kernel. Wider kernels smooth the densities and explore more broadly; narrower ones stay close to past observations. Dragging sets a constant width.</Help>
+          <div><label htmlFor={id("bandwidth")}>Bandwidth <span>h</span></label><Help label="bandwidth">Width of each Gaussian kernel. Wider kernels smooth the densities and explore more broadly; narrower ones stay close to past observations. Dragging sets a constant width.</Help>
           </div>
           <output htmlFor={id("bandwidth")}>{widthText}</output>
         </div>

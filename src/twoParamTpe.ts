@@ -14,9 +14,9 @@ function twoParamObjective(x1: number, x2: number): number {
 }
 
 export const twoParamObjectivePresets = {
-  multimodal: { label: "Multimodal", description: "Multiple local minima with interacting coordinates.", formula: "f(x₁, x₂) = 0.12(x₁ − 0.7)² + 0.18(x₂ + 0.5)² + sin(1.4x₁) cos(1.1x₂) + 1.2", evaluate: twoParamObjective },
-  quadratic: { label: "Quadratic", description: "An axis-aligned bowl with one minimum at (1.5, −1).", formula: "f(x₁, x₂) = 0.12(x₁ − 1.5)² + 0.18(x₂ + 1)²", evaluate: (x1: number, x2: number) => 0.12 * (x1 - 1.5) ** 2 + 0.18 * (x2 + 1) ** 2 },
-  rosenbrock: { label: "Rosenbrock", description: "A curved valley coupling both coordinates, with a minimum at (1, 1).", formula: "f(x₁, x₂) = [(1 − x₁)² + 100(x₂ − x₁²)²] / 1000", evaluate: (x1: number, x2: number) => ((1 - x1) ** 2 + 100 * (x2 - x1 ** 2) ** 2) / 1000 },
+  multimodal: { label: "Multimodal", description: "Multiple local minima with interacting coordinates.", formula: String.raw`\begin{aligned}f(x_1,x_2)={}&0.12(x_1-0.7)^2+0.18(x_2+0.5)^2\\&+\sin(1.4x_1)\cos(1.1x_2)+1.2\end{aligned}`, evaluate: twoParamObjective },
+  quadratic: { label: "Quadratic", description: "An axis-aligned bowl with one minimum at (1.5, −1).", formula: String.raw`f(x_1,x_2)=0.12(x_1-1.5)^2+0.18(x_2+1)^2`, evaluate: (x1: number, x2: number) => 0.12 * (x1 - 1.5) ** 2 + 0.18 * (x2 + 1) ** 2 },
+  rosenbrock: { label: "Rosenbrock", description: "A curved valley coupling both coordinates, with a minimum at (1, 1).", formula: String.raw`f(x_1,x_2)=\frac{(1-x_1)^2+100(x_2-x_1^2)^2}{1000}`, evaluate: (x1: number, x2: number) => ((1 - x1) ** 2 + 100 * (x2 - x1 ** 2) ** 2) / 1000 },
 } as const;
 export type TwoParamObjectivePreset = keyof typeof twoParamObjectivePresets;
 export function getTwoParamObjective(preset: TwoParamObjectivePreset = "multimodal") {

@@ -5,6 +5,7 @@ type Constraint = (x1: number, x2: number) => number;
 interface ConstraintDefinition {
   label: string;
   description: string;
+  /** KaTeX source of the feasible region. */
   formula: string;
   feasibleShare: string;
   constraints: readonly Constraint[];
@@ -24,18 +25,18 @@ export const twoParamConstraintPresets = {
   none: { label: "None", description: "The whole search domain is feasible.", formula: "", feasibleShare: "100%", constraints: [], boundaries: [] },
   disk: {
     label: "Small disk", description: "A disk of radius 0.7 centered at (3, 3).",
-    formula: "hypot(x₁ − 3, x₂ − 3) − 0.7 ≤ 0", feasibleShare: "1.5%",
+    formula: String.raw`\sqrt{(x_1-3)^2+(x_2-3)^2}\le 0.7`, feasibleShare: "1.5%",
     constraints: [(x1, x2) => Math.hypot(x1 - 3, x2 - 3) - 0.7], boundaries: [diskBoundary],
   },
   band: {
     label: "Thin band", description: "The space between two parallel lines.",
-    formula: "(x₁ + x₂ − 3.2)/√2 ≤ 0 and (2.8 − x₁ − x₂)/√2 ≤ 0", feasibleShare: "2.8%",
+    formula: String.raw`2.8\le x_1+x_2\le 3.2`, feasibleShare: "2.8%",
     constraints: [(x1, x2) => (x1 + x2 - 3.2) / Math.SQRT2, (x1, x2) => (2.8 - x1 - x2) / Math.SQRT2],
     boundaries: [diagonal(2.8), diagonal(3.2)],
   },
   halfplane: {
-    label: "Half-plane", description: "The side of the diagonal where x₁ + x₂ is at least 3.",
-    formula: "(3 − x₁ − x₂)/√2 ≤ 0", feasibleShare: "25%",
+    label: "Half-plane", description: "One side of a diagonal line.",
+    formula: String.raw`x_1+x_2\ge 3`, feasibleShare: "25%",
     constraints: [(x1, x2) => (3 - x1 - x2) / Math.SQRT2], boundaries: [diagonal(3)],
   },
 } satisfies Record<string, ConstraintDefinition>;

@@ -3,6 +3,7 @@ import { averageRegret, relativeBestSoFar, bestSoFar, bestFeasibleSoFar, current
 import { findObjectiveMinimum, type ObjectivePreset } from "./objectives";
 import { PanelClose } from "./PanelClose";
 import { Help } from "./Help";
+import { HelpMath } from "./HelpMath";
 import { ProgressPlot } from "./ProgressPlot";
 import { trialLimit, defaults, runSearch, type Proposal, type Trial } from "./oneParamTpe";
 
@@ -34,6 +35,10 @@ export function ComparisonPanel({ trials, currentLabel, randomTrials, minimum, r
   const definition = constrained ? "Minimum f(xᵢ) − f(x*) over feasible trials through trial t." : metric === "best"
     ? relative ? "minᵢ≤ₜ [f(xᵢ) − f(x*)] / f(x*)" : "minᵢ≤ₜ [f(xᵢ) − f(x*)]"
     : "(1/t) Σᵢ₌₁ᵗ [f(xᵢ) − f(x*)]";
+  const gap = String.raw`\bigl[f(x_i)-f(x^*)\bigr]`;
+  const definitionTex = constrained ? String.raw`\min_{i\le t,\ x_i\ \mathrm{feasible}}${gap}` : metric === "best"
+    ? relative ? String.raw`\min_{i\le t}\frac{f(x_i)-f(x^*)}{f(x^*)}` : String.raw`\min_{i\le t}${gap}`
+    : String.raw`\frac1t\sum_{i=1}^{t}${gap}`;
   return <section className="workspace comparison" aria-label="Search performance">
     <div className="section-heading"><h2>Performance</h2>{constrained && <span>{constrained.feasibleCount}</span>}<PanelClose label="performance panel" /></div>
     <div className="comparison-toolbar">
@@ -43,8 +48,9 @@ export function ComparisonPanel({ trials, currentLabel, randomTrials, minimum, r
       </div>
       <Help key={metric} label={title}>
         <strong>{title}</strong><br />
-        {constrained ? "∞ means no feasible trial has been found in that run. The reference is the constrained optimum." : metric === "best" ? relative ? "The smallest gap to the optimum found so far, relative to the optimum." : "The smallest gap to the optimum found so far." : "The average gap to the optimum across all evaluations so far."}<br />
-        {definition}<br />
+        {constrained ? "The smallest gap to the constrained optimum among feasible trials so far:" : metric === "best" ? relative ? "The smallest gap to the optimum found so far, relative to the optimum:" : "The smallest gap to the optimum found so far:" : "The average gap to the optimum across all evaluations so far:"}
+        <HelpMath tex={definitionTex} />
+        {constrained && <>∞ means no feasible trial has been found in that run.<br /></>}
         {approximate && <>The optimum reference is numerically estimated.<br /></>}
         The logarithmic scale adjusts to the displayed history. Values below its lower bound are drawn at the bottom.
       </Help>
