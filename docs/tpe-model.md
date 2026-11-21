@@ -45,7 +45,7 @@ engine (for example after a JSON round trip), copying it before constructing the
 runtime. It is not an untrusted file parser or schema migration service.
 
 The current policy supports a single objective (minimize or maximize), fixed
-continuous box domains, Constant, Scott and Neighbor (Optuna) bandwidth rules,
+continuous box domains, Constant, Scott and Optuna bandwidth rules,
 uniform, recency, EI and Optuna weighting, and an optional broad prior. Observations retain their original objective values.
 The unconstrained split threshold uses minimization-oriented values.
 
@@ -88,7 +88,7 @@ Kernels distinguish observation and prior sources, raw observation-equivalent
 weights, and normalized mixture weights. Prior weights are applied per group.
 Kernels have one bandwidth per coordinate. Constant uses the configured width
 for every observation kernel. Scott resolves widths separately for
-each density and coordinate within a parameter group. Neighbor resolves a width
+each density and coordinate within a parameter group. Optuna resolves a width
 for each observation kernel and coordinate. Prior widths remain fixed.
 
 Each observation and prior kernel is a product of per-coordinate truncated
@@ -116,7 +116,7 @@ The fixture compares Good and Bad trial IDs, every kernel's center, per-coordina
 width and normalized mixture weight, and log ℓ and log g at 50 box points per
 case. The playground sorts coincident centers stably in trial order under the
 preset. Optuna calls NumPy’s default `argsort`, which can assign unequal
-neighbor widths to different trials when centers coincide.
+Optuna widths to different trials when centers coincide.
 
 Startup and TPE index two independent NumPy legacy `RandomState(seed)` streams.
 Startup consumes one uniform per parameter per trial in declaration order. Each

@@ -119,9 +119,9 @@ it("disables the Optuna preset when it matches and shows each coordinate's obser
     .toMatch(/<button type="button">Optuna preset<\/button>/);
 });
 
-it("labels the neighbor bandwidth rule as Optuna on one short line", () => {
+it("labels the Optuna bandwidth rule on one short line", () => {
   const html = renderPanel(undefined, { settings: applyOptunaPreset(twoParamDefaultModelSettings), widths: [{ label: "x₁", values: [0.5, 1] }] });
-  expect(html).toContain('<option value="neighbor" selected="">Optuna</option>');
+  expect(html).toContain('<option value="optuna" selected="">Optuna</option>');
   expect(html).toContain('<span class="bandwidth-mode">Optuna rule · Good KDE</span>');
   expect(html).not.toContain("Neighbor");
 });

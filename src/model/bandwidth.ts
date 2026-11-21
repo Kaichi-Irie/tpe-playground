@@ -1,4 +1,4 @@
-export const bandwidthRules = ["constant", "scott", "neighbor"] as const;
+export const bandwidthRules = ["constant", "scott", "optuna"] as const;
 export type BandwidthRule = typeof bandwidthRules[number];
 
 export function isBandwidthRule(rule: string | null): rule is BandwidthRule {
@@ -15,7 +15,7 @@ function clipBandwidth(width: number, domainWidth: number, count: number, includ
   return Math.max(minimum, Math.min(domainWidth, width));
 }
 
-export function neighborBandwidths(centers: readonly number[], low: number, high: number, includePrior: boolean): number[] {
+export function optunaBandwidths(centers: readonly number[], low: number, high: number, includePrior: boolean): number[] {
   const range = high - low;
   if (!Number.isFinite(range) || range <= 0 || centers.some((center) => !Number.isFinite(center) || center < low || center > high)) {
     throw new Error("Invalid bandwidth inputs.");
@@ -37,7 +37,7 @@ export function neighborBandwidths(centers: readonly number[], low: number, high
 // Scott: s n^(-1/5). The prior is excluded.
 export function resolveBandwidth(samples: readonly number[], rule: BandwidthRule, constant: number, domainWidth: number, includePrior = false): number {
   validateBandwidthRule(rule);
-  if (rule === "neighbor") throw new Error("Neighbor bandwidths require centers and box bounds.");
+  if (rule === "optuna") throw new Error("Optuna bandwidths require centers and box bounds.");
   if (!Number.isFinite(constant) || constant <= 0 || !Number.isFinite(domainWidth) || domainWidth <= 0 || samples.some((x) => !Number.isFinite(x))) throw new Error("Invalid bandwidth inputs.");
   if (rule === "constant") return constant;
   const n = samples.length;

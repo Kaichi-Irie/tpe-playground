@@ -20,7 +20,7 @@ const weightMath: Record<WeightStrategy, string> = {
 const bandwidthLabels: Record<BandwidthRule, string> = {
   constant: "Constant",
   scott: "Scott",
-  neighbor: "Optuna",
+  optuna: "Optuna",
 };
 
 interface Props {

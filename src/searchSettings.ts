@@ -4,7 +4,7 @@ export type ModelSettings = Omit<TpeConfig, "mode">;
 
 export const optunaPreset = {
   gamma: 0.1,
-  bandwidthRule: "neighbor",
+  bandwidthRule: "optuna",
   weights: "optuna",
   priorWeight: 1,
   startupTrials: 10,
