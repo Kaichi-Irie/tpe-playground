@@ -95,7 +95,7 @@ it("shows the constraint selector with filling available only for an active pres
   expect(active).toContain('<option value="disk" selected="">Small disk</option>');
   expect(active).toContain('type="checkbox" checked=""');
   expect(active).toContain("Infeasible filling");
-  expect(active).toContain("Good takes feasible trials first. With filling on, the least-violating infeasible trials fill open slots. With filling off, Good can fall short of its target size.");
+  expect(active).toContain("Good takes feasible trials first. With filling on, the least-violating infeasible trials, those closest to the feasible region, fill open slots. With filling off, Good can fall short of its target size.");
   expect(active).toContain('1.5%');
 });
 

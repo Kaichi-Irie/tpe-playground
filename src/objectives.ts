@@ -3,6 +3,7 @@ export type ObjectivePreset = "multimodal" | "quadratic" | "narrow" | "boundary"
 interface ObjectiveDefinition {
   label: string;
   description: string;
+  /** KaTeX source. The constant c shifts each preset's minimum to 1. */
   formula: string;
   evaluate: (x: number) => number;
 }
@@ -16,25 +17,25 @@ const rawPresets: Record<ObjectivePreset, ObjectiveDefinition> = {
   multimodal: {
     label: "Multimodal",
     description: "Several local minima compete with the global minimum. The original playground function.",
-    formula: "f(x) = 0.18(x − 0.6)² + sin(1.8x) + 0.35cos(3x) + 1.5",
+    formula: String.raw`\begin{aligned}f(x)={}&0.18(x-0.6)^2+\sin 1.8x\\&+0.35\cos 3x+c\end{aligned}`,
     evaluate: rawObjective,
   },
   quadratic: {
     label: "Single minimum",
     description: "A smooth bowl with a single minimum at x = 1.5. A simple baseline for comparing settings.",
-    formula: "f(x) = 0.12(x − 1.5)²",
+    formula: String.raw`f(x)=0.12(x-1.5)^2+c`,
     evaluate: (x) => 0.12 * (x - 1.5) ** 2,
   },
   narrow: {
     label: "Narrow global minimum",
     description: "A narrow, deeper valley near x = 2 competes with a broad, shallower valley near x = −2.",
-    formula: "f(x) = 3 − 2.5 exp(−((x − 2)/0.25)²) − 1.5 exp(−((x + 2)/1.2)²)",
+    formula: String.raw`\begin{aligned}f(x)=c&-2.5\exp\!\Bigl[-\Bigl(\frac{x-2}{0.25}\Bigr)^{2}\Bigr]\\&-1.5\exp\!\Bigl[-\Bigl(\frac{x+2}{1.2}\Bigr)^{2}\Bigr]\end{aligned}`,
     evaluate: (x) => 3 - 2.5 * Math.exp(-(((x - 2) / 0.25) ** 2)) - 1.5 * Math.exp(-(((x + 2) / 1.2) ** 2)),
   },
   boundary: {
     label: "Boundary minimum",
     description: "The minimum lies at the left boundary, x = −5. Observe how sampling behaves near the search limit.",
-    formula: "f(x) = 0.06(x + 5)²",
+    formula: String.raw`f(x)=0.06(x+5)^2+c`,
     evaluate: (x) => 0.06 * (x + 5) ** 2,
   },
 };

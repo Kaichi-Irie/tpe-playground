@@ -205,6 +205,7 @@ h1 { font-size: var(--type-xl); letter-spacing: -.6px; margin-bottom: 4px; }
 .help-math { display: block; }
 .help-math .katex-display { margin: 6px 0; overflow-x: auto; overflow-y: hidden; padding: 2px 0; text-align: left; }
 .help-math .katex-display > .katex { text-align: left; }
+.help-math-inline .katex { white-space: nowrap; }
 .config-options .help-content { left: auto; right: 0; }
 .plot-header { padding: 16px 22px; }
 .plot-header h2 { font-size: var(--type-lg); }
@@ -840,7 +841,8 @@ header { height: 64px; padding: 10px 0; border: 0; }
 /* Settings are independent of the canvas toolbars. */
 .model-controls .responsive-settings { flex: 0 0 auto; padding: 8px 16px; }
 .settings-toggle { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
-.settings-dialog { padding: 0; width: min(440px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 32px); margin: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); box-shadow: 0 16px 64px var(--shadow); overflow: hidden; }
+/* Grow with the fluid type so the footer stays on one row at large sizes. */
+.settings-dialog { padding: 0; width: min(max(440px, 26em), calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 32px); margin: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); box-shadow: 0 16px 64px var(--shadow); overflow: hidden; }
 .settings-dialog[open] { display: flex; flex-direction: column; }
 .settings-dialog::backdrop { background: rgb(0 0 0 / .4); }
 .settings-dialog-heading { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 8px 16px 8px 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
@@ -921,8 +923,6 @@ header { height: 64px; padding: 10px 0; border: 0; }
 @media (max-width: 420px) {
   .settings-dialog-footer { gap: 6px; }
   .settings-dialog-footer button { padding-inline: 10px; }
-  .settings-dialog-footer .settings-preset-action { gap: 0; }
-  .settings-dialog-footer .settings-preset-action .help-trigger { width: 36px; }
   .share-search-link-word { display: none; }
 }
 @media (max-width: 380px) {
@@ -933,7 +933,8 @@ header { height: 64px; padding: 10px 0; border: 0; }
 .settings-dialog .settings-form .resample:hover { background: var(--hover); }
 .settings-preset-action { display: inline-flex; align-items: center; gap: 4px; }
 .settings-dialog-footer .settings-preset-action .help { position: static; }
-.settings-dialog-footer .settings-preset-action .help-trigger { width: 44px; height: 44px; padding: 0; border-color: transparent; }
+.settings-dialog-footer .settings-preset-action { gap: 0; }
+.settings-dialog-footer .settings-preset-action .help-trigger { width: 28px; height: 44px; padding: 0; border-color: transparent; }
 .settings-preset-action .help-content { top: auto; bottom: 100%; left: 16px; right: 16px; width: auto; }
 .share-search-status, .share-search-url { order: -1; flex: 0 0 100%; }
 .share-search-status { color: var(--muted); font-size: var(--type-md); }
