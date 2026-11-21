@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useId, useMemo, useReducer, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { acquisitionPlot, completeInitialInputs, buildExplanation, explanationDefaults, explanationGrid, fixedExample, kernelContribution, evaluateExplanation, splitAtThreshold, fractionForCount, type ExplanationExample, type ExplanationSettings } from "./explanation";
+import { acquisitionPlot, completeInitialInputs, buildExplanation, explanationCandidateLimit, explanationDefaults, explanationGrid, fixedExample, kernelContribution, evaluateExplanation, splitAtThreshold, fractionForCount, type ExplanationExample, type ExplanationSettings } from "./explanation";
 import { getObjective } from "./objectives";
 import "./step-explanation.css";
 import { samplingReducer } from "./labSampling";
@@ -827,7 +827,7 @@ export default function StepExplanation({ example = fixedExample, algorithmConta
         {stage === 5 && <><Range audio={audio} hint="prior" infoDisabled={infoDisabled} hinted={activeHint === "prior"} name="Prior" symbol="α" value={settings.priorWeight} min={0} max={10} step={0.25} onChange={(priorWeight) => { noteControlUsed("prior"); change({ priorWeight }); }} />
           <label className="journey-weight">Weighting <select aria-label="Weighting" data-guide-target={activeHint === "weights" || undefined} aria-describedby={activeHint === "weights" ? labHintElementId : undefined} value={settings.weights} onChange={(e) => { noteControlUsed("weights"); change({ weights: e.target.value as ExplanationSettings["weights"] }); }}><option value="uniform">Uniform</option><option value="recency">Recency</option><option value="ei">Improvement</option></select></label>
           <LabInfo id="weights" disabled={infoDisabled}><span className="journey-weight-note">{weightDescription}</span><JourneyMath tex={weightMath} /></LabInfo></>}
-        {(stage === 6 || stage === 7) && <><Range hint="candidates" infoDisabled={infoDisabled} hinted={activeHint === "candidates"} name="Candidates" symbol="M" value={settings.candidates} min={1} max={40} step={1} onChange={(candidates) => { noteControlUsed("candidates"); change({ candidates }); }} /><button className="journey-icon" aria-label="Resample candidates" title="Resample candidates" onClick={() => { if (controlDisabled) return; change({ seed: settings.seed + 1 }); }}>↻</button></>}
+        {(stage === 6 || stage === 7) && <><Range hint="candidates" infoDisabled={infoDisabled} hinted={activeHint === "candidates"} name="Candidates" symbol="M" value={settings.candidates} min={1} max={explanationCandidateLimit} step={1} onChange={(candidates) => { noteControlUsed("candidates"); change({ candidates }); }} /><button className="journey-icon" aria-label="Resample candidates" title="Resample candidates" onClick={() => { if (controlDisabled) return; change({ seed: settings.seed + 1 }); }}>↻</button></>}
       </fieldset>
     </div>
     <nav className="journey-navigation" aria-label="Walkthrough navigation">

@@ -20,6 +20,7 @@ export interface ExplanationSettings {
 export const explanationDefaults: ExplanationSettings = {
   gamma: 0.3, bandwidth: 0.55, priorWeight: 4, weights: "uniform", candidates: 8, seed: 50,
 };
+export const explanationCandidateLimit = 40;
 export const fixedExample: ExplanationExample = {
   label: "10 observations · one decision",
   objectivePreset: "multimodal",
@@ -40,6 +41,8 @@ export function kernelContribution(kernel: Kernel, x: number): number {
 export function buildExplanation(example: ExplanationExample, settings: ExplanationSettings) {
   const model = fitOneParamModel(example.trials, settings.priorWeight, {
     ...settings, bandwidthRule: "constant", startupTrials: 2, objectivePreset: example.objectivePreset,
+    // Keep the explanation's draw batch stable as the learner changes the visible prefix.
+    candidates: Math.max(explanationCandidateLimit, settings.candidates),
   });
   const { partition } = model.snapshot;
   if (partition.kind !== "single-objective") throw new Error("The Lab requires an unconstrained partition.");
@@ -47,13 +50,15 @@ export function buildExplanation(example: ExplanationExample, settings: Explanat
   const good = createLogDensity(group.good), bad = createLogDensity(group.bad);
   const trace = model.propose(settings.seed);
   if (trace.method !== "tpe") throw new Error("Explanation requires a fitted TPE proposal.");
+  const candidates = trace.groups[0].candidates.slice(0, settings.candidates);
+  const selectedIndex = candidates.reduce((best, candidate, i) => candidate.score > candidates[best].score ? i : best, 0);
   return {
     group, partition,
     logRatios: explanationGrid.map((x) => good({ x }) - bad({ x })),
     goodDensity: explanationGrid.map((x) => Math.exp(good({ x }))),
     badDensity: explanationGrid.map((x) => Math.exp(bad({ x }))),
-    candidates: trace.groups[0].candidates,
-    selectedIndex: trace.groups[0].selectedIndex,
+    candidates,
+    selectedIndex,
   };
 }
 

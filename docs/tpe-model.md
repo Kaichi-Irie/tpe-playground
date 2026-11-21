@@ -25,9 +25,9 @@ and constraint. The link opens at trial zero. Playback history stays in memory.
 
 History keys include coordinates and objective/constraint values, not just IDs.
 They are deterministic cache/provenance identifiers, not cryptographic digests.
-Exact history reconstruction still requires the observations. Version 2 records component-wise truncated sampling using the existing per-trial
-seed mixing and Box–Muller generator. Share links created in v1.0.0 replay a
-different optimized trajectory.
+Exact history reconstruction still requires the observations. Proposals use
+NumPy's seeded random stream and inverse-CDF sampling. Older share links replay
+with these draws and produce different trajectories.
 
 ## Fitting and proposing
 
@@ -99,8 +99,8 @@ integrates to one on the box and has log density `-Infinity` outside it. Margina
 drop the omitted coordinates' terms, including their normalization factors, and
 preserve the mixture weights.
 
-Sampling chooses a component by weight once, then uses bounded Box–Muller
-rejection for each coordinate of that component. The snapshot records
+Sampling chooses a component by weight for each candidate, then applies the
+truncated-normal inverse CDF to a uniform draw for each coordinate. The snapshot records
 `normalization: "truncated-box"` and `sampling: "truncated-components"`.
 
 ## Optuna parity
@@ -116,17 +116,40 @@ The fixture compares Good and Bad trial IDs, every kernel's center, per-coordina
 width and normalized mixture weight, and log ℓ and log g at 50 box points per
 case. The playground sorts coincident centers stably in trial order under the
 preset. Optuna calls NumPy’s default `argsort`, which can assign unequal
-neighbor widths to different trials when centers coincide. Startup and candidate
-draws use different random number generators and sampling algorithms, so the
-preset can produce different trajectories from the same seed.
+neighbor widths to different trials when centers coincide.
 
-Regenerate the fixture from the repository root with Python and uv.
+Startup and TPE index two independent NumPy legacy `RandomState(seed)` streams.
+Startup consumes one uniform per parameter per trial in declaration order. Each
+TPE group consumes all component uniforms first, followed by all candidate
+uniforms for each parameter in turn. The history size determines both offsets,
+so seeking to a trial reproduces its proposal. The fallback for an empty Good
+group without a prior also uses the startup stream.
+
+For sequential completed float trials, the same seed, same history and unchanged
+preset settings give the same Optuna proposal within 1e-9 per coordinate. Last-bit
+differences can affect which candidate wins when the top scores nearly tie.
+The trajectory fixture checks each step against Optuna with the preceding Optuna
+trials as history. Startup draws match exactly for NumPy builds that round the
+range multiplication and addition separately. Builds that fuse the operations
+can differ in the last bits.
+
+Regenerate the fixtures from the repository root with Python and uv.
 
 ```sh
 uv run --with optuna==5.1.0 python scripts/optuna_parity_fixtures.py
 ```
 
-`npm run check` compares against the committed fixture without running Python.
+If NumPy fuses the startup operations, use a fresh cache and build it from source
+with floating-point contraction disabled for the trajectory fixture. Use
+`--only density` with the original NumPy build to regenerate the density fixture.
+
+```sh
+UV_CACHE_DIR="$(mktemp -d)" CFLAGS="-ffp-contract=off" \
+  uv run --with optuna==5.1.0 --with numpy==2.5.5 --no-binary-package numpy \
+  python scripts/optuna_parity_fixtures.py --only trajectories
+```
+
+`npm run check` compares against the committed fixtures without running Python.
 See the versioned [Optuna sampler](https://github.com/optuna/optuna/blob/v5.1.0/optuna/samplers/_tpe/sampler.py)
 and [Parzen estimator](https://github.com/optuna/optuna/blob/v5.1.0/optuna/samplers/_tpe/parzen_estimator.py).
 

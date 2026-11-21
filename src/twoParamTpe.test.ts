@@ -172,7 +172,7 @@ describe("two-parameter constraints", () => {
     const run = (infeasibleFilling: boolean) => moveTwoParamPlayback(emptyTwoParamPlayback(), 200, 42, "multivariate", { constraintPreset: "disk", priorWeight: 0, infeasibleFilling });
     const on = run(true).trials.find((trial) => trial.violation === 0)?.id;
     const off = run(false).trials.find((trial) => trial.violation === 0)?.id;
-    expect(on).toBe(22);
-    expect(off).toBe(18);
+    expect(on).toBe(11);
+    expect(off).toBe(64);
   });
 });

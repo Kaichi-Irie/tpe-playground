@@ -83,14 +83,18 @@ it("assigns zero density outside the box for points, marginals, and grids", () =
   ]);
 });
 
-it("retries each rejected coordinate without redrawing the component or accepted coordinates", () => {
+it("chooses components first and samples the selected kernels in coordinate batches", () => {
   const density = createDensity(jointParameters, jointSamples, 1, [1, 1]);
-  const radiusOne = Math.exp(-0.5);
-  const draws = [0.25, radiusOne, 0.5, radiusOne, 0, radiusOne, 0, radiusOne, 0.5];
+  const draws = [0.25, 0.75, 0.4, 0.5, 0.7, 0];
   let i = 0;
-  expect(sampleDensity(density, () => {
+  const points = sampleDensity(density, 2, () => {
     if (i >= draws.length) throw new Error("Unexpected extra draw.");
     return draws[i++];
-  })).toEqual({ x: -4, y: 5 });
+  });
+  // Optuna ppf(0.4, 0, 10) and ppf(0.7, -6, 0), shifted by the first kernel's center.
+  expect(points[0].x).toBeCloseTo(-5 + 0.5244005127080409, 12);
+  expect(points[0].y).toBeCloseTo(6 - 0.3853204656084937, 12);
+  expect(points[1].x).toBeCloseTo(0, 12);
+  expect(points[1].y).toBe(0);
   expect(i).toBe(draws.length);
 });

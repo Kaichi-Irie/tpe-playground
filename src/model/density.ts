@@ -1,5 +1,6 @@
-import type { DensitySnapshot, Kernel, Parameter, Point, RandomSource } from "./types";
-import { logTruncatedNormalPeak, sampleTruncatedNormal } from "./truncnorm";
+import type { DensitySnapshot, Kernel, Parameter, Point } from "./types";
+import { choiceIndex } from "./numpyRandom";
+import { logTruncatedNormalPeak, truncnormPpf } from "./truncnorm";
 
 export function createDensity(parameters: readonly Parameter[], samples: readonly { id: number; params: Point }[], bandwidth: number, weights: readonly number[], priorWeight = 0): DensitySnapshot {
   const total = weights.reduce((sum, weight) => sum + weight, priorWeight);
@@ -97,14 +98,21 @@ export function logDensity(model: DensitySnapshot, point: Point, axes: readonly 
   return evaluate(point);
 }
 
-export function sampleDensity(model: DensitySnapshot, random: RandomSource): Point {
-  const total = model.kernels.reduce((sum, k) => sum + k.observationWeight, 0);
-  const choice = random() * total;
-  let cumulative = 0;
-  const kernel = model.kernels.find((k) => (cumulative += k.observationWeight) > choice)!;
-  const params: Record<string, number> = {};
+export function sampleDensity(model: DensitySnapshot, count: number, nextUniform: () => number): Point[] {
+  let total = 0;
+  const cdf = model.kernels.map((kernel) => total += kernel.mixtureWeight);
+  for (let i = 0; i < cdf.length; i++) cdf[i] /= total;
+
+  const components = Array.from({ length: count }, () => model.kernels[choiceIndex(cdf, nextUniform())]);
+  const points: Record<string, number>[] = components.map(() => ({}));
+  // NumPy chooses all components first, then draws one batch per coordinate.
   for (const { id, low, high } of model.parameters) {
-    params[id] = sampleTruncatedNormal(kernel.center[id], kernel.bandwidths[id], low, high, random);
+    for (const [i, kernel] of components.entries()) {
+      const mean = kernel.center[id];
+      const width = kernel.bandwidths[id];
+      const z = truncnormPpf(nextUniform(), (low - mean) / width, (high - mean) / width);
+      points[i][id] = Math.max(low, Math.min(high, mean + width * z));
+    }
   }
-  return params;
+  return points;
 }

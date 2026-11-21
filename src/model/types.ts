@@ -90,4 +90,3 @@ export type ProposalTrace = ProposalContext & (
   { readonly method: "random"; readonly reason: "startup" | "no-feasible-good" } |
   { readonly method: "tpe"; readonly modelId: string; readonly groups: readonly GroupTrace[] }
 );
-export type RandomSource = () => number;
