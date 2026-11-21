@@ -13,9 +13,10 @@ it.each(steps)("matches Optuna 5.1.0 for $name, trial $step", ({ seed, mode, pro
   const proposal = proposeTpe(problem, trials.slice(0, step), config, seed);
   const startup = step < config.startupTrials;
   expect(proposal.method).toBe(startup ? "random" : "tpe");
+  // NumPy builds that fuse low + range * u into an FMA can differ in the last bit.
+  const tolerance = startup ? 1e-14 : 1e-9;
   for (const { id } of problem.parameters) {
     const actual = proposal.selected[id];
-    if (startup) expect(actual, id).toBe(trial.params[id]);
-    else expect(Math.abs(actual - trial.params[id]), id).toBeLessThanOrEqual(1e-9);
+    expect(Math.abs(actual - trial.params[id]), id).toBeLessThanOrEqual(tolerance);
   }
 });

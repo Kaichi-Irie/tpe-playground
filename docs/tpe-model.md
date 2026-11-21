@@ -129,24 +129,13 @@ For sequential completed float trials, the same seed, same history and unchanged
 preset settings give the same Optuna proposal within 1e-9 per coordinate. Last-bit
 differences can affect which candidate wins when the top scores nearly tie.
 The trajectory fixture checks each step against Optuna with the preceding Optuna
-trials as history. Startup draws match exactly for NumPy builds that round the
-range multiplication and addition separately. Builds that fuse the operations
-can differ in the last bits.
+trials as history. Startup points match to within the last bit because some
+NumPy builds fuse the range multiplication and addition.
 
 Regenerate the fixtures from the repository root with Python and uv.
 
 ```sh
 uv run --with optuna==5.1.0 python scripts/optuna_parity_fixtures.py
-```
-
-If NumPy fuses the startup operations, use a fresh cache and build it from source
-with floating-point contraction disabled for the trajectory fixture. Use
-`--only density` with the original NumPy build to regenerate the density fixture.
-
-```sh
-UV_CACHE_DIR="$(mktemp -d)" CFLAGS="-ffp-contract=off" \
-  uv run --with optuna==5.1.0 --with numpy==2.5.5 --no-binary-package numpy \
-  python scripts/optuna_parity_fixtures.py --only trajectories
 ```
 
 `npm run check` compares against the committed fixtures without running Python.

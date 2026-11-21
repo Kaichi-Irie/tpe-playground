@@ -3,7 +3,6 @@
 uv run --with optuna==5.1.0 python scripts/optuna_parity_fixtures.py
 """
 
-import argparse
 import json
 from pathlib import Path
 
@@ -181,24 +180,12 @@ def write_density_fixture():
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--only", choices=("density", "trajectories"))
-    args = parser.parse_args()
     if optuna.__version__ != OPTUNA_VERSION:
         raise SystemExit(f"Expected Optuna {OPTUNA_VERSION}, got {optuna.__version__}")
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-    if args.only != "density":
-        draws = np.random.RandomState(42).random_sample(16).tolist()
-        scaled = np.random.RandomState(42).uniform([LOW] * len(draws), [HIGH] * len(draws))
-        if scaled.tolist() != [LOW + (HIGH - LOW) * u for u in draws]:
-            raise SystemExit(
-                "The trajectory fixture requires NumPy without fused multiply-add in uniform(). "
-                "See docs/tpe-model.md for the source build command."
-            )
-        write_trajectories()
-    if args.only != "trajectories":
-        write_density_fixture()
+    write_trajectories()
+    write_density_fixture()
 
 
 if __name__ == "__main__":
