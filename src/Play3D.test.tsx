@@ -32,7 +32,7 @@ it("starts a sequential Play 3D search with no observations and a preview of its
   expect(html).toContain("About Play 3D density model");
   expect(html).toContain("keeping each (x₁, x₂) pair together.");
   expect(html).toContain("each coordinate has its own KDE and candidate draw.");
-  for (const label of ["Good fraction", "Bandwidth", "Scott", "Silverman", "settings-dialog", "Prior weight", "Startup trials", "Candidates", "Weights", "Reset model defaults", "Quadratic", "Rosenbrock"]) expect(html).toContain(label);
+  for (const label of ["Good fraction", "Bandwidth", "Scott", "settings-dialog", "Prior weight", "Startup trials", "Candidates", "Weights", "Reset model defaults", "Quadratic", "Rosenbrock"]) expect(html).toContain(label);
   expect(html).not.toContain("coming soon");
   expect(html).toContain("Density model");
   expect(html).toContain("Univariate");

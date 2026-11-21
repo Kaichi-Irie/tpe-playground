@@ -1,4 +1,4 @@
-export const bandwidthRules = ["constant", "scott", "silverman", "neighbor"] as const;
+export const bandwidthRules = ["constant", "scott", "neighbor"] as const;
 export type BandwidthRule = typeof bandwidthRules[number];
 
 export function isBandwidthRule(rule: string | null): rule is BandwidthRule {
@@ -34,8 +34,7 @@ export function neighborBandwidths(centers: readonly number[], low: number, high
 }
 
 // One-dimensional rules use observation locations, independently of mixture weights.
-// Scott: s n^(-1/5). Silverman: 0.9 min(s, IQR / 1.34) n^(-1/5).
-// Quartiles use linear interpolation (R type 7). The prior is excluded.
+// Scott: s n^(-1/5). The prior is excluded.
 export function resolveBandwidth(samples: readonly number[], rule: BandwidthRule, constant: number, domainWidth: number, includePrior = false): number {
   validateBandwidthRule(rule);
   if (rule === "neighbor") throw new Error("Neighbor bandwidths require centers and box bounds.");
@@ -45,18 +44,8 @@ export function resolveBandwidth(samples: readonly number[], rule: BandwidthRule
   let spread = 0;
   if (n > 1) {
     const mean = samples.reduce((sum, x) => sum + x, 0) / n;
-    const sd = Math.sqrt(samples.reduce((sum, x) => sum + (x - mean) ** 2, 0) / (n - 1));
-    spread = sd;
-    if (rule === "silverman") {
-      const sorted = [...samples].sort((a, b) => a - b);
-      const quantile = (p: number) => {
-        const index = (n - 1) * p, lower = Math.floor(index);
-        return sorted[lower] + (sorted[Math.ceil(index)] - sorted[lower]) * (index - lower);
-      };
-      const robust = (quantile(0.75) - quantile(0.25)) / 1.34;
-      spread = Math.min(spread, robust);
-    }
+    spread = Math.sqrt(samples.reduce((sum, x) => sum + (x - mean) ** 2, 0) / (n - 1));
   }
   // Undefined singleton spread and zero spread both resolve to the clip floor.
-  return clipBandwidth((rule === "silverman" ? 0.9 : 1) * spread * Math.max(1, n) ** -0.2, domainWidth, n, includePrior);
+  return clipBandwidth(spread * Math.max(1, n) ** -0.2, domainWidth, n, includePrior);
 }

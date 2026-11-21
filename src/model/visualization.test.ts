@@ -7,7 +7,7 @@ import { twoParamConfig, emptyTwoParamPlayback, moveTwoParamPlayback, twoParamOb
 
 describe("shared visualization evaluation", () => {
   it("matches point evaluation on Cartesian grids, including narrow peaks, tails and reversed axes", () => {
-    for (const mode of ["multivariate", "univariate"] as const) for (const bandwidthRule of ["constant", "scott", "silverman"] as const) for (const priorWeight of [0, 0.5]) {
+    for (const mode of ["multivariate", "univariate"] as const) for (const bandwidthRule of ["constant", "scott"] as const) for (const priorWeight of [0, 0.5]) {
       const model = fitTpe(twoParamProblem, twoParamObservations(moveTwoParamPlayback(emptyTwoParamPlayback(), 40, 42, mode, { startupTrials: 40 }).trials), twoParamConfig(mode, { bandwidth: 0.01, bandwidthRule, priorWeight, weights: "ei" }));
       const evaluate = createFieldEvaluator(model, { axes: ["x1", "x2"], projection: { kind: "full" } });
       for (const [xId, yId] of [["x1", "x2"], ["x2", "x1"]]) {

@@ -41,7 +41,7 @@ it("renders the density explorer with playback controls and an empty initial his
   expect(html).toContain('id="weights"');
   expect(html).toContain('id="bandwidth-rule"');
   expect(html).toContain("Scott");
-  expect(html).toContain("Silverman");
+  expect(html).not.toContain("Silverman");
   expect(html).toContain("Dragging sets a constant width.");
   expect(html).toContain("Gaussian prior");
   expect(html).toContain("About Gaussian prior");

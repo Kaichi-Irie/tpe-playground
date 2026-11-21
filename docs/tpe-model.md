@@ -45,7 +45,7 @@ engine (for example after a JSON round trip), copying it before constructing the
 runtime. It is not an untrusted file parser or schema migration service.
 
 The current policy supports a single objective (minimize or maximize), fixed
-continuous box domains, Constant, Scott, Silverman and Neighbor bandwidth rules,
+continuous box domains, Constant, Scott and Neighbor (Optuna) bandwidth rules,
 uniform, recency, EI and Optuna weighting, and an optional broad prior. Observations retain their original objective values.
 The unconstrained split threshold uses minimization-oriented values.
 
@@ -87,7 +87,7 @@ candidate-selection code. The RNG traverses groups in declared parameter order.
 Kernels distinguish observation and prior sources, raw observation-equivalent
 weights, and normalized mixture weights. Prior weights are applied per group.
 Kernels have one bandwidth per coordinate. Constant uses the configured width
-for every observation kernel. Scott and Silverman resolve widths separately for
+for every observation kernel. Scott resolves widths separately for
 each density and coordinate within a parameter group. Neighbor resolves a width
 for each observation kernel and coordinate. Prior widths remain fixed.
 

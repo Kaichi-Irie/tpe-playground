@@ -8,7 +8,7 @@ import { ShareSearchLink } from "./ShareSearchLink";
 import type { ShareExperiment } from "./shareSearch";
 import { applyOptunaPreset, bandwidthRange, candidateCounts, gammaRange, matchesOptunaPreset, priorWeights, startupTrialCounts, weightOptions, type ModelSettings } from "./searchSettings";
 
-const bandwidthRuleMath = String.raw`\begin{aligned}\text{Constant}&:\ h\\\text{Scott}&:\ \hat\sigma\,n^{-1/5}\\\text{Silverman}&:\ 0.9\min\!\left(\hat\sigma,\tfrac{\mathrm{IQR}}{1.34}\right)n^{-1/5}\\\text{Optuna}&:\ \max(x_i-x_{i-1},\,x_{i+1}-x_i)\end{aligned}`;
+const bandwidthRuleMath = String.raw`\begin{aligned}\text{Constant}&:\ h\\\text{Scott}&:\ s\,n^{-1/5}\\\text{Optuna}&:\ \max(x_i-x_{i-1},\,x_{i+1}-x_i)\end{aligned}`;
 
 const weightMath: Record<WeightStrategy, string> = {
   uniform: String.raw`w_i=1`,
@@ -20,7 +20,6 @@ const weightMath: Record<WeightStrategy, string> = {
 const bandwidthLabels: Record<BandwidthRule, string> = {
   constant: "Constant",
   scott: "Scott",
-  silverman: "Silverman",
   neighbor: "Optuna",
 };
 
@@ -90,7 +89,7 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
       <fieldset className="settings-fields"><legend>Model</legend>
             <div className="parameter">
               <div className="parameter-label">
-                <div><label htmlFor={id("bandwidth-rule")}>Bandwidth rule</label><Help label="bandwidth rule">Kernel width h for each group and coordinate:<HelpMath tex={bandwidthRuleMath} />n is the group size. Scott and Silverman scale with the group’s spread (standard deviation, IQR). Optuna takes the larger gap to the neighboring observations. Automatic widths are clipped to a positive range and narrow as observations accumulate.</Help>
+                <div><label htmlFor={id("bandwidth-rule")}>Bandwidth rule</label><Help label="bandwidth rule">Kernel width h for each group and coordinate:<HelpMath tex={bandwidthRuleMath} />n is the group size and s its standard deviation. Optuna takes the larger gap to the neighboring observations. Automatic widths are clipped to a positive range and narrow as observations accumulate.</Help>
                 </div>
               </div>
               <select className="bandwidth-rule-select" id={id("bandwidth-rule")} aria-label={`${labelPrefix}Bandwidth rule`} value={bandwidthRule} onChange={(event) => change({ bandwidthRule: event.target.value as BandwidthRule })}>{bandwidthRules.map((rule) => <option key={rule} value={rule}>{bandwidthLabels[rule]}</option>)}</select>
