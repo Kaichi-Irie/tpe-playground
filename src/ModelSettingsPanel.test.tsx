@@ -52,7 +52,7 @@ it("keeps dialog actions in the footer and the seed in Experiment", () => {
 
   const footer = html.match(/class="settings-dialog-footer">([\s\S]*?)<\/div>/)?.[1];
   expect(footer).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Reset model defaults"/);
-  expect(footer).toMatch(/Share link<\/button>/);
+  expect(footer).toMatch(/Share<span class="share-search-link-word"> link<\/span><\/button>/);
 
   const experiment = html.match(/<legend>Experiment<\/legend>([\s\S]*?)<\/fieldset>/)?.[1];
   expect(experiment).toContain('<output aria-label="Search seed">42</output>');
@@ -61,7 +61,7 @@ it("keeps dialog actions in the footer and the seed in Experiment", () => {
   const model = html.match(/<legend>Model<\/legend>([\s\S]*?)<\/fieldset>/)?.[1];
   expect(model).toContain('aria-label="About bandwidth rule"');
 
-  const bandwidth = html.match(/aria-label="About bandwidth"[^>]*>ⓘ<\/button><span[^>]*>([^<]*)<\/span>/)?.[1];
+  const bandwidth = html.match(/aria-label="About bandwidth"[^>]*>ⓘ<\/button><span[^>]*role="tooltip"[^>]*>([\s\S]*?)<\/span><\/span>/)?.[1];
   expect(bandwidth).toContain("Width of each Gaussian kernel.");
   expect(bandwidth).not.toContain("magic clipping");
 
@@ -117,4 +117,11 @@ it("disables the Optuna preset when it matches and shows each coordinate's obser
   expect(html).toMatch(/<input id="bandwidth"[^>]*value="2.5"/);
   expect(renderPanel(undefined, { settings: { ...settings, gamma: 0.2 } }))
     .toMatch(/<button type="button">Optuna preset<\/button>/);
+});
+
+it("labels the neighbor bandwidth rule as Optuna on one short line", () => {
+  const html = renderPanel(undefined, { settings: applyOptunaPreset(twoParamDefaultModelSettings), widths: [{ label: "x₁", values: [0.5, 1] }] });
+  expect(html).toContain('<option value="neighbor" selected="">Optuna</option>');
+  expect(html).toContain('<span class="bandwidth-mode">Optuna rule · Good KDE</span>');
+  expect(html).not.toContain("Neighbor");
 });

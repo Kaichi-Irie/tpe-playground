@@ -108,7 +108,7 @@ it("starts a shared Play 2D search at trial zero with the linked settings", () =
   expect(html).toContain('value="quadratic" selected=""');
   expect(html).toContain('aria-label="Search seed">0</output>');
   expect(html).toContain('aria-valuetext="15 percent"');
-  expect(html).toContain("Share link");
+  expect(html).toContain('Share<span class="share-search-link-word"> link</span>');
   expect(html.replace(/<article\b[^>]*class="about-page"[\s\S]*?<\/article>/, "")).not.toContain("Infeasible filling");
 });
 

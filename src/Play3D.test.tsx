@@ -82,7 +82,7 @@ it("starts a shared Play 3D search at trial zero with the linked density mode an
   expect(html).toContain('value="univariate" selected=""');
   expect(html).toContain('aria-label="Play 3D Search seed">7</output>');
   expect(html).toContain('aria-valuetext="50 percent"');
-  expect(html).toContain("Share link");
+  expect(html).toContain('Share<span class="share-search-link-word"> link</span>');
 });
 
 it("shows the constraint selector with filling available only for an active preset", () => {
@@ -125,4 +125,14 @@ it("describes candidate sampling per coordinate in the univariate proposal", () 
   } finally {
     initialPlayback.mockRestore();
   }
+});
+
+it("states the feasible share only for an active constraint", () => {
+  const none = renderToStaticMarkup(<Play3DConstraintSettings preset="none" infeasibleFilling onPresetChange={() => {}} onFillingChange={() => {}} />);
+  expect(none).toContain("The whole search domain is feasible.");
+  expect(none).not.toContain("of the domain is feasible");
+  expect(none).toContain("Changing the constraint restarts the search.");
+
+  const disk = renderToStaticMarkup(<Play3DConstraintSettings preset="disk" infeasibleFilling onPresetChange={() => {}} onFillingChange={() => {}} />);
+  expect(disk).toContain("of the domain is feasible. Changing the constraint restarts the search.");
 });
