@@ -7,7 +7,7 @@ import type { DensityMode, Observation, Problem, ProposalTrace, TpeConfig } from
 export type { DensityMode } from "./model/types";
 
 export interface TwoParamTrial { id: number; x1: number; x2: number; value: number; constraints: number[]; violation: number }
-export const twoParamSettings = { bandwidth: 0.65, gamma: 0.25, count: 200, seed: 0, startupTrials: 10, candidates: 24 };
+export const twoParamSettings = { bandwidth: 0.65, gamma: 0.25, count: 200, seed: 42, startupTrials: 10, candidates: 24 };
 
 function twoParamObjective(x1: number, x2: number): number {
   return 0.12 * (x1 - 0.7) ** 2 + 0.18 * (x2 + 0.5) ** 2 + Math.sin(1.4 * x1) * Math.cos(1.1 * x2) + 1.2;

@@ -37,7 +37,7 @@ function initialTheme(): boolean {
 
 const domainWidth = domain[1] - domain[0];
 const defaultSearch: SharedSearch<ObjectivePreset> = {
-  seed: 0,
+  seed: 42,
   preset: "multimodal",
   settings: { ...defaults, priorWeight: prior.weight, ...searchDefaults },
 };
