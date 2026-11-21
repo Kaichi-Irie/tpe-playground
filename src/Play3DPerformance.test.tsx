@@ -36,11 +36,11 @@ it("shows each constrained run at infinity until its first feasible trial", () =
   const settings = { ...twoParamDefaultModelSettings, priorWeight: 0 };
   const run = (count: number) => moveTwoParamPlayback(emptyTwoParamPlayback(), count, 42, "multivariate", { ...settings, constraintPreset });
   const render = (count: number) => renderToStaticMarkup(<Play3DPerformance {...run(count)} seed={42} objectivePreset="multimodal" constraintPreset={constraintPreset} settings={settings} />);
-  const html = render(18);
+  const html = render(10);
   expect(html).toContain('<i aria-hidden="true"></i>Filling on');
   expect(html).toContain('<i aria-hidden="true"></i>Filling off');
   expect(html).toContain('<i aria-hidden="true"></i>Random');
-  expect(html).toContain("0 / 18 feasible");
+  expect(html).toContain("0 / 10 feasible");
   expect(html).not.toContain("Average regret");
   expect(html).toContain(">∞</text>");
   const infinityY = html.match(/<line class="grid"[^>]* y1="([^"]+)"/)?.[1];
@@ -48,12 +48,22 @@ it("shows each constrained run at infinity until its first feasible trial", () =
   for (const name of ["tpe", "third", "random"]) {
     expect(html).toContain(`${name}-progress-line`);
   }
-  expect(html).not.toContain(`cy="${infinityY}" r="4" class="third-progress-point"`);
-  expect(html).not.toContain(`cy="${infinityY}" r="5" class="random-progress-point"`);
+  expect(html).toContain(`cy="${infinityY}" r="4" class="third-progress-point"`);
+  expect(html).toContain(`cy="${infinityY}" r="5" class="random-progress-point"`);
   expect(html).toContain(`cy="${infinityY}" r="3" class="tpe-progress-point"`);
-  const atFirstFeasible = render(22);
-  expect(atFirstFeasible).toContain("1 / 22 feasible");
+  const atFirstFeasible = render(11);
+  expect(atFirstFeasible).toContain("1 / 11 feasible");
   expect(atFirstFeasible).not.toContain(`cy="${infinityY}" r="3" class="tpe-progress-point"`);
+
+  const beforeComparisonsFeasible = render(63);
+  const atComparisonsFeasible = render(64);
+  for (const marker of [
+    `cy="${infinityY}" r="4" class="third-progress-point"`,
+    `cy="${infinityY}" r="5" class="random-progress-point"`,
+  ]) {
+    expect(beforeComparisonsFeasible).toContain(marker);
+    expect(atComparisonsFeasible).not.toContain(marker);
+  }
 
   const firstTrialHtml = render(1);
   expect(firstTrialHtml).toContain(">∞</text>");

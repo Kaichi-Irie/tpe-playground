@@ -1,5 +1,6 @@
 import { neighborBandwidths, resolveBandwidth, validateBandwidthRule } from "./bandwidth";
 import { createDensity, logDensity, sampleDensity } from "./density";
+import { randomSample, validateRandomSeed } from "./numpyRandom";
 import { partitionConstrainedSingleObjective, partitionSingleObjective, totalViolation, validateWeightStrategy } from "./partition";
 import type { Evaluation, GroupModel, GroupTrace, ModelSnapshot, Observation, Point, Problem, ProposalTrace, TpeConfig } from "./types";
 
@@ -31,15 +32,6 @@ export function validateInput(problem: Problem, trials: readonly Observation[], 
   if (new Set(trials.map((t) => t.id)).size !== trials.length || trials.some((t) => !Number.isInteger(t.id) || t.id < 0 || t.objectives.length !== 1 || !Number.isFinite(t.objectives[0]) || t.constraints.length !== problem.constraintCount || !Array.from(t.constraints).every(Number.isFinite) || !Number.isFinite(totalViolation(t.constraints)) || Object.keys(t.params).length !== problem.parameters.length || problem.parameters.some((p) => !Number.isFinite(t.params[p.id]) || t.params[p.id] < p.low || t.params[p.id] > p.high))) throw new Error("Invalid observations.");
 }
 
-export function createRandom(seed: number, trialCount: number) {
-  if (!Number.isFinite(seed)) throw new Error("Invalid seed.");
-  let state = (seed ^ Math.imul(trialCount + 1, 2654435761)) >>> 0;
-  state = Math.imul(state ^ (state >>> 16), 0x21f0aaad);
-  state = Math.imul(state ^ (state >>> 15), 0x735a2d97);
-  state = (state ^ (state >>> 15)) >>> 0;
-  return () => { state = (Math.imul(1664525, state) + 1013904223) >>> 0; return (state + 0.5) / 2 ** 32; };
-}
-
 export function evaluateGroup(group: GroupModel, point: Point): Evaluation {
   const logL = logDensity(group.good, point), logG = logDensity(group.bad, point);
   return { logL, logG, score: logL - logG };
@@ -62,13 +54,15 @@ function modelRuntime(snapshot: ModelSnapshot) {
       });
     },
     propose(seed: number): ProposalTrace {
-      const random = createRandom(seed, snapshot.inputTrialIds.length);
+      validateRandomSeed(seed);
+      const count = snapshot.config.candidates;
+      const drawsPerTrial = count * (snapshot.groups.length + snapshot.problem.parameters.length);
+      // An explicitly fitted model can also propose during startup. Start its stream at zero.
+      let position = Math.max(0, snapshot.inputTrialIds.length - snapshot.config.startupTrials) * drawsPerTrial;
       const selected: Record<string, number> = {};
       const groups: GroupTrace[] = snapshot.groups.map((group) => {
-        const candidates = Array.from({ length: snapshot.config.candidates }, () => {
-          const params = sampleDensity(group.good, random);
-          return { params, ...evaluateGroup(group, params) };
-        });
+        const samples = sampleDensity(group.good, count, () => randomSample(seed, position++));
+        const candidates = samples.map((params) => ({ params, ...evaluateGroup(group, params) }));
         const selectedIndex = candidates.reduce((best, c, i) => c.score > candidates[best].score ? i : best, 0);
         Object.assign(selected, candidates[selectedIndex].params);
         return { groupId: group.id, parameterIds: group.parameterIds, candidates, selectedIndex };
@@ -120,10 +114,11 @@ function fitValidatedTpe(problem: Problem, trials: readonly Observation[], confi
 
 export function proposeTpe(problem: Problem, trials: readonly Observation[], config: TpeConfig, seed: number): ProposalTrace {
   validateInput(problem, trials, config);
+  validateRandomSeed(seed);
   const startup = trials.length < config.startupTrials;
   if (!startup && !needsFeasibleGood(problem, trials, config)) return fitValidatedTpe(problem, trials, config).propose(seed);
-  const random = createRandom(seed, trials.length);
-  return freezeData({ version: 2, method: "random", reason: startup ? "startup" : "no-feasible-good", seed, problem: structuredClone(problem), config: { ...config }, inputTrialIds: trials.map((t) => t.id), historyKey: dataKey(trials.map((t) => [t.id, problem.parameters.map((p) => t.params[p.id]), t.objectives, t.constraints])), selected: Object.fromEntries(problem.parameters.map((p) => [p.id, p.low + random() * (p.high - p.low)])) });
+  const offset = trials.length * problem.parameters.length;
+  return freezeData({ version: 2, method: "random", reason: startup ? "startup" : "no-feasible-good", seed, problem: structuredClone(problem), config: { ...config }, inputTrialIds: trials.map((t) => t.id), historyKey: dataKey(trials.map((t) => [t.id, problem.parameters.map((p) => t.params[p.id]), t.objectives, t.constraints])), selected: Object.fromEntries(problem.parameters.map((p, i) => [p.id, p.low + (p.high - p.low) * randomSample(seed, offset + i)])) });
 }
 
 export function needsFeasibleGood(problem: Problem, trials: readonly Observation[], config: TpeConfig): boolean {

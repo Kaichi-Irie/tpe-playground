@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
-import { createRandom } from "./engine";
-import { erf, logGaussMass, logNdtr, sampleTruncatedNormal } from "./truncnorm";
+import fixture from "./fixtures/optuna-5.1-trajectories.json";
+import { randomSample } from "./numpyRandom";
+import { erf, logGaussMass, logNdtr, truncnormPpf } from "./truncnorm";
 
 it.each([
   [0, 0], [1e-12, 1.1283791670955126e-12], [0.5, 0.5204998778130465],
@@ -30,14 +31,13 @@ it("preserves mass for extremely narrow and wide standardized intervals", () => 
 
 it("samples within the box with the expected truncated mean", () => {
   const count = 20000;
-  const random = createRandom(42, 0);
   const pdf = (z: number) => Math.exp(-0.5 * z ** 2) / Math.sqrt(2 * Math.PI);
   const mass = 0.3413447460685429; // Φ(1) − Φ(0)
   const mean = (pdf(0) - pdf(1)) / mass;
   const variance = 1 - pdf(1) / mass - mean ** 2;
   let sum = 0;
   for (let i = 0; i < count; i++) {
-    const sample = sampleTruncatedNormal(0, 1, 0, 1, random);
+    const sample = truncnormPpf(randomSample(42, i), 0, 1);
     expect(sample).toBeGreaterThanOrEqual(0);
     expect(sample).toBeLessThanOrEqual(1);
     sum += sample;
@@ -45,6 +45,17 @@ it("samples within the box with the expected truncated mean", () => {
   expect(Math.abs(sum / count - mean)).toBeLessThan(3 * Math.sqrt(variance / count));
 });
 
-it("bounds rejection attempts for pathological draws", () => {
-  expect(() => sampleTruncatedNormal(0, 1, 0, 1, () => 0)).toThrow("Could not sample within the domain");
+it.each(fixture.ppf)("matches Optuna inverse CDF for [$a, $b]", ({ a, b, q, values }) => {
+  let previous = a;
+  for (const [i, quantile] of q.entries()) {
+    const actual = truncnormPpf(quantile, a, b);
+    expect(Math.abs(actual - values[i]), `q=${quantile}, got ${actual}, expected ${values[i]}`).toBeLessThanOrEqual(1e-12);
+    expect(actual).toBeGreaterThanOrEqual(previous);
+    expect(actual).toBeLessThanOrEqual(b);
+    previous = actual;
+  }
+});
+
+it("resolves quantiles in intervals narrower than the spacing of the normal CDF", () => {
+  expect(truncnormPpf(0.25, -1e-20, 1e-20)).toBe(-5e-21);
 });

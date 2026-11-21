@@ -12,7 +12,7 @@ const trials: Observation[] = [[-2, -2], [2, 2], [-3, 3], [3, -3]].map(([x1, x2]
 const config = { ...twoParamConfig(), gamma: 0.5, bandwidth: 0.5, startupTrials: 2 };
 
 describe("shared TPE model", () => {
-  // The fixture records the truncated-kernel model with seed 42.
+  // The fixture records NumPy-stream draws for the truncated-kernel model with seed 42.
   it("reproduces seeded one-parameter and joint two-parameter truncated-kernel trajectories", () => {
     const one = movePlayback(emptyPlayback(), trajectories.one.length, 42, 1, defaults).trials;
     const two = moveTwoParamPlayback(emptyTwoParamPlayback(), trajectories.two.length, 42, "multivariate", { priorWeight: 0 }).trials;
@@ -80,7 +80,17 @@ describe("shared TPE model", () => {
     expect(() => fitTpe(twoParamProblem, [trials[0], trials[0]], config)).toThrow();
     expect(() => fitTpe(twoParamProblem, [{ ...trials[0], params: { x1: 1 } }, trials[1]], config)).toThrow();
     expect(() => fitTpe(twoParamProblem, trials, { ...config, bandwidth: NaN })).toThrow();
-    expect(() => proposeTpe(twoParamProblem, [], config, NaN)).toThrow();
+  });
+
+  it("accepts only unsigned 32-bit integer seeds in both proposal paths", () => {
+    const fitted = fitTpe(twoParamProblem, trials, config);
+    for (const seed of [NaN, Infinity, -1, 0.5, 2 ** 32]) {
+      expect(() => proposeTpe(twoParamProblem, [], config, seed)).toThrow("Invalid seed");
+      expect(() => proposeTpe(twoParamProblem, trials, config, seed)).toThrow("Invalid seed");
+      expect(() => fitted.propose(seed)).toThrow("Invalid seed");
+    }
+    expect(proposeTpe(twoParamProblem, [], config, 0).seed).toBe(0);
+    expect(fitted.propose(2 ** 32 - 1).seed).toBe(2 ** 32 - 1);
   });
 
   it("separates startup proposals from explanatory fitted densities", () => {

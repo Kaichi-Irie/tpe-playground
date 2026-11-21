@@ -64,7 +64,7 @@ export function ModelSettingsPanel({ children, status, experiment, settings, def
       <button type="button" className="settings-reset" disabled={isDefault} onClick={() => onChange(defaultSettings)} aria-label="Reset model defaults">Reset defaults</button>
       <span className="settings-preset-action">
         <button type="button" disabled={matchesOptunaPreset(settings)} onClick={() => onChange(applyOptunaPreset(settings))}>Optuna preset</button>
-        <Help label="Optuna preset">Uses Optuna 5.1’s split, kernel widths and weights for completed trials in single-objective continuous searches. Optuna defaults to multivariate TPE. This button keeps the current density mode. Random draws differ, so search trajectories can differ.</Help>
+        <Help label="Optuna preset">Uses Optuna 5.1’s split, kernel widths and weights for completed trials in single-objective continuous searches. With the same seed and history and unchanged preset settings, proposals match TPESampler(seed). Optuna defaults to multivariate TPE. This button keeps the current density mode.</Help>
       </span>
       <ShareSearchLink experiment={experiment} seed={seed} settings={settings} />
     </>}><div className="settings-form">
