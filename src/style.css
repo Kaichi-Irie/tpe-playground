@@ -1014,10 +1014,12 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
 .app-tabs .page-check { display: none; }
 .app-actions { display: flex; align-items: center; flex-shrink: 0; gap: 4px; margin-left: auto; }
 .lab-header-actions:empty { display: none; }
-.app-header .theme-toggle, .algorithm-trigger { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 44px; width: auto; height: 44px; padding: 0 10px; border: 0; border-radius: 6px; color: var(--text); background: transparent; cursor: pointer; }
+.app-header .theme-toggle, .algorithm-trigger, .app-actions .source-link { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 44px; width: auto; height: 44px; padding: 0 10px; border: 0; border-radius: 6px; color: var(--text); background: transparent; cursor: pointer; }
+.source-link { gap: 7px; text-decoration: none; white-space: nowrap; }
+.app-actions .source-link { font-size: var(--type-sm); }
 .algorithm-trigger { gap: 7px; font-size: var(--type-sm); }
 .algorithm-trigger svg { fill: none; stroke: currentColor; stroke-width: 1.5; }
-.app-header button:hover { background: var(--surface-muted); }
+.app-header button:hover, .app-actions .source-link:hover { background: var(--surface-muted); }
 .app-header :focus-visible, .algorithm-popover :focus-visible, .page-picker-menu :focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .page-picker { display: none; align-items: center; justify-content: space-between; gap: 14px; min-height: 44px; min-width: 96px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: var(--type-lg); cursor: pointer; }
 .page-picker-menu, .algorithm-popover { position: fixed; inset: 56px 12px auto auto; margin: 0; padding: 8px; max-width: calc(100vw - 24px); max-height: calc(100dvh - 68px); overflow: auto; overscroll-behavior: contain; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); box-shadow: 0 8px 24px var(--shadow); }
@@ -1025,6 +1027,7 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
 .page-picker-menu nav { display: flex; flex-direction: column; }
 .page-picker-menu a { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 12px; border-radius: 6px; text-decoration: none; color: var(--text); font-size: var(--type-lg); }
 .page-picker-menu a[aria-current="page"] { color: var(--accent); background: var(--surface-muted); }
+.page-picker-menu .source-link { display: none; justify-content: flex-start; margin-top: 4px; }
 .algorithm-popover { width: 320px; padding: 8px 12px 12px; }
 .algorithm-popover-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--type-md); }
 .algorithm-popover-heading button { width: 44px; height: 44px; border: 0; background: transparent; color: var(--text); font-size: 22px; cursor: pointer; }
@@ -1047,11 +1050,28 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
   .app-brand span, .algorithm-trigger > span { display: none; }
   .app-brand a { justify-content: center; width: 36px; }
   .app-tabs a { padding-inline: 8px; }
+  .app-actions .source-link-full { display: none; }
   .page-picker-menu, .algorithm-popover { top: 48px; max-height: calc(100dvh - 60px); }
+}
+@media (max-width: 900px) {
+  .page-lab .app-actions .source-link-label { display: none; }
+}
+@media (800px < width <= 900px) {
+  main.page-lab > header.app-header { gap: 8px; }
+  .page-lab .app-tabs a { padding-inline: 8px; }
+}
+@media (max-width: 540px) {
+  .page-lab .app-tabs { display: none; }
+  .page-lab .page-picker { display: inline-flex; }
 }
 @media (max-width: 480px) {
   .app-tabs { display: none; }
   .page-picker { display: inline-flex; }
+}
+@media (max-width: 420px) {
+  /* Keep Lab's algorithm, tutorial, and sound controls in the header. */
+  .page-lab .app-actions .source-link { display: none; }
+  .page-picker-menu .source-link { display: flex; }
 }
 @media (max-width: 360px) {
   main > header.app-header { gap: 4px; }
