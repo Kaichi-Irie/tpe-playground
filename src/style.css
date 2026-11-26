@@ -1016,8 +1016,6 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
 .app-actions { display: flex; align-items: center; flex-shrink: 0; gap: 4px; margin-left: auto; }
 .lab-header-actions:empty { display: none; }
 .app-header .theme-toggle, .algorithm-trigger, .app-actions .source-link { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 44px; width: auto; height: 44px; padding: 0 10px; border: 0; border-radius: 6px; color: var(--text); background: transparent; cursor: pointer; }
-.source-link { gap: 7px; text-decoration: none; white-space: nowrap; }
-.app-actions .source-link { font-size: var(--type-sm); }
 .algorithm-trigger { gap: 7px; font-size: var(--type-sm); }
 .algorithm-trigger svg { fill: none; stroke: currentColor; stroke-width: 1.5; }
 .app-header button:hover, .app-actions .source-link:hover { background: var(--surface-muted); }
@@ -1051,11 +1049,7 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
   .app-brand span, .algorithm-trigger > span { display: none; }
   .app-brand a { justify-content: center; width: 36px; }
   .app-tabs a { padding-inline: 8px; }
-  .app-actions .source-link-full { display: none; }
   .page-picker-menu, .algorithm-popover { top: 48px; max-height: calc(100dvh - 60px); }
-}
-@media (max-width: 900px) {
-  .page-lab .app-actions .source-link-label { display: none; }
 }
 @media (800px < width <= 900px) {
   main.page-lab > header.app-header { gap: 8px; }
