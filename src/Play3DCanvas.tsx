@@ -8,7 +8,7 @@ export type Play3DSceneItem = { id: string; depth: number } & (
   | { kind: "triangle"; layer: Play3DSurfaceLayer; points: readonly number[]; inspect: () => void; muted?: boolean }
   | { kind: "segment"; points: readonly number[]; inspect: () => void; muted?: boolean }
   | { kind: "boundary"; points: readonly number[] }
-  | { kind: "guide"; points: readonly number[] }
+  | { kind: "guide"; points: readonly number[]; dashOffset: number }
   | { kind: "floor-anchor"; x: number; y: number }
   | { kind: "candidate"; x: number; y: number; selected: boolean; inspect: () => void }
   | { kind: "axis-candidate"; points: readonly number[]; x: number; y: number; selected: boolean; inspect: () => void }
@@ -47,6 +47,17 @@ function segmentDistance(x: number, y: number, points: readonly number[]) {
   return Math.hypot(x - ax - t * dx, y - ay - t * dy);
 }
 
+// Matches Canvas 2D stroke geometry when lineCap === "butt".
+function isOnButtSegment(x: number, y: number, points: readonly number[], halfWidth: number) {
+  const [ax, ay, bx, by] = points;
+  const dx = bx - ax, dy = by - ay, lenSq = dx * dx + dy * dy;
+  if (!lenSq) return false;
+  const proj = (x - ax) * dx + (y - ay) * dy;
+  if (proj < 0 || proj > lenSq) return false;
+  const perp = Math.abs((x - ax) * dy - (y - ay) * dx) / Math.sqrt(lenSq);
+  return perp <= halfWidth;
+}
+
 // Topmost painted candidate, surface triangle, or contour under (x, y), in viewBox units.
 // Painted candidate geometry always wins over proximity tolerance; proximity ties resolve by distance.
 export function hitTestPlay3DScene(
@@ -80,7 +91,7 @@ export function hitTestPlay3DScene(
       const winnerRadius = fitScale !== undefined
         ? axisWinnerRadius(fitScale) + 0.9 / fitScale
         : tolerance * 1.5;
-      if (segDist <= tickRadius || (item.selected && anchorDist <= winnerRadius)) return item;
+      if (isOnButtSegment(x, y, item.points, tickRadius) || (item.selected && anchorDist <= winnerRadius)) return item;
       const distance = item.selected ? Math.min(segDist, anchorDist) : segDist;
       if (distance <= proximityTolerance && distance < closestDistance) {
         closestDistance = distance;
@@ -168,8 +179,10 @@ function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[],
       ctx.globalAlpha = 0.65;
       ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
       ctx.setLineDash([4 / fit.scale, 4 / fit.scale]);
+      ctx.lineDashOffset = item.dashOffset;
       ctx.strokeStyle = color("--text"); ctx.lineWidth = 1.5 / fit.scale; ctx.stroke();
       ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
     } else if (item.kind === "floor-anchor") {
       const floorRadius = Math.max(3.4, 3 / fit.scale);
       ctx.globalAlpha = 1;

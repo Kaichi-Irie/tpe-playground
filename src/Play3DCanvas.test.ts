@@ -48,4 +48,16 @@ describe("canvas scene", () => {
     // Outside painted radii of both (20, 0) and (29, 0), proximity resolves by distance rather than depth.
     expect(hitTestPlay3DScene([], 24, 0, 3, candidates, 1)?.id).toBe("far-back");
   });
+
+  it("uses butt-capped tick geometry so an unpainted end extension cannot steal a direct hit", () => {
+    const inspect = () => {};
+    const candidates: Play3DSceneItem[] = [
+      { id: "back-tick", kind: "axis-candidate", depth: 0.2, points: [10.5, 0, 10.5, 6], x: 10.5, y: 0, selected: false, inspect },
+      { id: "front-tick", kind: "axis-candidate", depth: 0.5, points: [0, 0, 10, 0], x: 0, y: 0, selected: false, inspect },
+    ];
+    // (10.5, 0) is 0.5 px past front-tick's butt-capped free end, but directly on back-tick.
+    expect(hitTestPlay3DScene([], 10.5, 0, 3, candidates, 1)?.id).toBe("back-tick");
+    // (5, 0.5) is inside front-tick's painted stroke.
+    expect(hitTestPlay3DScene([], 5, 0.5, 3, candidates, 1)?.id).toBe("front-tick");
+  });
 });

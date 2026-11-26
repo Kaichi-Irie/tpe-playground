@@ -128,6 +128,7 @@ export function buildPlay3DCandidateScene(
     });
     const addSubdividedGuide = (prefix: string, startX1: number, startX2: number, endX1: number, endX2: number) => {
       let prev = project(startX1, startX2, 0);
+      let dashOffset = 0;
       for (let i = 1; i <= guideSegmentCount; i++) {
         const next = i === guideSegmentCount
           ? project(endX1, endX2, 0)
@@ -137,7 +138,9 @@ export function buildPlay3DCandidateScene(
           kind: "guide",
           depth: (prev.depth + next.depth) / 2 + 0.018,
           points: [prev.x, prev.y, next.x, next.y],
+          dashOffset,
         });
+        dashOffset += Math.hypot(next.x - prev.x, next.y - prev.y);
         prev = next;
       }
     };

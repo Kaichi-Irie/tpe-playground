@@ -181,6 +181,8 @@ it("builds distinct multivariate, univariate, random, and hidden candidate scene
   const x2Guides = guides.filter((item) => item.id.startsWith("candidate-guide-x2-"));
   expect(x1Guides[0].points.slice(0, 2)).toEqual([uniProposal.x1 * 10, -50]);
   expect(x1Guides[x1Guides.length - 1].points.slice(2, 4)).toEqual([uniProposal.x1 * 10, uniProposal.x2 * 10]);
+  expect(x1Guides[0].dashOffset).toBe(0);
+  expect(x1Guides[1].dashOffset).toBeCloseTo(Math.hypot(x1Guides[0].points[2] - x1Guides[0].points[0], x1Guides[0].points[3] - x1Guides[0].points[1]), 10);
   expect(x2Guides[0].points.slice(0, 2)).toEqual([-50, uniProposal.x2 * 10]);
   expect(x2Guides[x2Guides.length - 1].points.slice(2, 4)).toEqual([uniProposal.x1 * 10, uniProposal.x2 * 10]);
   expect(anchors).toHaveLength(1);
