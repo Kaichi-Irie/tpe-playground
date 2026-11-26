@@ -8,7 +8,6 @@ const stylesheets = ["style.css", "step-explanation.css"].map((file) =>
 
 const iconGlyphs = new Set([
   ".algorithm-popover-heading button",
-  ".canvas-playback .playback-buttons > button",
   ".journey-algorithm-toggle",
   ".journey-arrow",
   ".journey-icon",
@@ -16,7 +15,6 @@ const iconGlyphs = new Set([
   ".lab-hint-dismiss",
   ".panel-close",
   ".settings-dismiss",
-  ".visual-workspace .primary-playback > .play span",
 ]);
 
 // The code-first list has its own scale to fit long lines at phone widths.
