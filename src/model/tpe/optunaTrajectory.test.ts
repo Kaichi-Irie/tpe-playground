@@ -1,8 +1,9 @@
 import { expect, it } from "vitest";
-import { optunaPreset } from "../searchSettings";
+import { optunaPreset } from "../../searchSettings";
 import { proposeTpe } from "./engine";
-import fixture from "./fixtures/optuna-5.1-trajectories.json";
-import type { DensityMode, Observation, Problem } from "./types";
+import fixture from "../fixtures/optuna-5.1-trajectories.json";
+import type { Observation, Problem } from "../types";
+import type { DensityMode } from "./types";
 
 const runs = fixture.runs as { name: string; seed: number; mode: DensityMode; problem: Problem; trials: Observation[] }[];
 

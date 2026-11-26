@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { logDensity } from "./density";
 import { fitTpe } from "./engine";
-import type { Point } from "./types";
+import type { Point } from "../types";
 import { createFieldEvaluator, evaluateFieldGrid2D, type Projection } from "./visualization";
-import { twoParamConfig, emptyTwoParamPlayback, moveTwoParamPlayback, twoParamObservations, twoParamProblem } from "../twoParamTpe";
+import { twoParamConfig, emptyTwoParamPlayback, moveTwoParamPlayback, twoParamObservations, twoParamProblem } from "../../twoParamTpe";
 
 describe("shared visualization evaluation", () => {
   it("matches point evaluation on Cartesian grids, including narrow peaks, tails and reversed axes", () => {

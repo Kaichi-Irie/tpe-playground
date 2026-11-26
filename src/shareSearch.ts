@@ -1,6 +1,6 @@
 import { twoParamConstraintPresets, type TwoParamConstraintPreset } from "./twoParamConstraints";
-import { isBandwidthRule } from "./model/bandwidth";
-import type { DensityMode } from "./model/types";
+import { isBandwidthRule } from "./model/tpe/bandwidth";
+import type { DensityMode } from "./model/tpe/types";
 import {
   applyOptunaPreset, bandwidthRange, candidateCounts, constrainSettings, gammaRange, matchesOptunaPreset, priorWeights, startupTrialCounts, weightOptions, type ModelSettings,
 } from "./searchSettings";

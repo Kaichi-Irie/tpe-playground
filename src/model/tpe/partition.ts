@@ -1,4 +1,5 @@
-import type { Observation, Partition, WeightStrategy } from "./types";
+import type { Observation } from "../types";
+import type { Partition, WeightStrategy } from "./types";
 
 const goodCount = (n: number, gamma: number) => Math.min(n - 1, Math.max(1, Math.ceil(gamma * n)));
 

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { isBandwidthRule, optunaBandwidths, resolveBandwidth, type BandwidthRule } from "./bandwidth";
-import { fitOneParamModel, runSearch, defaults } from "../oneParamTpe";
+import { fitOneParamModel, runSearch, defaults } from "../../oneParamTpe";
 import { logDensity } from "./density";
 
 it("matches the Scott formula", () => {
@@ -67,7 +67,7 @@ it("clips the singleton-to-two-observation Scott transition at a 10% good split"
 
 it("fits coordinate-wise adaptive widths in both two-parameter density modes, preserving normalization and prior", async () => {
   const { fitTpe } = await import("./engine");
-  const { twoParamConfig, twoParamProblem } = await import("../twoParamTpe");
+  const { twoParamConfig, twoParamProblem } = await import("../../twoParamTpe");
   const observations = Array.from({ length: 12 }, (_, i) => ({ id: i + 1, params: { x1: i < 6 ? -5 + i * 2 : 0, x2: i < 6 ? 0 : -5 + (i - 6) * 2 }, objectives: [i], constraints: [] }));
   for (const mode of ["multivariate", "univariate"] as const) {
     for (const bandwidthRule of ["scott"] as const) {

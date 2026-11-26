@@ -1,8 +1,9 @@
 import { optunaBandwidths, resolveBandwidth, validateBandwidthRule } from "./bandwidth";
 import { createDensity, logDensity, sampleDensity } from "./density";
-import { randomSample, validateRandomSeed } from "./numpyRandom";
+import { randomSample, validateRandomSeed } from "../numpyRandom";
 import { partitionConstrainedSingleObjective, partitionSingleObjective, totalViolation, validateWeightStrategy } from "./partition";
-import type { Evaluation, GroupModel, GroupTrace, ModelSnapshot, Observation, Point, Problem, ProposalTrace, TpeConfig } from "./types";
+import type { Observation, Point, Problem } from "../types";
+import type { Evaluation, GroupModel, GroupTrace, ModelSnapshot, ProposalTrace, TpeConfig } from "./types";
 
 export function freezeData<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {

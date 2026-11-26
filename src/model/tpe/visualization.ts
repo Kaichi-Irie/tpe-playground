@@ -1,6 +1,6 @@
 import { createLogDensity, logDensityGrid2D } from "./density";
 import type { FittedTpeModel } from "./engine";
-import type { Point } from "./types";
+import type { Point } from "../types";
 
 export type FieldId = "good-density" | "bad-density" | "log-ratio";
 export type Projection = { readonly kind: "full" } | { readonly kind: "slice"; readonly fixed: Point } | { readonly kind: "marginal" };

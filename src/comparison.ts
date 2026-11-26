@@ -1,5 +1,5 @@
 import { trialLimit, type Trial } from "./oneParamTpe";
-import type { ProposalTrace } from "./model/types";
+import type { ProposalTrace } from "./model/tpe/types";
 
 export function currentRunLabel(proposals: readonly { trace: ProposalTrace }[], randomOnly: boolean, currentFilling?: boolean): string {
   const tpe = proposals.filter(({ trace }) => trace.method === "tpe");

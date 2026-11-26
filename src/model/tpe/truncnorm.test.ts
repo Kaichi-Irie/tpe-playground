@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
-import fixture from "./fixtures/optuna-5.1-trajectories.json";
-import { randomSample } from "./numpyRandom";
+import fixture from "../fixtures/optuna-5.1-trajectories.json";
+import { randomSample } from "../numpyRandom";
 import { erf, logGaussMass, logNdtr, truncnormPpf } from "./truncnorm";
 
 it.each([
