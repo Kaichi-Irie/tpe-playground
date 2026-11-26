@@ -12,7 +12,7 @@ it("renders the density explorer with playback controls and an empty initial his
   expect(html).toContain(`href="${import.meta.env.BASE_URL}" aria-current="page">Play 2D`);
   expect(html).toContain(`href="${import.meta.env.BASE_URL}" aria-label="TPE Playground"`);
   expect(html).toContain('href="#play-3d">Play 3D');
-  expect(html).toMatch(/<header\b[^>]*>.*<a class="source-link" href="https:\/\/github\.com\/Kaichi-Irie\/tpe-playground" target="_blank" rel="noopener" aria-label="View source code on GitHub \(opens in a new tab\)"/);
+  expect(html).toMatch(/<header\b[^>]*>.*<a class="source-link" href="https:\/\/github\.com\/Kaichi-Irie\/tpe-playground" target="_blank" rel="noopener" aria-label="View source code on GitHub \(opens in a new tab\)"[^>]*><svg\b[^>]*aria-hidden="true"[^>]*><path\b[^>]*><\/path><\/svg><\/a>/);
   expect(html).not.toContain('href="#explain"');
   expect(html).toContain("Minimize f(x)");
   expect(html).not.toContain("TPE density explorer");
