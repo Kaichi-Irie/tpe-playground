@@ -8,8 +8,11 @@ export type Play3DSceneItem = { id: string; depth: number } & (
   | { kind: "triangle"; layer: Play3DSurfaceLayer; points: readonly number[]; inspect: () => void; muted?: boolean }
   | { kind: "segment"; points: readonly number[]; inspect: () => void; muted?: boolean }
   | { kind: "boundary"; points: readonly number[] }
+  | { kind: "guide"; points: readonly number[] }
+  | { kind: "candidate"; x: number; y: number; selected: boolean; inspect: () => void }
+  | { kind: "axis-candidate"; points: readonly number[]; x: number; y: number; selected: boolean; inspect: () => void }
   | { kind: "trial"; feasible?: boolean; x: number; y: number; group: "good" | "bad" | "unclassified" }
-  | { kind: "proposal"; x: number; y: number; floorX: number; floorY: number }
+  | { kind: "proposal"; x: number; y: number; floorX: number; floorY: number; highlightFloor?: boolean }
 );
 export interface Play3DViewBox { x: number; y: number; width: number; height: number }
 
@@ -30,8 +33,20 @@ export function fitPlay3DViewBox(box: Play3DViewBox, width: number, height: numb
   return { scale, x: (width - box.width * scale) / 2 - box.x * scale, y: (height - box.height * scale) / 2 - box.y * scale };
 }
 
-// Topmost painted surface triangle or contour under (x, y), in viewBox units.
+// Topmost painted candidate, surface triangle, or contour under (x, y), in viewBox units.
 export function hitTestPlay3DScene(items: readonly Play3DSceneItem[], x: number, y: number, tolerance: number) {
+  const candidateTolerance = tolerance * 2;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
+    if (item.kind === "candidate") {
+      if (Math.hypot(x - item.x, y - item.y) <= candidateTolerance) return item;
+    } else if (item.kind === "axis-candidate") {
+      const [ax, ay, bx, by] = item.points;
+      const dx = bx - ax, dy = by - ay, length = dx * dx + dy * dy;
+      const t = length ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / length)) : 0;
+      if (Math.hypot(x - ax - t * dx, y - ay - t * dy) <= candidateTolerance) return item;
+    }
+  }
   for (let i = items.length - 1; i >= 0; i--) {
     const item = items[i];
     if (item.kind === "triangle") {
@@ -109,6 +124,44 @@ function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[],
       const value = color(item.muted ? "--neutral-point" : surface.color);
       ctx.globalAlpha = item.muted ? 0.035 : surface.fill; ctx.fillStyle = value; ctx.fill();
       if (surface.stroke) { ctx.globalAlpha = surface.stroke; ctx.strokeStyle = value; ctx.lineWidth = 0.35; ctx.stroke(); }
+    } else if (item.kind === "guide") {
+      const [ax, ay, bx, by] = item.points;
+      ctx.globalAlpha = 0.65;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+      ctx.setLineDash([4 / fit.scale, 4 / fit.scale]);
+      ctx.strokeStyle = color("--text"); ctx.lineWidth = 1.5 / fit.scale; ctx.stroke();
+      ctx.setLineDash([]);
+    } else if (item.kind === "candidate") {
+      if (item.selected) {
+        const outer = Math.max(4.5, 4 / fit.scale);
+        const inner = Math.max(1.8, 1.6 / fit.scale);
+        ctx.globalAlpha = 1;
+        ctx.beginPath(); ctx.arc(item.x, item.y, outer, 0, 2 * Math.PI);
+        ctx.fillStyle = color("--surface"); ctx.fill();
+        ctx.strokeStyle = color("--text"); ctx.lineWidth = 1.8 / fit.scale; ctx.stroke();
+        ctx.beginPath(); ctx.arc(item.x, item.y, inner, 0, 2 * Math.PI);
+        ctx.fillStyle = color("--text"); ctx.fill();
+      } else {
+        const r = Math.max(2.9, 2.5 / fit.scale);
+        ctx.beginPath(); ctx.arc(item.x, item.y, r, 0, 2 * Math.PI);
+        ctx.globalAlpha = 0.82; ctx.fillStyle = color("--proposal"); ctx.fill();
+        ctx.globalAlpha = 0.85; ctx.strokeStyle = color("--surface"); ctx.lineWidth = 1.1 / fit.scale; ctx.stroke();
+      }
+    } else if (item.kind === "axis-candidate") {
+      const [ax, ay, bx, by] = item.points;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+      if (item.selected) {
+        ctx.globalAlpha = 1; ctx.strokeStyle = color("--text"); ctx.lineWidth = 2.2 / fit.scale; ctx.stroke();
+        const outer = Math.max(3.8, 3.4 / fit.scale);
+        const inner = Math.max(1.4, 1.3 / fit.scale);
+        ctx.beginPath(); ctx.arc(item.x, item.y, outer, 0, 2 * Math.PI);
+        ctx.fillStyle = color("--surface"); ctx.fill();
+        ctx.strokeStyle = color("--text"); ctx.lineWidth = 1.8 / fit.scale; ctx.stroke();
+        ctx.beginPath(); ctx.arc(item.x, item.y, inner, 0, 2 * Math.PI);
+        ctx.fillStyle = color("--text"); ctx.fill();
+      } else {
+        ctx.globalAlpha = 0.85; ctx.strokeStyle = color("--proposal"); ctx.lineWidth = 1.8 / fit.scale; ctx.stroke();
+      }
     } else if (item.kind === "trial" && item.feasible === false) {
       const { x, y } = item;
       const r = Math.max(4.5, 2.4 / fit.scale);
@@ -125,6 +178,12 @@ function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[],
       ctx.globalAlpha = 1;
       ctx.beginPath(); ctx.moveTo(item.floorX, item.floorY); ctx.lineTo(item.x, item.y);
       ctx.setLineDash([5, 4]); ctx.strokeStyle = color("--muted"); ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
+      if (item.highlightFloor) {
+        const floorRadius = Math.max(3.4, 3 / fit.scale);
+        ctx.beginPath(); ctx.arc(item.floorX, item.floorY, floorRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = color("--surface"); ctx.fill();
+        ctx.strokeStyle = color("--text"); ctx.lineWidth = 1.6 / fit.scale; ctx.stroke();
+      }
       ctx.beginPath(); ctx.arc(item.x, item.y, 7, 0, 2 * Math.PI);
       ctx.fillStyle = color("--surface"); ctx.fill();
       ctx.strokeStyle = color("--text"); ctx.lineWidth = 2; ctx.stroke();

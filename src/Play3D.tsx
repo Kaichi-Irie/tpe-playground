@@ -20,12 +20,14 @@ import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState
 import { buildTwoParamView, twoParamDefaultModelSettings, getTwoParamObjective, twoParamObjectivePresets, emptyTwoParamPlayback, moveTwoParamPlayback, proposeTwoParamTrial, twoParamProposalFromTrace, twoParamSettings, type DensityMode, type TwoParamObjectivePreset, type TwoParamModelSettings } from "./twoParamTpe";
 
 type Surface = "objective" | "good" | "bad" | "acquisition";
-type Layer = Surface | "observations";
+type Layer = Surface | "observations" | "candidates";
 const layers: { key: Layer; label: string }[] = [
   { key: "objective", label: "Objective contours" }, { key: "good", label: "Good KDE ℓ(x)" },
   { key: "bad", label: "Bad KDE g(x)" }, { key: "observations", label: "Observations" },
-  { key: "acquisition", label: "Acquisition" },
+  { key: "candidates", label: "Candidates" }, { key: "acquisition", label: "Acquisition" },
 ];
+const densityLayers = ["good", "bad", "acquisition"] as const;
+const axisCandidateTickLength = 0.38;
 const initialView = { yaw: -0.65, pitch: 0.5, zoom: 1 };
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
@@ -150,7 +152,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
     });
   }
 
-  const [visible, setVisible] = useState<Record<Layer, boolean>>({ objective: true, good: true, bad: true, observations: true, acquisition: false });
+  const [visible, setVisible] = useState<Record<Layer, boolean>>({ objective: true, good: true, bad: true, observations: true, candidates: true, acquisition: false });
   const guide = usePlayGuide({ page: "play-3d", step, startupTrials: settings.startupTrials, acquisitionVisible: visible.acquisition, seeking: seekTarget !== null }, !constraintHint);
   useEffect(() => {
     if (!constraintHint) return;
@@ -220,13 +222,13 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
   const viewX = (minX + maxX - fitWidth) / 2, viewY = (minY + maxY - fitHeight) / 2;
   const viewBox = useMemo<Play3DViewBox>(() => ({ x: viewX, y: viewY, width: fitWidth, height: fitHeight }), [viewX, viewY, fitWidth, fitHeight]);
   const sceneBox = `${viewX} ${viewY} ${fitWidth} ${fitHeight}`;
-  // Surfaces are pixels now; find the topmost painted triangle or contour.
+  // Surfaces and candidates are pixels now; find the topmost painted item.
   function inspectAt(event: PointerEvent<SVGSVGElement>) {
     if (drag.current || event.target !== event.currentTarget) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const fit = fitPlay3DViewBox(viewBox, rect.width, rect.height);
     const hit = hitTestPlay3DScene(scene, (event.clientX - rect.left - fit.x) / fit.scale, (event.clientY - rect.top - fit.y) / fit.scale, 3 / fit.scale);
-    if (hit && (hit.kind === "triangle" || hit.kind === "segment")) hit.inspect();
+    if (hit) hit.inspect();
   }
   // Keep compact-screen detail stable while dragging: reuse the resting mesh
   // instead of flattening peaks and rebuilding topology at each drag boundary.
@@ -276,9 +278,76 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
   }), [preparedObjective, objectiveView, objectiveDefinition, heightScale, view, visible.objective]);
   const scene = useMemo(() => measurePlay3D("dynamic-project", () => {
     const items: Play3DSceneItem[] = [];
-    for (const { key } of layers) {
-      if (key === "observations" || key === "objective" || !visible[key] || !model.hasDensities) continue;
+    for (const key of densityLayers) {
+      if (!visible[key] || !model.hasDensities) continue;
       items.push(...projectTwoParamSurface(preparedDensities[key], project));
+    }
+    if (visible.candidates && proposal) {
+      if (proposal.candidates.length > 0) {
+        proposal.candidates.forEach((candidate, index) => {
+          const selected = index === proposal.selectedCandidateIndex;
+          const p = project(candidate.x1, candidate.x2, 0);
+          const label = `${selected ? "Selected candidate" : "Candidate"} ${index + 1} · x₁ = ${candidate.x1.toFixed(2)}, x₂ = ${candidate.x2.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
+          items.push({
+            id: `candidate-${index}`,
+            kind: "candidate",
+            depth: p.depth + (selected ? 0.028 : 0.02),
+            x: p.x,
+            y: p.y,
+            selected,
+            inspect: () => { if (!drag.current) setInspection(label); },
+          });
+        });
+      } else if (proposal.axisCandidates) {
+        const { x1, x2, selectedX1Index, selectedX2Index } = proposal.axisCandidates;
+        x1.forEach((candidate, index) => {
+          const selected = index === selectedX1Index;
+          const start = project(candidate.value, -5, 0);
+          const end = project(candidate.value, -5 - axisCandidateTickLength, 0);
+          const label = `${selected ? "Selected x₁ candidate" : "x₁ candidate"} ${index + 1} · x₁ = ${candidate.value.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
+          items.push({
+            id: `candidate-x1-${index}`,
+            kind: "axis-candidate",
+            depth: selected ? start.depth + 0.028 : (start.depth + end.depth) / 2 + 0.02,
+            points: [start.x, start.y, end.x, end.y],
+            x: start.x,
+            y: start.y,
+            selected,
+            inspect: () => { if (!drag.current) setInspection(label); },
+          });
+        });
+        x2.forEach((candidate, index) => {
+          const selected = index === selectedX2Index;
+          const start = project(-5, candidate.value, 0);
+          const end = project(-5 - axisCandidateTickLength, candidate.value, 0);
+          const label = `${selected ? "Selected x₂ candidate" : "x₂ candidate"} ${index + 1} · x₂ = ${candidate.value.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
+          items.push({
+            id: `candidate-x2-${index}`,
+            kind: "axis-candidate",
+            depth: selected ? start.depth + 0.028 : (start.depth + end.depth) / 2 + 0.02,
+            points: [start.x, start.y, end.x, end.y],
+            x: start.x,
+            y: start.y,
+            selected,
+            inspect: () => { if (!drag.current) setInspection(label); },
+          });
+        });
+        const x1Winner = project(proposal.x1, -5, 0);
+        const x2Winner = project(-5, proposal.x2, 0);
+        const combinedFloor = project(proposal.x1, proposal.x2, 0);
+        items.push({
+          id: "candidate-guide-x1",
+          kind: "guide",
+          depth: (x1Winner.depth + combinedFloor.depth) / 2 + 0.018,
+          points: [x1Winner.x, x1Winner.y, combinedFloor.x, combinedFloor.y],
+        });
+        items.push({
+          id: "candidate-guide-x2",
+          kind: "guide",
+          depth: (x2Winner.depth + combinedFloor.depth) / 2 + 0.018,
+          points: [x2Winner.x, x2Winner.y, combinedFloor.x, combinedFloor.y],
+        });
+      }
     }
     if (visible.observations) for (const trial of model.trials) {
       const p = project(trial.x1, trial.x2, scale("objective", trial.value));
@@ -288,7 +357,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
     if (proposal) {
       const p = project(proposal.x1, proposal.x2, scale("objective", objectiveDefinition.evaluate(proposal.x1, proposal.x2)));
       const floor = project(proposal.x1, proposal.x2, 0);
-      items.push({ id: "next-trial", kind: "proposal", depth: p.depth + 0.03, x: p.x, y: p.y, floorX: floor.x, floorY: floor.y });
+      items.push({ id: "next-trial", kind: "proposal", depth: p.depth + 0.03, x: p.x, y: p.y, floorX: floor.x, floorY: floor.y, highlightFloor: visible.candidates && proposal.axisCandidates !== null });
     }
     return measurePlay3D("merge-sort", () => mergeDepthSorted(objectiveScene, items.sort((a, b) => a.depth - b.depth)));
   // Projection and scaling depend exclusively on these immutable inputs.
@@ -303,6 +372,10 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
     return <circle key={`trial-${trial.id}`} cx={p.x} cy={p.y} r={4.5} className="observation-target-play-3d" tabIndex={0} aria-label={label} onFocus={() => setInspection(label)} onPointerEnter={() => { if (!drag.current) setInspection(label); }}><title>{label}</title></circle>;
   }) : null;
   const proposalLabel = proposal ? `Next evaluation · x₁ = ${proposal.x1.toFixed(3)}, x₂ = ${proposal.x2.toFixed(3)}` : null;
+  const candidatesLabel = !visible.candidates || !proposal ? null
+    : proposal.candidates.length > 0 ? `TPE candidates · ${proposal.candidates.length} joint sample${proposal.candidates.length === 1 ? "" : "s"}`
+      : proposal.axisCandidates ? `TPE candidates · ${proposal.axisCandidates.x1.length} x₁ and ${proposal.axisCandidates.x2.length} x₂ axis sample${proposal.axisCandidates.x1.length === 1 ? "" : "s"}`
+        : null;
   const optimumMarker = (() => {
     if (!visible.objective) return null;
     const optimum = objectiveView.optimum;
@@ -345,7 +418,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
       onToggle={() => { cancelSeek(); if (complete) moveTo(0); setPlaying(!playing || complete); }} />
 
     </div>
-    <div className="legend" aria-label="Play 3D plot layers">{layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} data-guide-target={key === "acquisition" && guideAcquisition || undefined} aria-describedby={key === "acquisition" && guideAcquisition ? guide.textId : undefined} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{key === "observations" && constrained ? "Observations · ✕ infeasible" : label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : "Acquisition"}</span></button>)}</div>
+    <div className="legend" aria-label="Play 3D plot layers">{layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} data-guide-target={key === "acquisition" && guideAcquisition || undefined} aria-describedby={key === "acquisition" && guideAcquisition ? guide.textId : undefined} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{key === "observations" && constrained ? "Observations · ✕ infeasible" : label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : key === "candidates" ? "Cand." : "Acquisition"}</span></button>)}</div>
     <div className="scene-stage">
     <Play3DCanvas items={scene} floor={floor} viewBox={viewBox} />
     <svg className="scene-play-3d" ref={sceneRef} viewBox={sceneBox} style={{ "--chart-zoom": chartZoom } as CSSProperties} role="group" aria-label="Interactive 3D landscape and KDE surfaces" data-guide-target={guide.active === "rotate" || undefined} aria-describedby={guide.active === "rotate" ? `view-help ${guide.textId}` : "view-help"} tabIndex={0}
@@ -355,6 +428,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
       onKeyDown={(event) => { if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "+", "=", "-"].includes(event.key)) return; event.preventDefault(); if (["+", "=", "-"].includes(event.key)) zoom(event.key === "-" ? 1 / 1.15 : 1.15); else rotate(event.key === "ArrowLeft" ? -0.12 : event.key === "ArrowRight" ? 0.12 : 0, event.key === "ArrowUp" ? 0.1 : event.key === "ArrowDown" ? -0.1 : 0); }}>
       <title>Objective landscape, good and bad densities, and optional log density ratio</title>
       {markerTargets}
+      {candidatesLabel && <g className="candidates-play-3d" aria-label={candidatesLabel}><title>{candidatesLabel}</title></g>}
       {proposalLabel && <g className="proposal-play-3d" aria-label={proposalLabel}><title>{proposalLabel}</title></g>}
       {optimumMarker}
       <g className="axes-play-3d" pointerEvents="none">
@@ -369,7 +443,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
     <details className="scaling-play-3d"><summary aria-label="How to read this view">?</summary><div className="scaling-content">
       <h3>How to read this view</h3>
       <p>Drag or use arrow keys to rotate; + / − to zoom. Hover the surface or focus an observation to read its values.</p>
-      <p>The faint surface is the objective; {constrained ? "the diamond marks the constrained optimum and the boundary outlines the feasible region. ✕ marks infeasible trials. KDEs appear after 2 observations if Good has trials or a prior." : "the diamond marks its optimum (estimated for Multimodal). KDEs appear after 2 observations."} The hollow marker is the next evaluation.</p>
+      <p>The faint surface is the objective; {constrained ? "the diamond marks the constrained optimum and the boundary outlines the feasible region. ✕ marks infeasible trials. KDEs appear after 2 observations if Good has trials or a prior." : "the diamond marks its optimum (estimated for Multimodal). KDEs appear after 2 observations."} The hollow marker is the next evaluation. {mode === "univariate" ? "When TPE proposes, axis ticks show per-coordinate candidates and dashed floor lines combine their winners." : "When TPE proposes, floor dots show sampled candidates and the ringed anchor marks the winner."}</p>
       <p>Heights are rescaled to share one view: Linear keeps relative heights; Log1p expands the valley floor. Scaling never changes the optimizer, and hover shows original values.</p>
     </div></details>
     <div className="scene-inspection" aria-live="polite">{seekTarget === null ? inspection : `Moving to trial ${seekTarget}…`}</div>

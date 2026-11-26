@@ -20,4 +20,17 @@ describe("canvas scene", () => {
     expect(hitTestPlay3DScene(items, 21, 5, 0.5)).toBeNull();
     expect(hitTestPlay3DScene(items, 9, 9, 0.5)).toBeNull();
   });
+
+  it("inspects multivariate and axis candidates even beneath translucent surfaces", () => {
+    const inspect = () => {};
+    const items: Play3DSceneItem[] = [
+      { id: "cand-other", kind: "candidate", depth: 0.2, x: 2, y: 2, selected: false, inspect },
+      { id: "cand-winner", kind: "candidate", depth: 0.3, x: 2, y: 2, selected: true, inspect },
+      { id: "axis-x1", kind: "axis-candidate", depth: 0.2, points: [10, 10, 14, 10], x: 10, y: 10, selected: false, inspect },
+      { id: "surface", kind: "triangle", layer: "good", depth: 5, points: [0, 0, 20, 0, 0, 20], inspect },
+    ];
+    expect(hitTestPlay3DScene(items, 2.5, 2, 0.5)?.id).toBe("cand-winner");
+    expect(hitTestPlay3DScene(items, 12, 10.6, 0.5)?.id).toBe("axis-x1");
+    expect(hitTestPlay3DScene(items, 6, 2, 0.5)?.id).toBe("surface");
+  });
 });

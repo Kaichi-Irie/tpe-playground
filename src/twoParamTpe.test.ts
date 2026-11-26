@@ -45,19 +45,43 @@ describe("Sequential two-parameter search", () => {
 
   it("uses earlier observations to choose the highest scoring joint candidate", () => {
     const initial = moveTwoParamPlayback(emptyTwoParamPlayback(), twoParamSettings.startupTrials);
-    expect(proposeTwoParamTrial(initial.trials.slice(0, -1)).method).toBe("random");
+    const startup = proposeTwoParamTrial(initial.trials.slice(0, -1));
+    expect(startup.method).toBe("random");
+    expect(startup.candidates).toEqual([]);
+    expect(startup.selectedCandidateIndex).toBeNull();
+    expect(startup.axisCandidates).toBeNull();
     const proposal = proposeTwoParamTrial(initial.trials);
     expect(proposal.method).toBe("tpe");
     expect(proposal.candidates).toHaveLength(twoParamSettings.candidates);
+    expect(proposal.axisCandidates).toBeNull();
+    expect(proposal.selectedCandidateIndex).not.toBeNull();
     const model = buildTwoParamView(initial.trials);
     for (const candidate of proposal.candidates) {
       expect(candidate.logRatio).toBeCloseTo(model.evaluate(candidate.x1, candidate.x2).acquisition, 12);
     }
     const best = proposal.candidates.reduce((a, b) => b.logRatio > a.logRatio ? b : a);
     expect([proposal.x1, proposal.x2]).toEqual([best.x1, best.x2]);
+    const selected = proposal.candidates[proposal.selectedCandidateIndex!];
+    expect([selected.x1, selected.x2]).toEqual([proposal.x1, proposal.x2]);
     const next = moveTwoParamPlayback(initial, initial.trials.length + 1);
     expect(next.trials.slice(0, -1)).toEqual(initial.trials);
     expect(next.trials[next.trials.length - 1].value).toBe(twoParamObjective(proposal.x1, proposal.x2));
+  });
+
+  it("exposes per-axis candidates without inventing joint candidates in univariate mode", () => {
+    const initial = moveTwoParamPlayback(emptyTwoParamPlayback(), twoParamSettings.startupTrials, 42, "univariate");
+    const proposal = proposeTwoParamTrial(initial.trials, 42, "univariate");
+    expect(proposal.method).toBe("tpe");
+    expect(proposal.candidates).toEqual([]);
+    expect(proposal.selectedCandidateIndex).toBeNull();
+    expect(proposal.axisCandidates).not.toBeNull();
+    const { x1, x2, selectedX1Index, selectedX2Index } = proposal.axisCandidates!;
+    expect(x1).toHaveLength(twoParamSettings.candidates);
+    expect(x2).toHaveLength(twoParamSettings.candidates);
+    expect(x1[selectedX1Index].value).toBe(proposal.x1);
+    expect(x2[selectedX2Index].value).toBe(proposal.x2);
+    expect(x1[selectedX1Index].logRatio).toBe(Math.max(...x1.map((candidate) => candidate.logRatio)));
+    expect(x2[selectedX2Index].logRatio).toBe(Math.max(...x2.map((candidate) => candidate.logRatio)));
   });
 
   it("replays deterministically, truncates history, and respects search boundaries", () => {

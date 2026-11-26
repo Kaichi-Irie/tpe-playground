@@ -39,6 +39,8 @@ it("starts a sequential Play 3D search with no observations and a preview of its
   expect(html).toContain('id="trial-seek-help-play-3d">Seeking back discards later trials.</span>');
   expect(html).toContain('aria-describedby="trial-seek-help-play-3d"');
   expect(html).not.toContain('class="observation-target-play-3d');
+  expect(html).toContain('class="layer candidates" aria-pressed="true"');
+  expect(html).not.toContain('class="candidates-play-3d"');
 });
 
 it("describes random-only playback without a TPE start trial", () => {
@@ -122,6 +124,21 @@ it("describes candidate sampling per coordinate in the univariate proposal", () 
     const sharedSettings = new URLSearchParams("mode=univariate&startupTrials=2&candidates=8");
     const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} />);
     expect(html).toContain("Drew 8 candidates per coordinate from ℓ and picked the highest ℓ/g for each.");
+    expect(html).toContain('aria-label="TPE candidates · 8 x₁ and 8 x₂ axis samples"');
+    expect(html).toContain("axis ticks show per-coordinate candidates and dashed floor lines combine their winners.");
+  } finally {
+    initialPlayback.mockRestore();
+  }
+});
+
+it("summarizes joint candidates in multivariate TPE proposals", () => {
+  const playback = twoParam.moveTwoParamPlayback(twoParam.emptyTwoParamPlayback(), 2, 0, "multivariate", { startupTrials: 2, candidates: 8 });
+  const initialPlayback = vi.spyOn(twoParam, "emptyTwoParamPlayback").mockReturnValueOnce(playback);
+  try {
+    const sharedSettings = new URLSearchParams("mode=multivariate&startupTrials=2&candidates=8");
+    const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} />);
+    expect(html).toContain('aria-label="TPE candidates · 8 joint samples"');
+    expect(html).toContain("floor dots show sampled candidates and the ringed anchor marks the winner.");
   } finally {
     initialPlayback.mockRestore();
   }
