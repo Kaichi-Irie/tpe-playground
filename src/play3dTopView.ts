@@ -20,7 +20,7 @@ export function clampTopPan({ zoom, panX, panY }: TopViewState): TopViewState {
 
 export function createTopViewLayout(width: number, height: number, topView: TopViewState) {
   const viewBox = { x: 0, y: 0, width, height };
-  const left = 52, right = 24, top = 54, bottom = width <= 700 ? 112 : 60;
+  const left = 52, right = 24, top = 54, bottom = width <= 700 ? 112 : 80;
   const size = Math.max(1, Math.min(width - left - right, height - top - bottom));
   const x = (width + left - right - size) / 2;
   const y = (height + top - bottom - size) / 2;
