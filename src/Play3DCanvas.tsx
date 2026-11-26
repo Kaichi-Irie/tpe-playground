@@ -2,12 +2,14 @@ import { memo, useEffect, useLayoutEffect, useRef } from "react";
 import { measurePlay3D } from "./play3dProfiling";
 
 export type Play3DSurfaceLayer = "objective" | "good" | "bad" | "acquisition";
-// Plain, depth-sorted drawing commands in SVG viewBox units. Thousands of these
+// Plain drawing commands in SVG viewBox units. Thousands of these
 // are painted into one canvas, so no per-item DOM nodes, layout or style exist.
 export type Play3DSceneItem = { id: string; depth: number } & (
   | { kind: "triangle"; layer: Play3DSurfaceLayer; points: readonly number[]; inspect: () => void; muted?: boolean }
-  | { kind: "segment"; points: readonly number[]; inspect: () => void; muted?: boolean }
-  | { kind: "boundary"; points: readonly number[] }
+  | { kind: "segment"; points: readonly number[]; inspect?: () => void; muted?: boolean }
+  | { kind: "boundary" | "grid"; points: readonly number[] }
+  | { kind: "quad"; layer: Play3DSurfaceLayer; alpha: number; points: readonly number[]; muted?: boolean }
+  | { kind: "field-contour"; layer: Play3DSurfaceLayer; points: readonly number[] }
   | { kind: "trial"; feasible?: boolean; x: number; y: number; group: "good" | "bad" | "unclassified" }
   | { kind: "proposal"; x: number; y: number; floorX: number; floorY: number }
 );
@@ -52,11 +54,11 @@ export function hitTestPlay3DScene(items: readonly Play3DSceneItem[], x: number,
 
 type Play3DFloor = readonly (readonly [number, number, number, number])[];
 
-function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[], floor: Play3DFloor, viewBox: Play3DViewBox) {
+export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[], floor: Play3DFloor, viewBox: Play3DViewBox, clipRect?: Play3DViewBox) {
   const width = canvas.clientWidth, height = canvas.clientHeight;
   const ctx = canvas.getContext("2d");
   if (!ctx || !width || !height) return;
-  const ratio = Math.min(maxPixelRatio, window.devicePixelRatio || 1);
+  const ratio = Math.min(maxPixelRatio, globalThis.devicePixelRatio || 1);
   const pixelWidth = Math.round(width * ratio), pixelHeight = Math.round(height * ratio);
   if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) { canvas.width = pixelWidth; canvas.height = pixelHeight; }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -73,6 +75,13 @@ function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[],
   ctx.lineJoin = "round";
   ctx.lineCap = "butt";
 
+  if (clipRect) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
+    ctx.clip();
+  }
+
   ctx.beginPath();
   for (const [x1, y1, x2, y2] of floor) { ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }
   ctx.globalAlpha = 1; ctx.strokeStyle = color("--grid"); ctx.lineWidth = 1;
@@ -80,18 +89,30 @@ function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[],
 
   // Consecutive contour segments share one stroke call; surfaces keep one fill
   // per triangle so translucent overlaps accumulate exactly as SVG painted them.
-  let lineStyle: "contour" | "muted" | "boundary" | undefined;
+  const lineStyles = {
+    contour: { token: "--objective", alpha: 0.7, width: 1.1 },
+    muted: { token: "--neutral-point", alpha: 0.28, width: 1.1 },
+    boundary: { token: "--constraint-boundary", alpha: 0.95, width: 1.8 },
+    grid: { token: "--grid", alpha: 1, width: 1 },
+    objective: { token: "--objective", alpha: 0.8, width: 1.1 },
+    good: { token: "--good", alpha: 0.8, width: 1.1 },
+    bad: { token: "--bad", alpha: 0.8, width: 1.1 },
+    acquisition: { token: "--acquisition", alpha: 0.8, width: 1.1 },
+  };
+  let lineStyle: keyof typeof lineStyles | undefined;
   const flushContour = () => {
     if (!lineStyle) return;
-    ctx.globalAlpha = lineStyle === "muted" ? 0.28 : lineStyle === "boundary" ? 0.95 : 0.7;
-    ctx.strokeStyle = color(lineStyle === "muted" ? "--neutral-point" : lineStyle === "boundary" ? "--constraint-boundary" : "--objective");
-    ctx.lineWidth = (lineStyle === "boundary" ? 1.8 : 1.1) / fit.scale;
+    const { token, alpha, width } = lineStyles[lineStyle];
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color(token);
+    ctx.lineWidth = width / fit.scale;
     ctx.stroke();
     lineStyle = undefined;
   };
   for (const item of items) {
-    if (item.kind === "segment" || item.kind === "boundary") {
-      const nextStyle = item.kind === "boundary" ? "boundary" : item.muted ? "muted" : "contour";
+    if (item.kind === "segment" || item.kind === "boundary" || item.kind === "grid" || item.kind === "field-contour") {
+      const nextStyle = item.kind === "segment" ? (item.muted ? "muted" : "contour")
+        : item.kind === "field-contour" ? item.layer : item.kind;
       if (lineStyle !== nextStyle) {
         flushContour();
         ctx.beginPath();
@@ -102,7 +123,12 @@ function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[],
       continue;
     }
     flushContour();
-    if (item.kind === "triangle") {
+    if (item.kind === "quad") {
+      const [ax, ay, bx, by] = item.points;
+      ctx.globalAlpha = item.alpha;
+      ctx.fillStyle = color(item.muted ? "--neutral-point" : surfaceStyles[item.layer].color);
+      ctx.fillRect(ax, ay, bx - ax, by - ay);
+    } else if (item.kind === "triangle") {
       const surface = surfaceStyles[item.layer];
       const [ax, ay, bx, by, cx, cy] = item.points;
       ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.closePath();
@@ -121,10 +147,12 @@ function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[],
       ctx.beginPath(); ctx.arc(item.x, item.y, 4.5, 0, 2 * Math.PI);
       ctx.globalAlpha = 1; ctx.fillStyle = color(trialColors[item.group]); ctx.fill();
       ctx.strokeStyle = color("--surface"); ctx.lineWidth = 1.5; ctx.stroke();
-    } else {
+    } else if (item.kind === "proposal") {
       ctx.globalAlpha = 1;
-      ctx.beginPath(); ctx.moveTo(item.floorX, item.floorY); ctx.lineTo(item.x, item.y);
-      ctx.setLineDash([5, 4]); ctx.strokeStyle = color("--muted"); ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
+      if (item.floorX !== item.x || item.floorY !== item.y) {
+        ctx.beginPath(); ctx.moveTo(item.floorX, item.floorY); ctx.lineTo(item.x, item.y);
+        ctx.setLineDash([5, 4]); ctx.strokeStyle = color("--muted"); ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
+      }
       ctx.beginPath(); ctx.arc(item.x, item.y, 7, 0, 2 * Math.PI);
       ctx.fillStyle = color("--surface"); ctx.fill();
       ctx.strokeStyle = color("--text"); ctx.lineWidth = 2; ctx.stroke();
@@ -132,19 +160,20 @@ function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[],
   }
   flushContour();
   ctx.globalAlpha = 1;
+  if (clipRect) ctx.restore();
 }
 
 // One bitmap replaces ~10k SVG paths. Each update costs one redraw instead of
 // thousands of DOM mutations, style/layout passes and retained render objects.
-export const Play3DCanvas = memo(function Play3DCanvas({ items, floor, viewBox }: { items: readonly Play3DSceneItem[]; floor: Play3DFloor; viewBox: Play3DViewBox }) {
+export const Play3DCanvas = memo(function Play3DCanvas({ items, floor, viewBox, clipRect }: { items: readonly Play3DSceneItem[]; floor: Play3DFloor; viewBox: Play3DViewBox; clipRect?: Play3DViewBox }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const latest = useRef({ items, floor, viewBox });
+  const latest = useRef({ items, floor, viewBox, clipRect });
   const frame = useRef<number | null>(null);
   useLayoutEffect(() => {
-    latest.current = { items, floor, viewBox };
+    latest.current = { items, floor, viewBox, clipRect };
     const element = canvas.current;
-    if (element) measurePlay3D("canvas-draw", () => drawScene(element, items, floor, viewBox));
-  }, [items, floor, viewBox]);
+    if (element) measurePlay3D("canvas-draw", () => drawScene(element, items, floor, viewBox, clipRect));
+  }, [items, floor, viewBox, clipRect]);
   useEffect(() => {
     const element = canvas.current;
     if (!element) return;
@@ -153,8 +182,8 @@ export const Play3DCanvas = memo(function Play3DCanvas({ items, floor, viewBox }
       if (frame.current !== null) return;
       frame.current = requestAnimationFrame(() => {
         frame.current = null;
-        const { items, floor, viewBox } = latest.current;
-        drawScene(element, items, floor, viewBox);
+        const { items, floor, viewBox, clipRect } = latest.current;
+        drawScene(element, items, floor, viewBox, clipRect);
       });
     };
     const resize = new ResizeObserver(redraw);

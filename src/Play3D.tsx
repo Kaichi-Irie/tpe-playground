@@ -4,6 +4,7 @@ import { measurePlay3D } from "./play3dProfiling";
 import { seekTwoParamPlayback } from "./seekTwoParamPlayback";
 import { Play3DCanvas, fitPlay3DViewBox, hitTestPlay3DScene, type Play3DSceneItem, type Play3DViewBox } from "./Play3DCanvas";
 import { mergeDepthSorted, twoParamSurfaceMesh, type TwoParamSurfaceVertex } from "./twoParamSurfaceMesh";
+import { clampTopPan, createTopFieldItems, createTopObjectiveTint, createTopViewLayout, formatTopInspection, initialTopView, topTicks, type Play3DViewMode } from "./play3dTopView";
 import { usePlotSize } from "./usePlotSize";
 import { PlaybackControls } from "./PlaybackControls";
 import { defaultPlaybackSpeed, type PlaybackSpeed } from "./playbackSpeed";
@@ -17,7 +18,7 @@ import { Help } from "./Help";
 import { HelpMath } from "./HelpMath";
 import { constrainSettings } from "./searchSettings";
 import { readPlay3DSharedSearch, type SharedSearch } from "./shareSearch";
-import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent } from "react";
 import { buildTwoParamView, twoParamDefaultModelSettings, getTwoParamObjective, twoParamObjectivePresets, emptyTwoParamPlayback, moveTwoParamPlayback, proposeTwoParamTrial, twoParamProposalFromTrace, twoParamSettings, type DensityMode, type TwoParamObjectivePreset, type TwoParamModelSettings } from "./twoParamTpe";
 
 type Surface = "objective" | "good" | "bad" | "acquisition";
@@ -31,6 +32,7 @@ const initialView = { yaw: -0.65, pitch: 0.5, zoom: 1 };
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
 const domainWidth = 10;
+const emptyFloor = [] as const;
 const constraintHintKey = "tpe-play-3d-constraint-hint-seen";
 const constrainedModelDefaults = { ...twoParamDefaultModelSettings, infeasibleFilling: true };
 const defaultSearch: SharedSearch<TwoParamObjectivePreset> = {
@@ -39,7 +41,7 @@ const defaultSearch: SharedSearch<TwoParamObjectivePreset> = {
   settings: { ...twoParamDefaultModelSettings, bandwidthRule: twoParamDefaultModelSettings.bandwidthRule ?? "constant" },
 };
 
-export default function Play3D({ sharedSettings = null }: { sharedSettings?: URLSearchParams | null } = {}) {
+export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }: { sharedSettings?: URLSearchParams | null; initialViewMode?: Play3DViewMode } = {}) {
   const [initialSearch] = useState(() => readPlay3DSharedSearch(
     sharedSettings, defaultSearch, twoParamObjectivePresets, twoParamSettings.count, domainWidth,
   ));
@@ -168,6 +170,17 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
   }, [constraintHint, guide.workspaceRef]);
   const guideAcquisition = guide.active === "acquisition";
   const [view, setView] = useState(initialView);
+  const [viewMode, setViewMode] = useState(initialViewMode);
+  const [topView, setTopView] = useState(initialTopView);
+  const isTop = viewMode === "top";
+  const pannable = isTop && topView.zoom > 1;
+  const topClipId = useId();
+  const topLayout = useMemo(() => createTopViewLayout(sceneWidth, sceneHeight, topView), [sceneWidth, sceneHeight, topView]);
+  const { x: plotX, y: plotY, size: plotSize } = topLayout.plotRect;
+  const topClip = useMemo(() => ({ x: plotX, y: plotY, width: plotSize, height: plotSize }), [plotX, plotY, plotSize]);
+  const topDrag = useRef<{ x: number; y: number; id: number } | null>(null);
+  const topDidPan = useRef(false);
+  const showRotateGuide = !isTop && guide.active === "rotate";
   const [inspection, setInspection] = useState("");
   const drag = useRef<{ x: number; y: number; id: number } | null>(null);
   const cameraFrame = useRef<number | null>(null);
@@ -183,6 +196,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
     if (yaw || pitch) rotate(yaw, pitch);
   }
   function endDrag(event: PointerEvent<SVGSVGElement>) {
+    if (topDrag.current?.id === event.pointerId) topDrag.current = null;
     if (drag.current?.id !== event.pointerId) return;
     drag.current = null;
     flushRotation();
@@ -195,7 +209,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
   };
   const cosYaw = Math.cos(view.yaw), sinYaw = Math.sin(view.yaw);
   const cosPitch = Math.cos(view.pitch), sinPitch = Math.sin(view.pitch);
-  const project = (x: number, y: number, height: number) => {
+  const project3D = (x: number, y: number, height: number) => {
     const u = x * cosYaw - y * sinYaw;
     const v = x * sinYaw + y * cosYaw;
     const z = height * 4;
@@ -203,7 +217,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
   };
   // Fit the projected unit-height volume; user zoom remains independent of fitting.
   const bounds = [-5, 5].flatMap((x) => [-5, 5].flatMap((y) => [0, 1].map((z) => {
-    const p = project(x, y, z);
+    const p = project3D(x, y, z);
     return { x: 500 + (p.x - 500) / view.zoom, y: 350 + (p.y - 350) / view.zoom };
   })));
   const minX = Math.min(...bounds.map((p) => p.x)), maxX = Math.max(...bounds.map((p) => p.x));
@@ -211,39 +225,47 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
   const aspect = sceneWidth / sceneHeight;
   const fitWidth = Math.max(maxX - minX + 64, (maxY - minY + 96) * aspect);
   const fitHeight = fitWidth / aspect;
-  const chartZoom = fitWidth / sceneWidth;
+  const chartZoom = isTop ? 1 : fitWidth / sceneWidth;
   const labelScale = chartZoom * typeScale;
   const heightLabelRef = useRef<SVGTextElement>(null);
   const [heightLabelWidth, setHeightLabelWidth] = useState(0);
   useLayoutEffect(() => {
     const label = heightLabelRef.current;
     if (label) setHeightLabelWidth(label.getComputedTextLength());
-  }, [chartZoom, typeScale]);
+  }, [chartZoom, typeScale, isTop]);
   const viewX = (minX + maxX - fitWidth) / 2, viewY = (minY + maxY - fitHeight) / 2;
-  const viewBox = useMemo<Play3DViewBox>(() => ({ x: viewX, y: viewY, width: fitWidth, height: fitHeight }), [viewX, viewY, fitWidth, fitHeight]);
-  const sceneBox = `${viewX} ${viewY} ${fitWidth} ${fitHeight}`;
-  // Surfaces are pixels now; find the topmost painted triangle or contour.
-  function inspectAt(event: PointerEvent<SVGSVGElement>) {
-    if (drag.current || event.target !== event.currentTarget) return;
+  const perspectiveBox = useMemo<Play3DViewBox>(() => ({ x: viewX, y: viewY, width: fitWidth, height: fitHeight }), [viewX, viewY, fitWidth, fitHeight]);
+  const viewBox = isTop ? topLayout.viewBox : perspectiveBox;
+  const sceneBox = `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`;
+  function inspectAt(event: Pick<PointerEvent<SVGSVGElement>, "currentTarget" | "target" | "clientX" | "clientY">) {
+    if (drag.current || topDrag.current || event.target !== event.currentTarget) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const fit = fitPlay3DViewBox(viewBox, rect.width, rect.height);
-    const hit = hitTestPlay3DScene(scene, (event.clientX - rect.left - fit.x) / fit.scale, (event.clientY - rect.top - fit.y) / fit.scale, 3 / fit.scale);
-    if (hit && (hit.kind === "triangle" || hit.kind === "segment")) hit.inspect();
+    const x = (event.clientX - rect.left - fit.x) / fit.scale;
+    const y = (event.clientY - rect.top - fit.y) / fit.scale;
+    if (isTop) {
+      const point = topLayout.unproject(x, y);
+      setInspection(point ? formatTopInspection(point, model, visible, objectiveView.feasible) : "");
+      return;
+    }
+    // Surfaces are pixels now; find the topmost painted triangle or contour.
+    const hit = hitTestPlay3DScene(scene, x, y, 3 / fit.scale);
+    if (hit && (hit.kind === "triangle" || hit.kind === "segment")) hit.inspect?.();
   }
   // Keep compact-screen detail stable while dragging: reuse the resting mesh
   // instead of flattening peaks and rebuilding topology at each drag boundary.
   const objectiveStride = compact ? 2 : 1;
   const densityStride = compact ? 2 : 1;
-  const objectiveMesh = useMemo(() => twoParamSurfaceMesh(objectiveView.grid, objectiveStride,
-    (point) => 0.25 + 0.75 * objectiveView.normalize(point.objective, heightScale)), [objectiveView, objectiveStride, heightScale]);
+  const objectiveMesh = useMemo(() => isTop ? [] : twoParamSurfaceMesh(objectiveView.grid, objectiveStride,
+    (point) => 0.25 + 0.75 * objectiveView.normalize(point.objective, heightScale)), [isTop, objectiveView, objectiveStride, heightScale]);
   const densityMeshes = useMemo(() => measurePlay3D("density-grid-mesh", () => {
     const mesh = (key: "good" | "bad" | "acquisition") => {
-      if (!visible[key] || !model.hasDensities) return [];
+      if (isTop || !visible[key] || !model.hasDensities) return [];
       const [low, high] = model.scales[key];
       return twoParamSurfaceMesh(model.grid, densityStride, (point) => (point[key] - low) / (high - low));
     };
     return { good: mesh("good"), bad: mesh("bad"), acquisition: mesh("acquisition") };
-  }), [model, densityStride, visible.good, visible.bad, visible.acquisition]);
+  }), [isTop, model, densityStride, visible.good, visible.bad, visible.acquisition]);
   function prepareSurface(mesh: TwoParamSurfaceVertex[][], key: Surface, label: string, evaluate: (x1: number, x2: number) => number, feasible?: (x1: number, x2: number) => boolean) {
     return prepareTwoParamSurface(mesh, key, (x1, x2) => {
       if (!drag.current) setInspection(`${label} · x₁ = ${x1.toFixed(2)}, x₂ = ${x2.toFixed(2)} · value = ${evaluate(x1, x2).toPrecision(4)}`);
@@ -258,16 +280,16 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
   // Objective geometry and React elements do not depend on the trial history.
   // Reuse them on each search step, including the thousands of contour segments.
   const objectiveScene = useMemo(() => measurePlay3D("objective-project", () => {
-    if (!visible.objective) return [];
-    const items: Play3DSceneItem[] = projectTwoParamSurface(preparedObjective, project);
+    if (isTop || !visible.objective) return [];
+    const items: Play3DSceneItem[] = projectTwoParamSurface(preparedObjective, project3D);
     objectiveView.contours.forEach(({ level, a, b, muted }, index) => {
-      const start = project(a.x1, a.x2, scale("objective", level));
-      const end = project(b.x1, b.x2, scale("objective", level));
+      const start = project3D(a.x1, a.x2, scale("objective", level));
+      const end = project3D(b.x1, b.x2, scale("objective", level));
       items.push({ id: `contour-${index}`, kind: "segment", muted, depth: (start.depth + end.depth) / 2 + 0.01, points: [start.x, start.y, end.x, end.y], inspect: () => { if (!drag.current) setInspection(`Objective contour · f(x) = ${level.toPrecision(4)}`); } });
     });
     for (const [lineIndex, line] of objectiveView.boundaries.entries()) {
       for (const onSurface of [false, true]) {
-        const points = line.map(({ x1, x2, objective }) => project(x1, x2, onSurface ? scale("objective", objective) : 0));
+        const points = line.map(({ x1, x2, objective }) => project3D(x1, x2, onSurface ? scale("objective", objective) : 0));
         for (let index = 1; index < points.length; index++) {
           const a = points[index - 1], b = points[index];
           items.push({ id: `boundary-${lineIndex}-${onSurface}-${index}`, kind: "boundary", depth: (a.depth + b.depth) / 2 + 0.015, points: [a.x, a.y, b.x, b.y] });
@@ -275,52 +297,90 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
       }
     }
     return measurePlay3D("objective-sort", () => items.sort((a, b) => a.depth - b.depth));
-  }), [preparedObjective, objectiveView, objectiveDefinition, heightScale, view, visible.objective]);
+  }), [isTop, preparedObjective, objectiveView, objectiveDefinition, heightScale, view, visible.objective]);
+  const topTint = useMemo(() => isTop && visible.objective ? createTopObjectiveTint(objectiveDefinition.evaluate, objectiveView) : [],
+    [isTop, visible.objective, objectiveDefinition, objectiveView]);
+  const topFields = useMemo(() => isTop ? createTopFieldItems(model, visible) : [], [isTop, model, visible]);
+  const projectTrial = (x1: number, x2: number, value: number) => isTop
+    ? topLayout.project(x1, x2) : project3D(x1, x2, scale("objective", value));
   const scene = useMemo(() => measurePlay3D("dynamic-project", () => {
     const items: Play3DSceneItem[] = [];
-    for (const { key } of layers) {
+    if (isTop) {
+      const line = (x1: number, x2: number, x3: number, x4: number) => {
+        const a = topLayout.project(x1, x2), b = topLayout.project(x3, x4);
+        return [a.x, a.y, b.x, b.y];
+      };
+      for (const item of topTint) {
+        const [x1, x2, x3, x4] = item.points;
+        items.push({ ...item, points: line(x1, x2, x3, x4) });
+      }
+      for (const tick of topTicks) {
+        items.push(
+          { id: `grid-x1-${tick}`, kind: "grid", depth: 0, points: line(tick, -5, tick, 5) },
+          { id: `grid-x2-${tick}`, kind: "grid", depth: 0, points: line(-5, tick, 5, tick) },
+        );
+      }
+      for (const item of topFields) {
+        const [x1, x2, x3, x4] = item.points;
+        items.push({ ...item, points: line(x1, x2, x3, x4) });
+      }
+      if (visible.objective) {
+        objectiveView.contours.forEach(({ a, b, muted }, index) => {
+          items.push({ id: `contour-${index}`, kind: "segment", muted, depth: 0, points: line(a.x1, a.x2, b.x1, b.x2) });
+        });
+        for (const [lineIndex, boundary] of objectiveView.boundaries.entries()) {
+          for (let index = 1; index < boundary.length; index++) {
+            const a = boundary[index - 1], b = boundary[index];
+            items.push({ id: `boundary-${lineIndex}-${index}`, kind: "boundary", depth: 0, points: line(a.x1, a.x2, b.x1, b.x2) });
+          }
+        }
+      }
+    } else for (const { key } of layers) {
       if (key === "observations" || key === "objective" || !visible[key] || !model.hasDensities) continue;
-      items.push(...projectTwoParamSurface(preparedDensities[key], project));
+      items.push(...projectTwoParamSurface(preparedDensities[key], project3D));
     }
     if (visible.observations) for (const trial of model.trials) {
-      const p = project(trial.x1, trial.x2, scale("objective", trial.value));
+      const p = projectTrial(trial.x1, trial.x2, trial.value);
       const group = !model.hasPartition ? "unclassified" : model.goodIds.has(trial.id) ? "good" : "bad";
       items.push({ id: `trial-${trial.id}`, kind: "trial", depth: p.depth + 0.02, x: p.x, y: p.y, group, feasible: model.feasibleIds.has(trial.id) });
     }
     if (proposal) {
-      const p = project(proposal.x1, proposal.x2, scale("objective", objectiveDefinition.evaluate(proposal.x1, proposal.x2)));
-      const floor = project(proposal.x1, proposal.x2, 0);
+      const p = projectTrial(proposal.x1, proposal.x2, objectiveDefinition.evaluate(proposal.x1, proposal.x2));
+      const floor = isTop ? p : project3D(proposal.x1, proposal.x2, 0);
       items.push({ id: "next-trial", kind: "proposal", depth: p.depth + 0.03, x: p.x, y: p.y, floorX: floor.x, floorY: floor.y });
     }
+    if (isTop) return items;
     return measurePlay3D("merge-sort", () => mergeDepthSorted(objectiveScene, items.sort((a, b) => a.depth - b.depth)));
   // Projection and scaling depend exclusively on these immutable inputs.
-  }), [model, view, visible, proposal, objectiveView, heightScale, objectiveScene, preparedDensities]);
+  }), [model, view, visible, proposal, objectiveView, heightScale, objectiveScene, preparedDensities, isTop, topLayout, topTint, topFields]);
   // Painted markers live in the canvas; these invisible SVG twins keep trials
   // focusable, labelled and hoverable without adding per-frame paint work.
   const markerTargets = visible.observations ? model.trials.map((trial) => {
-    const p = project(trial.x1, trial.x2, scale("objective", trial.value));
+    const p = projectTrial(trial.x1, trial.x2, trial.value);
+    if (isTop && !topLayout.contains(p.x, p.y)) return null;
     const group = !model.hasPartition ? "Unclassified" : model.goodIds.has(trial.id) ? "Good" : "Bad";
     const feasibility = sceneInput.settings.constraintPreset === "none" ? "" : trial.violation === 0 ? " · Feasible" : ` · Infeasible · violation ${trial.violation.toPrecision(3)}`;
     const label = `Trial ${trial.id} · ${group}${feasibility} · x₁ = ${trial.x1.toFixed(2)}, x₂ = ${trial.x2.toFixed(2)} · f(x) = ${trial.value.toFixed(3)}`;
-    return <circle key={`trial-${trial.id}`} cx={p.x} cy={p.y} r={4.5} className="observation-target-play-3d" tabIndex={0} aria-label={label} onFocus={() => setInspection(label)} onPointerEnter={() => { if (!drag.current) setInspection(label); }}><title>{label}</title></circle>;
+    return <circle key={`trial-${trial.id}`} cx={p.x} cy={p.y} r={4.5} className="observation-target-play-3d" tabIndex={0} aria-label={label} onFocus={() => setInspection(label)} onPointerEnter={(event) => { if (!drag.current && !topDrag.current && (!isTop || event.pointerType !== "touch")) setInspection(label); }} onClick={() => { if (isTop && !topDidPan.current) setInspection(label); }}><title>{label}</title></circle>;
   }) : null;
   const proposalLabel = proposal ? `Next evaluation · x₁ = ${proposal.x1.toFixed(3)}, x₂ = ${proposal.x2.toFixed(3)}` : null;
   const optimumMarker = (() => {
     if (!visible.objective) return null;
     const optimum = objectiveView.optimum;
-    const p = project(optimum.x1, optimum.x2, scale("objective", optimum.value));
+    const p = projectTrial(optimum.x1, optimum.x2, optimum.value);
+    if (isTop && !topLayout.contains(p.x, p.y)) return null;
     const label = `${constrained ? "Constrained optimum" : objectivePreset === "multimodal" ? "Estimated optimum" : "Optimum"} · x₁ = ${optimum.x1.toFixed(3)}, x₂ = ${optimum.x2.toFixed(3)} · f(x) = ${optimum.value.toPrecision(4)}`;
-    return <g className="optimum-play-3d" role="img" tabIndex={0} aria-label={label} onFocus={() => setInspection(label)} onPointerEnter={() => { if (!drag.current) setInspection(label); }}>
+    return <g className="optimum-play-3d" role="img" tabIndex={0} aria-label={label} onFocus={() => setInspection(label)} onPointerEnter={(event) => { if (!drag.current && !topDrag.current && (!isTop || event.pointerType !== "touch")) setInspection(label); }} onClick={() => { if (isTop && !topDidPan.current) setInspection(label); }}>
       <title>{label}</title><path d={`M${p.x},${p.y - 7} l7,7 l-7,7 l-7,-7 Z`} /><text x={p.x + 12 * labelScale} y={p.y - 12 * labelScale}>{constrained ? "Constrained optimum" : `Optimum (${optimum.x1.toFixed(objectivePreset === "multimodal" ? 2 : 1)}, ${optimum.x2.toFixed(objectivePreset === "multimodal" ? 2 : 1)})`}</text>
     </g>;
   })();
-  const floor = useMemo(() => [-5, -2.5, 0, 2.5, 5].flatMap((tick) => [[project(tick, -5, 0), project(tick, 5, 0)], [project(-5, tick, 0), project(5, tick, 0)]].map(([a, b]) => [a.x, a.y, b.x, b.y] as const)),
+  const floor = useMemo(() => topTicks.flatMap((tick) => [[project3D(tick, -5, 0), project3D(tick, 5, 0)], [project3D(-5, tick, 0), project3D(5, tick, 0)]].map(([a, b]) => [a.x, a.y, b.x, b.y] as const)),
   // project depends only on the camera.
   [view]);
-  const origin = project(-5, -5, 0);
-  const x1End = project(5, -5, 0);
-  const heightEnd = project(-5, -5, 1);
-  const axes = [{ end: x1End, label: "x₁", value: "5" }, { end: project(-5, 5, 0), label: "x₂", value: "5" }];
+  const origin = project3D(-5, -5, 0);
+  const x1End = project3D(5, -5, 0);
+  const heightEnd = project3D(-5, -5, 1);
+  const axes = [{ end: x1End, label: "x₁", value: "5" }, { end: project3D(-5, 5, 0), label: "x₂", value: "5" }];
   // Give the origin caption room on narrow plots and place the height caption
   // on the other side of its tick when the projected x₁ label crowds it.
   const originLabelInset = 32 * labelScale;
@@ -334,8 +394,76 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
   }
   function zoom(factor: number) {
     guide.retire("rotate");
-    setView((v) => ({ ...v, zoom: clamp(v.zoom * factor, 0.55, 1.7) }));
+    if (isTop) setTopView((v) => clampTopPan({ ...v, zoom: v.zoom * factor }));
+    else setView((v) => ({ ...v, zoom: clamp(v.zoom * factor, 0.55, 1.7) }));
   }
+  function changeViewMode(next: Play3DViewMode) {
+    if (next === viewMode) return;
+    flushRotation();
+    drag.current = null;
+    topDrag.current = null;
+    setInspection("");
+    if (next === "top") guide.retire("rotate");
+    setViewMode(next);
+  }
+  function pan(dx: number, dy: number) {
+    setTopView((v) => clampTopPan({ ...v, panX: v.panX + dx, panY: v.panY + dy }));
+  }
+  function onScenePointerDown(event: PointerEvent<SVGSVGElement>) {
+    if (event.button !== 0 || drag.current || topDrag.current) return;
+    if (isTop) {
+      topDidPan.current = false;
+      if (pannable) topDrag.current = { x: event.clientX, y: event.clientY, id: event.pointerId };
+      return;
+    }
+    inspectAt(event);
+    drag.current = { x: event.clientX, y: event.clientY, id: event.pointerId };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  function onScenePointerMove(event: PointerEvent<SVGSVGElement>) {
+    if (isTop) {
+      const last = topDrag.current;
+      if (!last) {
+        if (event.pointerType !== "touch") inspectAt(event);
+        return;
+      }
+      if (last.id !== event.pointerId) return;
+      const dx = event.clientX - last.x, dy = event.clientY - last.y;
+      if (!topDidPan.current) {
+        if (Math.hypot(dx, dy) < 4) return;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        topDidPan.current = true;
+        setInspection("");
+      }
+      topDrag.current = { x: event.clientX, y: event.clientY, id: event.pointerId };
+      const rect = event.currentTarget.getBoundingClientRect();
+      const size = plotSize * fitPlay3DViewBox(viewBox, rect.width, rect.height).scale;
+      pan(dx / size, dy / size);
+      return;
+    }
+    const last = drag.current;
+    if (!last) { inspectAt(event); return; }
+    if (last.id !== event.pointerId) return;
+    pendingRotation.current.yaw += (event.clientX - last.x) * 0.008;
+    pendingRotation.current.pitch += (event.clientY - last.y) * 0.008;
+    drag.current = { x: event.clientX, y: event.clientY, id: event.pointerId };
+    if (cameraFrame.current === null) cameraFrame.current = requestAnimationFrame(flushRotation);
+  }
+  function onSceneKeyDown(event: ReactKeyboardEvent<SVGSVGElement>) {
+    if (["+", "=", "-"].includes(event.key)) {
+      event.preventDefault();
+      zoom(event.key === "-" ? 1 / 1.15 : 1.15);
+      return;
+    }
+    const dx = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
+    const dy = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;
+    if ((!dx && !dy) || (isTop && !pannable)) return;
+    event.preventDefault();
+    if (isTop) pan(dx * 0.08, dy * 0.08);
+    else rotate(dx * 0.12, -dy * 0.1);
+  }
+  const plotBottom = plotY + plotSize;
+  const markers = <>{markerTargets}{proposalLabel && <g className="proposal-play-3d" aria-label={proposalLabel}><title>{proposalLabel}</title></g>}{optimumMarker}</>;
   const feasibleTrials = constrained ? playback.trials.filter((trial) => trial.violation === 0) : playback.trials;
   const feasibleCount = `${feasibleTrials.length} / ${step} feasible`;
   const bestValue = feasibleTrials.length ? Math.min(...feasibleTrials.map((trial) => trial.value)).toFixed(3) : "—";
@@ -349,37 +477,83 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
     </div>
     <div className="legend" aria-label="Play 3D plot layers">{layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} data-guide-target={key === "acquisition" && guideAcquisition || undefined} aria-describedby={key === "acquisition" && guideAcquisition ? guide.textId : undefined} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{key === "observations" && constrained ? "Observations · ✕ infeasible" : label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : "Acquisition"}</span></button>)}</div>
     <div className="scene-stage">
-    <Play3DCanvas items={scene} floor={floor} viewBox={viewBox} />
-    <svg className="scene-play-3d" ref={sceneRef} viewBox={sceneBox} style={{ "--chart-zoom": chartZoom } as CSSProperties} role="group" aria-label="Interactive 3D landscape and KDE surfaces" data-guide-target={guide.active === "rotate" || undefined} aria-describedby={guide.active === "rotate" ? `view-help ${guide.textId}` : "view-help"} tabIndex={0}
-      onPointerDown={(event) => { if (event.button !== 0 || drag.current) return; inspectAt(event); drag.current = { x: event.clientX, y: event.clientY, id: event.pointerId }; event.currentTarget.setPointerCapture(event.pointerId); }}
-      onPointerMove={(event) => { const last = drag.current; if (!last) { inspectAt(event); return; } if (last.id !== event.pointerId) return; const dx = event.clientX - last.x, dy = event.clientY - last.y; drag.current = { x: event.clientX, y: event.clientY, id: event.pointerId }; pendingRotation.current.yaw += dx * 0.008; pendingRotation.current.pitch += dy * 0.008; if (cameraFrame.current === null) cameraFrame.current = requestAnimationFrame(flushRotation); }}
+    <Play3DCanvas items={scene} floor={isTop ? emptyFloor : floor} viewBox={viewBox} clipRect={isTop ? topClip : undefined} />
+    <svg className={`scene-play-3d${isTop ? " is-top" : ""}${pannable ? " is-pannable" : ""}`} ref={sceneRef} viewBox={sceneBox} style={{ "--chart-zoom": chartZoom } as CSSProperties} role="group" aria-label={isTop ? "Interactive top-down objective and density contours" : "Interactive 3D landscape and KDE surfaces"} data-guide-target={showRotateGuide || undefined} aria-describedby={showRotateGuide ? `view-help ${guide.textId}` : "view-help"} tabIndex={0}
+      onPointerDown={onScenePointerDown} onPointerMove={onScenePointerMove}
       onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={endDrag}
-      onKeyDown={(event) => { if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "+", "=", "-"].includes(event.key)) return; event.preventDefault(); if (["+", "=", "-"].includes(event.key)) zoom(event.key === "-" ? 1 / 1.15 : 1.15); else rotate(event.key === "ArrowLeft" ? -0.12 : event.key === "ArrowRight" ? 0.12 : 0, event.key === "ArrowUp" ? 0.1 : event.key === "ArrowDown" ? -0.1 : 0); }}>
-      <title>Objective landscape, good and bad densities, and optional log density ratio</title>
-      {markerTargets}
-      {proposalLabel && <g className="proposal-play-3d" aria-label={proposalLabel}><title>{proposalLabel}</title></g>}
-      {optimumMarker}
-      <g className="axes-play-3d" pointerEvents="none">
-        {axes.map(({ end, label, value }) => <g key={label}><line x1={origin.x} y1={origin.y} x2={end.x} y2={end.y} /><text x={end.x} y={end.y - 12 * labelScale} textAnchor="middle">{label} · {value}</text></g>)}
-        <line x1={origin.x} y1={origin.y} x2={heightEnd.x} y2={heightEnd.y} />
-        <text ref={heightLabelRef} x={heightEnd.x} y={heightEnd.y - 12 * labelScale} textAnchor={heightLabelAnchor}>Objective / Density · 1</text>
-        <text x={originLabelX} y={origin.y + 24 * labelScale} textAnchor="middle">−5, −5 · 0</text>
-      </g>
+      onPointerLeave={(event) => {
+        if (!isTop || event.pointerType === "touch" || (topDrag.current && topDidPan.current)) return;
+        endDrag(event);
+        setInspection("");
+      }}
+      onClick={(event) => { if (isTop && !topDidPan.current) inspectAt(event); }}
+      onKeyDown={onSceneKeyDown}>
+      <title>{isTop ? "Objective and density contours viewed from above" : "Objective landscape, good and bad densities, and optional log density ratio"}</title>
+      {isTop ? <>
+        <defs><clipPath id={topClipId}><rect {...topClip} /></clipPath></defs>
+        <g clipPath={`url(#${topClipId})`}>{markers}</g>
+        <g className="axes-play-3d" pointerEvents="none">
+          <line x1={plotX} y1={plotY} x2={plotX} y2={plotBottom} />
+          <line x1={plotX} y1={plotBottom} x2={plotX + plotSize} y2={plotBottom} />
+          {topTicks.map((tick) => {
+            const { x, y } = topLayout.project(tick, tick);
+            const label = String(tick).replace("-", "−");
+            return <g key={tick}>
+              {topLayout.contains(x, plotBottom) && <>
+                <line x1={x} y1={plotBottom} x2={x} y2={plotBottom + 4} />
+                <text x={x} y={plotBottom + 17 * labelScale} textAnchor="middle">{label}</text>
+              </>}
+              {topLayout.contains(plotX, y) && <>
+                <line x1={plotX - 4} y1={y} x2={plotX} y2={y} />
+                <text x={plotX - 8} y={y} dominantBaseline="central" textAnchor="end">{label}</text>
+              </>}
+            </g>;
+          })}
+          <text x={plotX + plotSize / 2} y={plotBottom + 34 * labelScale} textAnchor="middle">x₁</text>
+          <text x={plotX - 38} y={plotY + plotSize / 2} dominantBaseline="central" textAnchor="middle">x₂</text>
+        </g>
+      </> : <>
+        {markers}
+        <g className="axes-play-3d" pointerEvents="none">
+          {axes.map(({ end, label, value }) => <g key={label}><line x1={origin.x} y1={origin.y} x2={end.x} y2={end.y} /><text x={end.x} y={end.y - 12 * labelScale} textAnchor="middle">{label} · {value}</text></g>)}
+          <line x1={origin.x} y1={origin.y} x2={heightEnd.x} y2={heightEnd.y} />
+          <text ref={heightLabelRef} x={heightEnd.x} y={heightEnd.y - 12 * labelScale} textAnchor={heightLabelAnchor}>Objective / Density · 1</text>
+          <text x={originLabelX} y={origin.y + 24 * labelScale} textAnchor="middle">−5, −5 · 0</text>
+        </g>
+      </>}
     </svg>
-      <div className="view-controls"><label className="objective-height-control">Objective height <select aria-label="Objective height scale" value={heightScale} onChange={(event) => setHeightScale(event.target.value as ObjectiveHeightScale)}><option value="linear">Linear</option><option value="log">Log1p</option></select></label><span id="view-help" className="sr-only">Drag to rotate · arrow keys rotate · + / − zoom</span><div><button onClick={() => zoom(1.15)} aria-label="Zoom in">+</button><button onClick={() => zoom(1 / 1.15)} aria-label="Zoom out">−</button><button onClick={() => setView(initialView)}>Reset view</button></div></div>
+      <div className="view-controls">
+        {!isTop && <label className="objective-height-control">Objective height <select aria-label="Objective height scale" value={heightScale} onChange={(event) => setHeightScale(event.target.value as ObjectiveHeightScale)}><option value="linear">Linear</option><option value="log">Log1p</option></select></label>}
+        <span id="view-help" className="sr-only">{isTop ? "Hover or tap to inspect coordinates · + / − zoom · drag or use arrow keys to pan when zoomed" : "Drag to rotate · arrow keys rotate · + / − zoom"}</span>
+        <div className="view-actions">
+          <div className="view-mode-toggle" role="group" aria-label="View mode">
+            <button aria-pressed={!isTop} onClick={() => changeViewMode("3d")}>3D</button>
+            <button aria-pressed={isTop} onClick={() => changeViewMode("top")}>Top</button>
+          </div>
+          <button onClick={() => zoom(1.15)} aria-label="Zoom in">+</button>
+          <button onClick={() => zoom(1 / 1.15)} aria-label="Zoom out" disabled={isTop && !pannable}>−</button>
+          <button onClick={() => { if (isTop) setTopView(initialTopView); else setView(initialView); }}>Reset view</button>
+        </div>
+      </div>
     </div>
     <details className="scaling-play-3d"><summary aria-label="How to read this view">?</summary><div className="scaling-content">
       <h3>How to read this view</h3>
+      {isTop ? <>
+        <p>Hover or tap the map to inspect coordinates and values. Use + / − to zoom, then drag or use arrow keys to pan.</p>
+        <p>Lines trace equal values of the objective and visible fitted layers. Stronger shading marks higher values within each fitted layer. When Acquisition has positive values, it highlights regions where ℓ(x) &gt; g(x).</p>
+        <p>{constrained ? "The diamond marks the constrained optimum and the boundary outlines the feasible region. ✕ marks infeasible trials. KDEs appear after 2 observations if Good has trials or a prior." : "The diamond marks the optimum (estimated for Multimodal). KDEs appear after 2 observations."} The hollow marker is the next evaluation.</p>
+      </> : <>
       <p>Drag or use arrow keys to rotate; + / − to zoom. Hover the surface or focus an observation to read its values.</p>
       <p>The faint surface is the objective; {constrained ? "the diamond marks the constrained optimum and the boundary outlines the feasible region. ✕ marks infeasible trials. KDEs appear after 2 observations if Good has trials or a prior." : "the diamond marks its optimum (estimated for Multimodal). KDEs appear after 2 observations."} The hollow marker is the next evaluation.</p>
       <p>Heights are rescaled to share one view: Linear keeps relative heights; Log1p expands the valley floor. Scaling never changes the optimizer, and hover shows original values.</p>
+      </>}
     </div></details>
     <div className="scene-inspection" aria-live="polite">{seekTarget === null ? inspection : `Moving to trial ${seekTarget}…`}</div>
     {constraintHint && <LabHintBubble textId="constraint-hint-text-play-3d" message="✕ marks trials that break the constraint. TPE fills open spots in the Good group with the trials that break it least. Turn Infeasible filling off in Settings to compare." phase="meaning" placement="bottom" onDismiss={(keyboard) => {
       setConstraintHint(false);
       if (keyboard) guide.workspaceRef.current?.querySelector<HTMLElement>(".settings-toggle")?.focus();
     }} />}
-    {guide.active && <LabHintBubble textId={guide.textId} message={playGuides[guide.active].action} phase="action" placement="bottom" onDismiss={guide.dismiss} />}
+    {guide.active && (guide.active !== "rotate" || showRotateGuide) && <LabHintBubble textId={guide.textId} message={playGuides[guide.active].action} phase="action" placement="bottom" onDismiss={guide.dismiss} />}
     </div>
 
     <ModelSettingsPanel experiment={{ page: "play-3d", preset: objectivePreset, mode, constraint: constraintPreset }} className="settings-play-3d" idSuffix="-play-3d" labelPrefix="Play 3D " defaultSettings={constrained ? constrainedModelDefaults : twoParamDefaultModelSettings} trialLimit={twoParamSettings.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} disableEi={constrained} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); restart(); }}

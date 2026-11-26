@@ -137,3 +137,28 @@ it("states the feasible share only for an active constraint", () => {
   const disk = renderToStaticMarkup(<Play3DConstraintSettings preset="disk" infeasibleFilling onPresetChange={() => {}} onFillingChange={() => {}} />);
   expect(disk).toContain("of the domain is feasible. Changing the constraint restarts the search.");
 });
+
+it("defaults the View mode group to 3D and keeps the original scene help", () => {
+  const html = renderToStaticMarkup(<Play3D />);
+  expect(html).toContain('role="group" aria-label="View mode"><button aria-pressed="true">3D</button><button aria-pressed="false">Top</button>');
+  expect(html).toContain('aria-label="Interactive 3D landscape and KDE surfaces"');
+  expect(html).toContain("Objective / Density · 1");
+  expect(html).toContain('id="view-help" class="sr-only">Drag to rotate');
+});
+
+it("renders clipped markers, 2D axes and contextual help in Top view", () => {
+  const html = renderToStaticMarkup(<Play3D initialViewMode="top" />);
+  expect(html).toContain('role="group" aria-label="View mode"><button aria-pressed="false">3D</button><button aria-pressed="true">Top</button>');
+  expect(html).toContain('class="scene-play-3d is-top"');
+  expect(html).toContain('aria-label="Interactive top-down objective and density contours"');
+  expect(html).toContain('aria-label="Zoom out" disabled=""');
+  expect(html).toContain('id="view-help" class="sr-only">Hover or tap to inspect coordinates');
+  expect(html).toContain("Hover or tap the map to inspect coordinates and values.");
+  expect(html).toContain("Stronger shading marks higher values within each fitted layer.");
+  expect(html).toContain(">x₁</text>");
+  expect(html).toContain(">x₂</text>");
+  expect(html).toContain(">−2.5</text>");
+  expect(html).toMatch(/<g clip-path="url\(#[^"]+\)">.*class="optimum-play-3d"/);
+  expect(html).not.toContain("Objective height scale");
+  expect(html).not.toContain("Objective / Density · 1");
+});
