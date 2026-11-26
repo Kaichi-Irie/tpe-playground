@@ -1,7 +1,11 @@
+import { playbackSpeeds, type PlaybackSpeed } from "./playbackSpeed";
+
 interface Props {
   step: number;
   limit: number;
   playing: boolean;
+  speed: PlaybackSpeed;
+  onSpeedChange: (speed: PlaybackSpeed) => void;
   onMove: (step: number) => void;
   onToggle: () => void;
   idSuffix?: string;
@@ -13,7 +17,7 @@ interface Props {
 }
 
 // Owns only the controls: the explorer decides how moving affects its history.
-export function PlaybackControls({ step, limit, playing, onMove, onToggle, idSuffix = "", labelPrefix = "", describedBy, targetStep = null, guidePlay, guideDescribedBy }: Props) {
+export function PlaybackControls({ step, limit, playing, speed, onSpeedChange, onMove, onToggle, idSuffix = "", labelPrefix = "", describedBy, targetStep = null, guidePlay, guideDescribedBy }: Props) {
   const complete = step === limit;
   const active = playing && !complete;
   const action = active ? "Pause" : complete ? "Replay" : "Play";
@@ -21,6 +25,10 @@ export function PlaybackControls({ step, limit, playing, onMove, onToggle, idSuf
   const timeline = <input id={`trial-progress${idSuffix}`} type="range" min="0" max={limit} step="1" value={targetStep ?? step} aria-label={`${labelPrefix}Trial progress`} aria-valuetext={targetStep === null ? `Trial ${step} of ${limit}` : `Moving to trial ${targetStep}; currently ${step} of ${limit}`} aria-describedby={describedBy} onChange={(event) => onMove(Number(event.target.value))} />;
   return <div className="playback canvas-playback primary-playback" aria-label={`${labelPrefix}Trial playback`}>
     {play}
+    <select className="playback-speed" aria-label={`${labelPrefix}Playback speed`} value={speed}
+      onChange={(event) => onSpeedChange(playbackSpeeds[event.currentTarget.selectedIndex])}>
+      {playbackSpeeds.map((option) => <option key={option} value={option}>{option}x</option>)}
+    </select>
     <div className="playback-buttons">
       <button aria-label="Reset" title="Reset to trial 0" onClick={() => onMove(0)} disabled={step === 0 && targetStep === null}>↺</button>
       <button aria-label="Previous trial" title="Back one trial" onClick={() => onMove(step - 1)} disabled={step === 0}>←</button>

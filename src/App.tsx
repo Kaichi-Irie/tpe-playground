@@ -3,6 +3,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import { ChunkLoadComplete } from "./chunkReload";
 import { usePlotSize } from "./usePlotSize";
 import { PlaybackControls } from "./PlaybackControls";
+import { defaultPlaybackSpeed, type PlaybackSpeed } from "./playbackSpeed";
 import LabHintBubble from "./LabHintBubble";
 import { playGuides } from "./playGuides";
 import { usePlayGuide } from "./usePlayGuide";
@@ -73,6 +74,7 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
   const [playback, setPlayback] = useState(emptyPlayback);
   const { step } = playback;
   const [playing, setPlaying] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(defaultPlaybackSpeed);
   const [selected, setSelected] = useState<Trial | null>(null);
   const searchGeneration = useRef(0);
   // Keep the Lab mounted after the first visit so its stage, progress, and settings survive tab switches.
@@ -121,9 +123,9 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
       if (generation !== searchGeneration.current) return;
       setPlayback((current) => movePlayback(current, current.step + 1, seed, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }));
       setSelected(null);
-    }, 1000);
+    }, 1000 / playbackSpeed);
     return () => window.clearTimeout(timer);
-  }, [playing, step, seed, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
+  }, [playing, playbackSpeed, step, seed, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
   function moveTo(next: number) {
     setPlaying(false);
     setPlayback((current) => movePlayback(current, next, seed, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }));
@@ -175,7 +177,7 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
       <div hidden={page !== "play-2d"} className="visual-workspace play-2d" ref={guide.workspaceRef} onKeyDown={guide.onKeyDown}>
       <section className="canvas-plot" aria-labelledby="plot-heading">
       <div className="canvas-controls">
-      <PlaybackControls step={step} limit={trialLimit} playing={playing} guidePlay={guide.active === "playback"} guideDescribedBy={guide.textId} onMove={moveTo}
+      <PlaybackControls step={step} limit={trialLimit} playing={playing} speed={playbackSpeed} onSpeedChange={setPlaybackSpeed} guidePlay={guide.active === "playback"} guideDescribedBy={guide.textId} onMove={moveTo}
         onToggle={() => { if (step === trialLimit) moveTo(0); setPlaying(!playing); }} />
 
       </div>
