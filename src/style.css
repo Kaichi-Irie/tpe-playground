@@ -672,8 +672,8 @@ header { height: 64px; padding: 10px 0; border: 0; }
 .playback-capsule .play:focus-visible { outline-color: var(--on-accent); }
 .playback-capsule svg { flex: none; width: 20px; height: 20px; }
 .playback-divider { width: 1px; height: 20px; background: var(--border); }
-.playback-capsule .playback-speed { gap: 4px; width: 68px; font-size: var(--type-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
-.speed-gauge { color: var(--muted); }
+.playback-capsule .playback-speed { gap: 5px; width: 80px; font-size: var(--type-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
+.speed-gauge { color: var(--accent); font-size: var(--type-lg); line-height: 1; letter-spacing: -0.06em; transform: translateY(-1px); }
 .trial-timeline { flex: 1; min-width: 80px; display: grid; gap: 4px; }
 .trial-timeline label { display: flex; justify-content: space-between; color: var(--muted); font-size: var(--type-sm); }
 .trial-timeline input { width: 100%; min-width: 0; height: 24px; margin: 0; accent-color: var(--accent); cursor: pointer; }
