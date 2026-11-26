@@ -480,7 +480,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
       onPointerDown={onScenePointerDown} onPointerMove={onScenePointerMove}
       onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={endDrag}
       onPointerLeave={(event) => {
-        if (!isTop || (topDrag.current && topDidPan.current)) return;
+        if (!isTop || event.pointerType === "touch" || (topDrag.current && topDidPan.current)) return;
         endDrag(event);
         setInspection("");
       }}
@@ -538,7 +538,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
       <h3>How to read this view</h3>
       {isTop ? <>
         <p>Hover or tap the map to inspect coordinates and values. Use + / − to zoom, then drag or use arrow keys to pan.</p>
-        <p>Lines trace equal values of the objective and visible fitted layers. Darker shading within each fitted layer marks higher values.</p>
+        <p>Lines trace equal values of the objective and visible fitted layers. Stronger shading marks higher values within each fitted layer. When Acquisition has positive values, it highlights regions where ℓ(x) &gt; g(x).</p>
         <p>{constrained ? "The diamond marks the constrained optimum and the boundary outlines the feasible region. ✕ marks infeasible trials. KDEs appear after 2 observations if Good has trials or a prior." : "The diamond marks the optimum (estimated for Multimodal). KDEs appear after 2 observations."} The hollow marker is the next evaluation.</p>
       </> : <>
       <p>Drag or use arrow keys to rotate; + / − to zoom. Hover the surface or focus an observation to read its values.</p>

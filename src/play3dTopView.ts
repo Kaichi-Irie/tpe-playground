@@ -30,7 +30,8 @@ export function createTopViewLayout(width: number, height: number, topView: TopV
   const centerY = y + size * (0.5 + panY);
   const units = size * zoom / 10;
   const project = (x1: number, x2: number) => ({ x: centerX + x1 * units, y: centerY - x2 * units, depth: 0 });
-  const contains = (vx: number, vy: number) => vx >= x && vx <= x + size && vy >= y && vy <= y + size;
+  const eps = 1e-6;
+  const contains = (vx: number, vy: number) => vx >= x - eps && vx <= x + size + eps && vy >= y - eps && vy <= y + size + eps;
   const unproject = (vx: number, vy: number) => {
     if (!contains(vx, vy)) return null;
     return { x1: clamp((vx - centerX) / units, -5, 5), x2: clamp((centerY - vy) / units, -5, 5) };
@@ -86,10 +87,15 @@ export function createTopFieldItems(model: Model, visible: FieldVisibility) {
   if (!model.hasDensities) return items;
   for (const { key, peak } of fields) {
     if (!visible[key]) continue;
-    const low = model.scales[key][0];
     const high = Math.max(...model.grid.flatMap((row) => row.map((point) => point[key])));
+    const positiveAcquisition = key === "acquisition" && high > 0;
+    const scaleLow = model.scales[key][0];
+    const low = positiveAcquisition ? Math.max(scaleLow, 0) : scaleLow;
     if (high <= low) continue;
-    const valueAt = (point: Model["grid"][number][number]) => (point[key] - low) / (high - low);
+    const valueAt = (point: Model["grid"][number][number]) => {
+      const value = positiveAcquisition ? Math.max(point[key], 0) : point[key];
+      return (value - low) / (high - low);
+    };
     const grid = model.grid;
     for (let i = 0; i < grid.length - 1; i++) for (let j = 0; j < grid[i].length - 1; j++) {
       const a = grid[i][j], b = grid[i + 1][j], c = grid[i + 1][j + 1], d = grid[i][j + 1];

@@ -153,6 +153,7 @@ it("renders clipped markers, 2D axes and contextual help in Top view", () => {
   expect(html).toContain('aria-label="Zoom out" disabled=""');
   expect(html).toContain('id="view-help" class="sr-only">Hover or tap to inspect coordinates');
   expect(html).toContain("Hover or tap the map to inspect coordinates and values.");
+  expect(html).toContain("Stronger shading marks higher values within each fitted layer.");
   expect(html).toContain(">x₁</text>");
   expect(html).toContain(">x₂</text>");
   expect(html).toContain(">−2.5</text>");

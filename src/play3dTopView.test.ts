@@ -23,6 +23,16 @@ it("clamps zoom and pan and inverts a panned projection", () => {
   expect(unproject(plotRect.x, plotRect.y + plotRect.size)).toEqual({ x1: -5, x2: -5 });
 });
 
+it("includes edge ticks and markers after zooming and panning to a plot corner", () => {
+  const zoom = 1.15;
+  const limit = (zoom - 1) / 2;
+  const { contains, plotRect, project } = createTopViewLayout(384, 480, { zoom, panX: limit, panY: limit });
+  const corner = project(-5, 5);
+  expect(contains(corner.x, plotRect.y + plotRect.size)).toBe(true);
+  expect(contains(plotRect.x, corner.y)).toBe(true);
+  expect(contains(corner.x, corner.y)).toBe(true);
+});
+
 it("reports the evaluated coordinates, constraint, and only visible fitted fields", () => {
   const point = { x1: -1.125, x2: 0.25 };
   const evaluate = vi.fn((x1, x2) => ({ x1, x2, objective: 1.25, good: 0.02, bad: 0.01, acquisition: 0.6931 }));
@@ -46,5 +56,20 @@ it("builds translucent fills and contours for fitted layers in painter order", (
     expect(Math.max(...fills)).toBeLessThanOrEqual(peak);
     expect(Math.max(...fills)).toBeGreaterThan(Math.min(...fills));
     expect(items.some((item) => item.kind === "field-contour" && item.layer === layer)).toBe(true);
+  }
+});
+
+it("draws Acquisition fills and contours only on the positive side of the grid when its peak is positive", () => {
+  const grid = [-4, -3, -1, 0, 2, 4].map((acquisition, i) => [-5, 5].map((x2) => ({
+    x1: -5 + i * 2, x2, objective: 0, good: 0, bad: 0, acquisition,
+  })));
+  const model = buildTwoParamView([]);
+  const items = createTopFieldItems({
+    ...model, hasDensities: true, grid, scales: { ...model.scales, acquisition: [-4, 4] },
+  }, { good: false, bad: false, acquisition: true });
+  expect(items.some(({ kind }) => kind === "quad")).toBe(true);
+  expect(items.some(({ kind }) => kind === "field-contour")).toBe(true);
+  for (const { points: [startX, , endX] } of items) {
+    expect(Math.min(startX, endX)).toBeGreaterThanOrEqual(1);
   }
 });
