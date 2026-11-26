@@ -19,15 +19,152 @@ import { HelpMath } from "./HelpMath";
 import { constrainSettings } from "./searchSettings";
 import { readPlay3DSharedSearch, type SharedSearch } from "./shareSearch";
 import { useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent } from "react";
-import { buildTwoParamView, twoParamDefaultModelSettings, getTwoParamObjective, twoParamObjectivePresets, emptyTwoParamPlayback, moveTwoParamPlayback, proposeTwoParamTrial, twoParamProposalFromTrace, twoParamSettings, type DensityMode, type TwoParamObjectivePreset, type TwoParamModelSettings } from "./twoParamTpe";
+import { buildTwoParamView, twoParamDefaultModelSettings, getTwoParamObjective, twoParamObjectivePresets, emptyTwoParamPlayback, moveTwoParamPlayback, proposeTwoParamTrial, twoParamProposalFromTrace, twoParamSettings, type DensityMode, type TwoParamObjectivePreset, type TwoParamModelSettings, type TwoParamProposal } from "./twoParamTpe";
 
 type Surface = "objective" | "good" | "bad" | "acquisition";
-type Layer = Surface | "observations";
+type Layer = Surface | "observations" | "candidates";
 const layers: { key: Layer; label: string }[] = [
   { key: "objective", label: "Objective contours" }, { key: "good", label: "Good KDE ℓ(x)" },
   { key: "bad", label: "Bad KDE g(x)" }, { key: "observations", label: "Observations" },
-  { key: "acquisition", label: "Acquisition" },
+  { key: "candidates", label: "Candidates" }, { key: "acquisition", label: "Acquisition" },
 ];
+const densityLayers = ["good", "bad", "acquisition"] as const;
+const axisCandidateTickLength = 0.38;
+const guideSegmentCount = 16;
+
+export interface Play3DCandidateInspectorEntry {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  selected: boolean;
+}
+
+export function buildPlay3DCandidateScene(
+  proposal: TwoParamProposal | null,
+  visible: boolean,
+  project: (x: number, y: number, height: number) => { x: number; y: number; depth: number },
+  onInspect: (label: string) => void,
+  options: { tickDirection?: -1 | 1; includeFloorAnchor?: boolean } = {},
+): {
+  items: Play3DSceneItem[];
+  hitTargets: Play3DSceneItem[];
+  inspectorEntries: Play3DCandidateInspectorEntry[];
+  defaultInspectorIndex: number;
+} {
+  if (!visible || !proposal) return { items: [], hitTargets: [], inspectorEntries: [], defaultInspectorIndex: 0 };
+  const tickOffset = (options.tickDirection ?? -1) * axisCandidateTickLength;
+  const includeFloorAnchor = options.includeFloorAnchor ?? true;
+  const items: Play3DSceneItem[] = [];
+  const hitTargets: Play3DSceneItem[] = [];
+  const inspectorEntries: Play3DCandidateInspectorEntry[] = [];
+  if (proposal.candidates.length > 0) {
+    proposal.candidates.forEach((candidate, index) => {
+      const selected = index === proposal.selectedCandidateIndex;
+      const p = project(candidate.x1, candidate.x2, 0);
+      const label = `${selected ? "Selected candidate" : "Candidate"} ${index + 1} · x₁ = ${candidate.x1.toFixed(2)}, x₂ = ${candidate.x2.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
+      const item: Play3DSceneItem = {
+        id: `candidate-${index}`,
+        kind: "candidate",
+        depth: p.depth + (selected ? 0.028 : 0.02),
+        x: p.x,
+        y: p.y,
+        selected,
+        inspect: () => onInspect(label),
+      };
+      items.push(item);
+      hitTargets.push(item);
+      inspectorEntries.push({ id: item.id, label, x: p.x, y: p.y, selected });
+    });
+    hitTargets.sort((a, b) => a.depth - b.depth);
+    return { items, hitTargets, inspectorEntries, defaultInspectorIndex: proposal.selectedCandidateIndex ?? 0 };
+  }
+  if (proposal.axisCandidates) {
+    const { x1, x2, selectedX1Index, selectedX2Index } = proposal.axisCandidates;
+    const combinedFloor = project(proposal.x1, proposal.x2, 0);
+    const x1Selected = x1[selectedX1Index];
+    const x2Selected = x2[selectedX2Index];
+    if (x1Selected && x2Selected) {
+      inspectorEntries.push({
+        id: "candidate-winners",
+        label: `Selected candidates · x₁ #${selectedX1Index + 1} = ${x1Selected.value.toFixed(2)} (log ℓ/g = ${x1Selected.logRatio.toFixed(3)}) · x₂ #${selectedX2Index + 1} = ${x2Selected.value.toFixed(2)} (log ℓ/g = ${x2Selected.logRatio.toFixed(3)})`,
+        x: combinedFloor.x,
+        y: combinedFloor.y,
+        selected: true,
+      });
+    }
+    x1.forEach((candidate, index) => {
+      const selected = index === selectedX1Index;
+      const start = project(candidate.value, -5, 0);
+      const end = project(candidate.value, -5 + tickOffset, 0);
+      const label = `${selected ? "Selected x₁ candidate" : "x₁ candidate"} ${index + 1} · x₁ = ${candidate.value.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
+      const item: Play3DSceneItem = {
+        id: `candidate-x1-${index}`,
+        kind: "axis-candidate",
+        depth: selected ? start.depth + 0.028 : (start.depth + end.depth) / 2 + 0.02,
+        points: [start.x, start.y, end.x, end.y],
+        x: start.x,
+        y: start.y,
+        selected,
+        inspect: () => onInspect(label),
+      };
+      items.push(item);
+      hitTargets.push(item);
+      inspectorEntries.push({ id: item.id, label, x: start.x, y: start.y, selected });
+    });
+    x2.forEach((candidate, index) => {
+      const selected = index === selectedX2Index;
+      const start = project(-5, candidate.value, 0);
+      const end = project(-5 + tickOffset, candidate.value, 0);
+      const label = `${selected ? "Selected x₂ candidate" : "x₂ candidate"} ${index + 1} · x₂ = ${candidate.value.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
+      const item: Play3DSceneItem = {
+        id: `candidate-x2-${index}`,
+        kind: "axis-candidate",
+        depth: selected ? start.depth + 0.028 : (start.depth + end.depth) / 2 + 0.02,
+        points: [start.x, start.y, end.x, end.y],
+        x: start.x,
+        y: start.y,
+        selected,
+        inspect: () => onInspect(label),
+      };
+      items.push(item);
+      hitTargets.push(item);
+      inspectorEntries.push({ id: item.id, label, x: start.x, y: start.y, selected });
+    });
+    const addSubdividedGuide = (prefix: string, startX1: number, startX2: number, endX1: number, endX2: number) => {
+      let prev = project(startX1, startX2, 0);
+      let dashOffset = 0;
+      for (let i = 1; i <= guideSegmentCount; i++) {
+        const next = i === guideSegmentCount
+          ? project(endX1, endX2, 0)
+          : project(startX1 + (endX1 - startX1) * (i / guideSegmentCount), startX2 + (endX2 - startX2) * (i / guideSegmentCount), 0);
+        items.push({
+          id: `${prefix}-${i}`,
+          kind: "guide",
+          depth: (prev.depth + next.depth) / 2 + 0.018,
+          points: [prev.x, prev.y, next.x, next.y],
+          dashOffset,
+        });
+        dashOffset += Math.hypot(next.x - prev.x, next.y - prev.y);
+        prev = next;
+      }
+    };
+    addSubdividedGuide("candidate-guide-x1", proposal.x1, -5, proposal.x1, proposal.x2);
+    addSubdividedGuide("candidate-guide-x2", -5, proposal.x2, proposal.x1, proposal.x2);
+    if (includeFloorAnchor) {
+      items.push({
+        id: "candidate-floor-anchor",
+        kind: "floor-anchor",
+        depth: combinedFloor.depth + 0.028,
+        x: combinedFloor.x,
+        y: combinedFloor.y,
+      });
+    }
+    hitTargets.sort((a, b) => a.depth - b.depth);
+    return { items, hitTargets, inspectorEntries, defaultInspectorIndex: 0 };
+  }
+  return { items: [], hitTargets: [], inspectorEntries: [], defaultInspectorIndex: 0 };
+}
 const initialView = { yaw: -0.65, pitch: 0.5, zoom: 1 };
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
@@ -154,7 +291,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     });
   }
 
-  const [visible, setVisible] = useState<Record<Layer, boolean>>({ objective: true, good: true, bad: true, observations: true, acquisition: false });
+  const [visible, setVisible] = useState<Record<Layer, boolean>>({ objective: true, good: true, bad: true, observations: true, candidates: true, acquisition: false });
   const guide = usePlayGuide({ page: "play-3d", step, startupTrials: settings.startupTrials, acquisitionVisible: visible.acquisition, seeking: seekTarget !== null }, !constraintHint);
   useEffect(() => {
     if (!constraintHint) return;
@@ -182,6 +319,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
   const topDidPan = useRef(false);
   const showRotateGuide = !isTop && guide.active === "rotate";
   const [inspection, setInspection] = useState("");
+  const [focusedCandidate, setFocusedCandidate] = useState<number | null>(null);
   const drag = useRef<{ x: number; y: number; id: number } | null>(null);
   const cameraFrame = useRef<number | null>(null);
   const pendingRotation = useRef({ yaw: 0, pitch: 0 });
@@ -244,13 +382,20 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     const x = (event.clientX - rect.left - fit.x) / fit.scale;
     const y = (event.clientY - rect.top - fit.y) / fit.scale;
     if (isTop) {
+      if (topLayout.contains(x, y)) {
+        const candidateHit = hitTestPlay3DScene([], x, y, 3 / fit.scale, candidateScene.hitTargets, fit.scale);
+        if (candidateHit && "inspect" in candidateHit) {
+          candidateHit.inspect?.();
+          return;
+        }
+      }
       const point = topLayout.unproject(x, y);
       setInspection(point ? formatTopInspection(point, model, visible, objectiveView.feasible) : "");
       return;
     }
-    // Surfaces are pixels now; find the topmost painted triangle or contour.
-    const hit = hitTestPlay3DScene(scene, x, y, 3 / fit.scale);
-    if (hit && (hit.kind === "triangle" || hit.kind === "segment")) hit.inspect?.();
+    // Surfaces and candidates are pixels now; find the topmost painted item.
+    const hit = hitTestPlay3DScene(scene, x, y, 3 / fit.scale, candidateScene.hitTargets, fit.scale);
+    if (hit && "inspect" in hit) hit.inspect?.();
   }
   // Keep compact-screen detail stable while dragging: reuse the resting mesh
   // instead of flattening peaks and rebuilding topology at each drag boundary.
@@ -303,6 +448,14 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
   const topFields = useMemo(() => isTop ? createTopFieldItems(model, visible) : [], [isTop, model, visible]);
   const projectTrial = (x1: number, x2: number, value: number) => isTop
     ? topLayout.project(x1, x2) : project3D(x1, x2, scale("objective", value));
+  const candidateScene = useMemo(() => buildPlay3DCandidateScene(
+    proposal,
+    visible.candidates,
+    isTop ? (x1, x2) => topLayout.project(x1, x2) : project3D,
+    (label) => { if (!drag.current && !topDrag.current) setInspection(label); },
+    isTop ? { tickDirection: 1, includeFloorAnchor: false } : { tickDirection: -1, includeFloorAnchor: true },
+  // project3D depends only on the camera.
+  ), [proposal, visible.candidates, isTop, topLayout, view]);
   const scene = useMemo(() => measurePlay3D("dynamic-project", () => {
     const items: Play3DSceneItem[] = [];
     if (isTop) {
@@ -335,9 +488,13 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
           }
         }
       }
-    } else for (const { key } of layers) {
-      if (key === "observations" || key === "objective" || !visible[key] || !model.hasDensities) continue;
-      items.push(...projectTwoParamSurface(preparedDensities[key], project3D));
+      items.push(...candidateScene.items);
+    } else {
+      items.push(...candidateScene.items);
+      for (const key of densityLayers) {
+        if (!visible[key] || !model.hasDensities) continue;
+        items.push(...projectTwoParamSurface(preparedDensities[key], project3D));
+      }
     }
     if (visible.observations) for (const trial of model.trials) {
       const p = projectTrial(trial.x1, trial.x2, trial.value);
@@ -352,7 +509,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     if (isTop) return items;
     return measurePlay3D("merge-sort", () => mergeDepthSorted(objectiveScene, items.sort((a, b) => a.depth - b.depth)));
   // Projection and scaling depend exclusively on these immutable inputs.
-  }), [model, view, visible, proposal, objectiveView, heightScale, objectiveScene, preparedDensities, isTop, topLayout, topTint, topFields]);
+  }), [model, view, visible, proposal, objectiveView, heightScale, objectiveScene, preparedDensities, candidateScene, isTop, topLayout, topTint, topFields]);
   // Painted markers live in the canvas; these invisible SVG twins keep trials
   // focusable, labelled and hoverable without adding per-frame paint work.
   const markerTargets = visible.observations ? model.trials.map((trial) => {
@@ -364,6 +521,14 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     return <circle key={`trial-${trial.id}`} cx={p.x} cy={p.y} r={4.5} className="observation-target-play-3d" tabIndex={0} aria-label={label} onFocus={() => setInspection(label)} onPointerEnter={(event) => { if (!drag.current && !topDrag.current && (!isTop || event.pointerType !== "touch")) setInspection(label); }} onClick={() => { if (isTop && !topDidPan.current) setInspection(label); }}><title>{label}</title></circle>;
   }) : null;
   const proposalLabel = proposal ? `Next evaluation · x₁ = ${proposal.x1.toFixed(3)}, x₂ = ${proposal.x2.toFixed(3)}` : null;
+  const candidatesLabel = !visible.candidates || !proposal ? null
+    : proposal.candidates.length > 0 ? `TPE candidates · ${proposal.candidates.length} joint sample${proposal.candidates.length === 1 ? "" : "s"} · arrow keys inspect candidates`
+      : proposal.axisCandidates ? `TPE candidates · ${proposal.axisCandidates.x1.length} x₁ and ${proposal.axisCandidates.x2.length} x₂ axis sample${proposal.axisCandidates.x1.length === 1 ? "" : "s"} · arrow keys inspect candidates`
+        : null;
+  const activeCandidateIndex = focusedCandidate !== null && focusedCandidate < candidateScene.inspectorEntries.length
+    ? focusedCandidate
+    : candidateScene.defaultInspectorIndex;
+  const activeCandidateEntry = candidateScene.inspectorEntries[activeCandidateIndex] ?? null;
   const optimumMarker = (() => {
     if (!visible.objective) return null;
     const optimum = objectiveView.optimum;
@@ -463,7 +628,31 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     else rotate(dx * 0.12, -dy * 0.1);
   }
   const plotBottom = plotY + plotSize;
-  const markers = <>{markerTargets}{proposalLabel && <g className="proposal-play-3d" aria-label={proposalLabel}><title>{proposalLabel}</title></g>}{optimumMarker}</>;
+  const candidateInspector = candidatesLabel && activeCandidateEntry ? <g className="candidates-play-3d" role="group" tabIndex={0} aria-label={`${candidatesLabel} · ${activeCandidateEntry.label}`}
+    onFocus={() => {
+      setFocusedCandidate(candidateScene.defaultInspectorIndex);
+      const entry = candidateScene.inspectorEntries[candidateScene.defaultInspectorIndex];
+      if (entry) setInspection(entry.label);
+    }}
+    onBlur={() => setFocusedCandidate(null)}
+    onKeyDown={(event) => {
+      const entries = candidateScene.inspectorEntries;
+      if (!entries.length) return;
+      let next: number | null = null;
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (activeCandidateIndex + 1) % entries.length;
+      else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (activeCandidateIndex - 1 + entries.length) % entries.length;
+      else if (event.key === "Home") next = candidateScene.defaultInspectorIndex;
+      else if (event.key === "End") next = entries.length - 1;
+      if (next === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setFocusedCandidate(next);
+      setInspection(entries[next].label);
+    }}>
+    <title>{`${candidatesLabel} · ${activeCandidateEntry.label}`}</title>
+    <circle cx={activeCandidateEntry.x} cy={activeCandidateEntry.y} r={7} className="candidate-focus-target-play-3d" />
+  </g> : null;
+  const markers = <>{markerTargets}{candidateInspector}{proposalLabel && <g className="proposal-play-3d" aria-label={proposalLabel}><title>{proposalLabel}</title></g>}{optimumMarker}</>;
   const feasibleTrials = constrained ? playback.trials.filter((trial) => trial.violation === 0) : playback.trials;
   const feasibleCount = `${feasibleTrials.length} / ${step} feasible`;
   const bestValue = feasibleTrials.length ? Math.min(...feasibleTrials.map((trial) => trial.value)).toFixed(3) : "—";
@@ -475,7 +664,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
       onToggle={() => { cancelSeek(); if (complete) moveTo(0); setPlaying(!playing || complete); }} />
 
     </div>
-    <div className="legend" aria-label="Play 3D plot layers">{layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} data-guide-target={key === "acquisition" && guideAcquisition || undefined} aria-describedby={key === "acquisition" && guideAcquisition ? guide.textId : undefined} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{key === "observations" && constrained ? "Observations · ✕ infeasible" : label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : "Acquisition"}</span></button>)}</div>
+    <div className="legend" aria-label="Play 3D plot layers">{layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} data-guide-target={key === "acquisition" && guideAcquisition || undefined} aria-describedby={key === "acquisition" && guideAcquisition ? guide.textId : undefined} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{key === "observations" && constrained ? "Observations · ✕ infeasible" : label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : key === "candidates" ? "Cand." : "Acquisition"}</span></button>)}</div>
     <div className="scene-stage">
     <Play3DCanvas items={scene} floor={isTop ? emptyFloor : floor} viewBox={viewBox} clipRect={isTop ? topClip : undefined} />
     <svg className={`scene-play-3d${isTop ? " is-top" : ""}${pannable ? " is-pannable" : ""}`} ref={sceneRef} viewBox={sceneBox} style={{ "--chart-zoom": chartZoom } as CSSProperties} role="group" aria-label={isTop ? "Interactive top-down objective and density contours" : "Interactive 3D landscape and KDE surfaces"} data-guide-target={showRotateGuide || undefined} aria-describedby={showRotateGuide ? `view-help ${guide.textId}` : "view-help"} tabIndex={0}
@@ -541,10 +730,10 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
       {isTop ? <>
         <p>Hover or tap the map to inspect coordinates and values. Use + / − to zoom, then drag or use arrow keys to pan.</p>
         <p>Lines trace equal values of the objective and visible fitted layers. Stronger shading marks higher values within each fitted layer. When Acquisition has positive values, it highlights regions where ℓ(x) &gt; g(x).</p>
-        <p>{constrained ? "The diamond marks the constrained optimum and the boundary outlines the feasible region. ✕ marks infeasible trials. KDEs appear after 2 observations if Good has trials or a prior." : "The diamond marks the optimum (estimated for Multimodal). KDEs appear after 2 observations."} The hollow marker is the next evaluation.</p>
+        <p>{constrained ? "The diamond marks the constrained optimum and the boundary outlines the feasible region. ✕ marks infeasible trials. KDEs appear after 2 observations if Good has trials or a prior." : "The diamond marks the optimum (estimated for Multimodal). KDEs appear after 2 observations."} The hollow marker is the next evaluation. {mode === "univariate" ? "When TPE proposes, axis ticks show per-coordinate candidates and dashed lines combine their winners." : "When TPE proposes, dots show sampled candidates and the ringed anchor marks the winner."}</p>
       </> : <>
       <p>Drag or use arrow keys to rotate; + / − to zoom. Hover the surface or focus an observation to read its values.</p>
-      <p>The faint surface is the objective; {constrained ? "the diamond marks the constrained optimum and the boundary outlines the feasible region. ✕ marks infeasible trials. KDEs appear after 2 observations if Good has trials or a prior." : "the diamond marks its optimum (estimated for Multimodal). KDEs appear after 2 observations."} The hollow marker is the next evaluation.</p>
+      <p>The faint surface is the objective; {constrained ? "the diamond marks the constrained optimum and the boundary outlines the feasible region. ✕ marks infeasible trials. KDEs appear after 2 observations if Good has trials or a prior." : "the diamond marks its optimum (estimated for Multimodal). KDEs appear after 2 observations."} The hollow marker is the next evaluation. {mode === "univariate" ? "When TPE proposes, axis ticks show per-coordinate candidates and dashed floor lines combine their winners." : "When TPE proposes, floor dots show sampled candidates and the ringed anchor marks the winner."}</p>
       <p>Heights are rescaled to share one view: Linear keeps relative heights; Log1p expands the valley floor. Scaling never changes the optimizer, and hover shows original values.</p>
       </>}
     </div></details>

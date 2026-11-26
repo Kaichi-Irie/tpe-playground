@@ -112,8 +112,23 @@ export function buildTwoParamView(trials: readonly TwoParamTrial[], mode: Densit
 }
 
 
-interface TwoParamCandidate { x1: number; x2: number; logRatio: number }
-interface TwoParamProposal { method: "random" | "tpe"; x1: number; x2: number; candidates: TwoParamCandidate[]; trace: ProposalTrace }
+export interface TwoParamCandidate { x1: number; x2: number; logRatio: number }
+export interface TwoParamAxisCandidate { value: number; logRatio: number }
+export interface TwoParamAxisCandidates {
+  x1: TwoParamAxisCandidate[];
+  x2: TwoParamAxisCandidate[];
+  selectedX1Index: number;
+  selectedX2Index: number;
+}
+export interface TwoParamProposal {
+  method: "random" | "tpe";
+  x1: number;
+  x2: number;
+  candidates: TwoParamCandidate[];
+  selectedCandidateIndex: number | null;
+  axisCandidates: TwoParamAxisCandidates | null;
+  trace: ProposalTrace;
+}
 export interface TwoParamPlayback { trials: TwoParamTrial[]; proposals: TwoParamProposal[] }
 export const emptyTwoParamPlayback = (): TwoParamPlayback => ({ trials: [], proposals: [] });
 
@@ -126,8 +141,23 @@ export function proposeTwoParamTrial(trials: readonly TwoParamTrial[], seed = tw
 
 export function twoParamProposalFromTrace(trace: ProposalTrace): TwoParamProposal {
   // Independent candidates belong to separate axes, never invent joint candidates.
-  const candidates = trace.method === "tpe" && trace.config.mode === "multivariate" ? trace.groups[0].candidates.map((c) => ({ x1: c.params.x1, x2: c.params.x2, logRatio: c.score })) : [];
-  return { method: trace.method, x1: trace.selected.x1, x2: trace.selected.x2, candidates, trace };
+  if (trace.method === "tpe" && trace.config.mode === "multivariate") {
+    const group = trace.groups[0];
+    const candidates = group.candidates.map((c) => ({ x1: c.params.x1, x2: c.params.x2, logRatio: c.score }));
+    return { method: trace.method, x1: trace.selected.x1, x2: trace.selected.x2, candidates, selectedCandidateIndex: group.selectedIndex, axisCandidates: null, trace };
+  }
+  if (trace.method === "tpe" && trace.config.mode === "univariate") {
+    const x1Group = trace.groups.find((group) => group.parameterIds[0] === "x1");
+    const x2Group = trace.groups.find((group) => group.parameterIds[0] === "x2");
+    const axisCandidates = x1Group && x2Group ? {
+      x1: x1Group.candidates.map((c) => ({ value: c.params.x1, logRatio: c.score })),
+      x2: x2Group.candidates.map((c) => ({ value: c.params.x2, logRatio: c.score })),
+      selectedX1Index: x1Group.selectedIndex,
+      selectedX2Index: x2Group.selectedIndex,
+    } : null;
+    return { method: trace.method, x1: trace.selected.x1, x2: trace.selected.x2, candidates: [], selectedCandidateIndex: null, axisCandidates, trace };
+  }
+  return { method: trace.method, x1: trace.selected.x1, x2: trace.selected.x2, candidates: [], selectedCandidateIndex: null, axisCandidates: null, trace };
 }
 
 export function moveTwoParamPlayback(state: TwoParamPlayback, next: number, seed = twoParamSettings.seed, mode: DensityMode = "multivariate", settings: TwoParamSearchSettings = {}): TwoParamPlayback {

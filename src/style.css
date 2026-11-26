@@ -291,6 +291,7 @@ progress::-moz-progress-bar { background: var(--accent); }
 .acquisition-line { stroke-width: 2.8; stroke-dasharray: 2 5; stroke-linecap: round; }
 .swatch { width: 28px; height: 3px; flex-shrink: 0; }
 .bad .swatch { background: repeating-linear-gradient(to right, var(--bad) 0 9px, transparent 9px 14px); }
+.candidates .swatch { width: 14px; height: 6px; background: radial-gradient(circle, var(--proposal) 2px, transparent 2.4px) 0 0 / 7px 6px repeat-x; }
 .acquisition .swatch { height: 4px; background: radial-gradient(circle, var(--acquisition) 1.5px, transparent 2px) 0 0 / 7px 4px repeat-x; }
 
 .weight-note { min-width: 0; }
@@ -361,7 +362,10 @@ progress::-moz-progress-bar { background: var(--accent); }
 .scaling-play-3d { padding: 16px 22px; border-top: 1px solid var(--border); }
 .scaling-play-3d p { font-size: var(--type-sm); margin-top: 10px; max-width: 100ch; }
 @media (max-width: 700px) { .scene-play-3d { min-height: 360px; } .view-controls > span { flex-basis: 100%; } }
-.proposal-play-3d { pointer-events: none; }
+.proposal-play-3d, .candidates-play-3d { pointer-events: none; }
+.candidate-focus-target-play-3d { fill: transparent; stroke: none; }
+.candidates-play-3d:focus { outline: none; }
+.candidates-play-3d:focus .candidate-focus-target-play-3d { stroke: var(--focus); stroke-width: 2.5; }
 .play-3d .proposal > p:last-child { flex-basis: 100%; margin-left: 0; }
 .play-3d .proposal p { font-size: var(--type-sm); color: var(--muted); }
 
@@ -457,6 +461,7 @@ header { height: 64px; padding: 10px 0; border: 0; }
   .visual-workspace .config { grid-template-columns: 145px 145px auto; }
 }
 .canvas-plot .observations .swatch { width: 6px; height: 6px; }
+.canvas-plot .candidates .swatch { width: 14px; height: 6px; }
 @media (max-width: 700px) {
   .visual-workspace .config { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 20px; }
   .visual-workspace .advanced-settings { position: absolute; right: 0; top: calc(100% + 8px); }
@@ -965,9 +970,18 @@ header { height: 64px; padding: 10px 0; border: 0; }
   .canvas-plot .layer-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .canvas-plot .layer-short { display: inline; }
 }
+@container (max-width: 420px) {
+  .play-3d .canvas-plot .legend { gap: 4px 6px; padding-inline: 6px; }
+  .play-3d .canvas-plot .swatch { width: 14px; }
+  .play-3d .canvas-plot .observations .swatch { width: 6px; }
+  .play-3d .canvas-plot .candidates .swatch { width: 14px; }
+  .play-3d .canvas-plot .acquisition .swatch { width: 22px; }
+}
 @container (max-width: 380px) {
   .canvas-plot .legend { gap: 4px 6px; padding-inline: 6px; }
   .canvas-plot .swatch { width: 14px; }
+  .canvas-plot .observations .swatch { width: 6px; }
+  .canvas-plot .candidates .swatch { width: 14px; }
   .canvas-plot .acquisition .swatch { width: 24px; }
 }
 

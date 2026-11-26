@@ -10,6 +10,10 @@ export type Play3DSceneItem = { id: string; depth: number } & (
   | { kind: "boundary" | "grid"; points: readonly number[] }
   | { kind: "quad"; layer: Play3DSurfaceLayer; alpha: number; points: readonly number[]; muted?: boolean }
   | { kind: "field-contour"; layer: Play3DSurfaceLayer; points: readonly number[] }
+  | { kind: "guide"; points: readonly number[]; dashOffset: number }
+  | { kind: "floor-anchor"; x: number; y: number }
+  | { kind: "candidate"; x: number; y: number; selected: boolean; inspect: () => void }
+  | { kind: "axis-candidate"; points: readonly number[]; x: number; y: number; selected: boolean; inspect: () => void }
   | { kind: "trial"; feasible?: boolean; x: number; y: number; group: "good" | "bad" | "unclassified" }
   | { kind: "proposal"; x: number; y: number; floorX: number; floorY: number }
 );
@@ -32,8 +36,72 @@ export function fitPlay3DViewBox(box: Play3DViewBox, width: number, height: numb
   return { scale, x: (width - box.width * scale) / 2 - box.x * scale, y: (height - box.height * scale) / 2 - box.y * scale };
 }
 
-// Topmost painted surface triangle or contour under (x, y), in viewBox units.
-export function hitTestPlay3DScene(items: readonly Play3DSceneItem[], x: number, y: number, tolerance: number) {
+const candidateDotRadius = (selected: boolean, fitScale: number) =>
+  selected ? Math.max(4.5, 4 / fitScale) : Math.max(2.9, 2.5 / fitScale);
+const candidateStrokeWidth = (selected: boolean, fitScale: number) => (selected ? 1.8 : 1.1) / fitScale;
+const axisWinnerRadius = (fitScale: number) => Math.max(3.8, 3.4 / fitScale);
+const axisTickWidth = (selected: boolean, fitScale: number) => (selected ? 2.2 : 1.8) / fitScale;
+
+function segmentDistance(x: number, y: number, points: readonly number[]) {
+  const [ax, ay, bx, by] = points;
+  const dx = bx - ax, dy = by - ay, length = dx * dx + dy * dy;
+  const t = length ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / length)) : 0;
+  return Math.hypot(x - ax - t * dx, y - ay - t * dy);
+}
+
+// Matches Canvas 2D stroke geometry when lineCap === "butt".
+function isOnButtSegment(x: number, y: number, points: readonly number[], halfWidth: number) {
+  const [ax, ay, bx, by] = points;
+  const dx = bx - ax, dy = by - ay, lenSq = dx * dx + dy * dy;
+  if (!lenSq) return false;
+  const proj = (x - ax) * dx + (y - ay) * dy;
+  if (proj < 0 || proj > lenSq) return false;
+  const perp = Math.abs((x - ax) * dy - (y - ay) * dx) / Math.sqrt(lenSq);
+  return perp <= halfWidth;
+}
+
+// Topmost painted candidate, surface triangle, or contour under (x, y), in viewBox units.
+// Painted candidate geometry always wins over proximity tolerance; proximity ties resolve by distance.
+export function hitTestPlay3DScene(
+  items: readonly Play3DSceneItem[],
+  x: number,
+  y: number,
+  tolerance: number,
+  candidates?: readonly Play3DSceneItem[],
+  fitScale?: number,
+) {
+  const candidateItems = candidates ?? items;
+  const proximityTolerance = tolerance * 2;
+  let closestProximity: Play3DSceneItem | null = null;
+  let closestDistance = Infinity;
+  for (let i = candidateItems.length - 1; i >= 0; i--) {
+    const item = candidateItems[i];
+    if (item.kind === "candidate") {
+      const distance = Math.hypot(x - item.x, y - item.y);
+      const directRadius = fitScale !== undefined
+        ? candidateDotRadius(item.selected, fitScale) + candidateStrokeWidth(item.selected, fitScale) / 2
+        : item.selected ? tolerance * 1.5 : tolerance;
+      if (distance <= directRadius) return item;
+      if (distance <= proximityTolerance && distance < closestDistance) {
+        closestDistance = distance;
+        closestProximity = item;
+      }
+    } else if (item.kind === "axis-candidate") {
+      const segDist = segmentDistance(x, y, item.points);
+      const anchorDist = Math.hypot(x - item.x, y - item.y);
+      const tickRadius = fitScale !== undefined ? axisTickWidth(item.selected, fitScale) / 2 : tolerance * 0.6;
+      const winnerRadius = fitScale !== undefined
+        ? axisWinnerRadius(fitScale) + 0.9 / fitScale
+        : tolerance * 1.5;
+      if (isOnButtSegment(x, y, item.points, tickRadius) || (item.selected && anchorDist <= winnerRadius)) return item;
+      const distance = item.selected ? Math.min(segDist, anchorDist) : segDist;
+      if (distance <= proximityTolerance && distance < closestDistance) {
+        closestDistance = distance;
+        closestProximity = item;
+      }
+    }
+  }
+  if (closestProximity) return closestProximity;
   for (let i = items.length - 1; i >= 0; i--) {
     const item = items[i];
     if (item.kind === "triangle") {
@@ -43,10 +111,7 @@ export function hitTestPlay3DScene(items: readonly Play3DSceneItem[], x: number,
       const d3 = (x - ax) * (cy - ay) - (cx - ax) * (y - ay);
       if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) return item;
     } else if (item.kind === "segment") {
-      const [ax, ay, bx, by] = item.points;
-      const dx = bx - ax, dy = by - ay, length = dx * dx + dy * dy;
-      const t = length ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / length)) : 0;
-      if (Math.hypot(x - ax - t * dx, y - ay - t * dy) <= tolerance) return item;
+      if (segmentDistance(x, y, item.points) <= tolerance) return item;
     }
   }
   return null;
@@ -135,6 +200,52 @@ export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DScene
       const value = color(item.muted ? "--neutral-point" : surface.color);
       ctx.globalAlpha = item.muted ? 0.035 : surface.fill; ctx.fillStyle = value; ctx.fill();
       if (surface.stroke) { ctx.globalAlpha = surface.stroke; ctx.strokeStyle = value; ctx.lineWidth = 0.35; ctx.stroke(); }
+    } else if (item.kind === "guide") {
+      const [ax, ay, bx, by] = item.points;
+      ctx.globalAlpha = 0.65;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+      ctx.setLineDash([4 / fit.scale, 4 / fit.scale]);
+      ctx.lineDashOffset = item.dashOffset;
+      ctx.strokeStyle = color("--text"); ctx.lineWidth = 1.5 / fit.scale; ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
+    } else if (item.kind === "floor-anchor") {
+      const floorRadius = Math.max(3.4, 3 / fit.scale);
+      ctx.globalAlpha = 1;
+      ctx.beginPath(); ctx.arc(item.x, item.y, floorRadius, 0, 2 * Math.PI);
+      ctx.fillStyle = color("--surface"); ctx.fill();
+      ctx.strokeStyle = color("--text"); ctx.lineWidth = 1.6 / fit.scale; ctx.stroke();
+    } else if (item.kind === "candidate") {
+      if (item.selected) {
+        const outer = candidateDotRadius(true, fit.scale);
+        const inner = Math.max(1.8, 1.6 / fit.scale);
+        ctx.globalAlpha = 1;
+        ctx.beginPath(); ctx.arc(item.x, item.y, outer, 0, 2 * Math.PI);
+        ctx.fillStyle = color("--surface"); ctx.fill();
+        ctx.strokeStyle = color("--text"); ctx.lineWidth = candidateStrokeWidth(true, fit.scale); ctx.stroke();
+        ctx.beginPath(); ctx.arc(item.x, item.y, inner, 0, 2 * Math.PI);
+        ctx.fillStyle = color("--text"); ctx.fill();
+      } else {
+        const r = candidateDotRadius(false, fit.scale);
+        ctx.beginPath(); ctx.arc(item.x, item.y, r, 0, 2 * Math.PI);
+        ctx.globalAlpha = 0.82; ctx.fillStyle = color("--proposal"); ctx.fill();
+        ctx.globalAlpha = 0.85; ctx.strokeStyle = color("--surface"); ctx.lineWidth = candidateStrokeWidth(false, fit.scale); ctx.stroke();
+      }
+    } else if (item.kind === "axis-candidate") {
+      const [ax, ay, bx, by] = item.points;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+      if (item.selected) {
+        ctx.globalAlpha = 1; ctx.strokeStyle = color("--text"); ctx.lineWidth = axisTickWidth(true, fit.scale); ctx.stroke();
+        const outer = axisWinnerRadius(fit.scale);
+        const inner = Math.max(1.4, 1.3 / fit.scale);
+        ctx.beginPath(); ctx.arc(item.x, item.y, outer, 0, 2 * Math.PI);
+        ctx.fillStyle = color("--surface"); ctx.fill();
+        ctx.strokeStyle = color("--text"); ctx.lineWidth = 1.8 / fit.scale; ctx.stroke();
+        ctx.beginPath(); ctx.arc(item.x, item.y, inner, 0, 2 * Math.PI);
+        ctx.fillStyle = color("--text"); ctx.fill();
+      } else {
+        ctx.globalAlpha = 0.85; ctx.strokeStyle = color("--proposal"); ctx.lineWidth = axisTickWidth(false, fit.scale); ctx.stroke();
+      }
     } else if (item.kind === "trial" && item.feasible === false) {
       const { x, y } = item;
       const r = Math.max(4.5, 2.4 / fit.scale);
