@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { objectiveContours } from "./contours";
+import { objectiveContours, scalarContours } from "./contours";
 
 it("interpolates contour crossings on a plane without degenerate segments", () => {
   const grid = Array.from({ length: 3 }, (_, x1) => Array.from({ length: 3 }, (_, x2) => ({ x1, x2, objective: x1 + x2 })));
@@ -23,4 +23,16 @@ it("handles constant cells and retains isolated contours inside a bowl", () => {
     expect(Math.abs(point.x2)).toBeLessThan(1);
   }
   expect(objectiveContours(grid.map((row) => row.map((point) => ({ ...point, objective: 1 }))), [1])).toEqual([]);
+});
+
+it("extracts contours from an arbitrary scalar field", () => {
+  const grid = [0, 1].map((x1) => [0, 1].map((x2) => ({ x1, x2, density: 2 * x1 - x2 })));
+  const segments = scalarContours(grid, [0.5, 1.5], (point) => point.density);
+  expect(new Set(segments.map(({ level }) => level))).toEqual(new Set([0.5, 1.5]));
+  for (const { level, a, b } of segments) {
+    expect(2 * a.x1 - a.x2).toBeCloseTo(level);
+    expect(2 * b.x1 - b.x2).toBeCloseTo(level);
+  }
+  expect(scalarContours(grid, [0, 1, 2], () => 1)).toEqual([]);
+  expect(scalarContours([], [1], () => 1)).toEqual([]);
 });
