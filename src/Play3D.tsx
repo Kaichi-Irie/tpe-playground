@@ -6,6 +6,7 @@ import { Play3DCanvas, fitPlay3DViewBox, hitTestPlay3DScene, type Play3DSceneIte
 import { mergeDepthSorted, twoParamSurfaceMesh, type TwoParamSurfaceVertex } from "./twoParamSurfaceMesh";
 import { usePlotSize } from "./usePlotSize";
 import { PlaybackControls } from "./PlaybackControls";
+import { defaultPlaybackSpeed, type PlaybackSpeed } from "./playbackSpeed";
 import { createTwoParamObjectiveView, type ObjectiveHeightScale } from "./twoParamObjectiveView";
 import { Play3DPerformance } from "./Play3DPerformance";
 import LabHintBubble from "./LabHintBubble";
@@ -95,6 +96,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
   }
   const [seed, setSeed] = useState(initialSearch.seed);
   const [playing, setPlaying] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(defaultPlaybackSpeed);
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const step = playback.trials.length;
   const complete = step === twoParamSettings.count;
@@ -123,9 +125,9 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
     const timer = window.setTimeout(() => {
       setPlayback((current) => moveTwoParamPlayback(current, current.trials.length + 1, seed, mode, searchSettings));
       setInspection("");
-    }, 1000);
+    }, 1000 / playbackSpeed);
     return () => window.clearTimeout(timer);
-  }, [playing, complete, step, seed, mode, searchSettings]);
+  }, [playing, playbackSpeed, complete, step, seed, mode, searchSettings]);
   function moveTo(next: number) {
     setPlaying(false);
     cancelSeek();
@@ -341,7 +343,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
   return <section className="visual-workspace play-3d" ref={guide.workspaceRef} onKeyDown={guide.onKeyDown} aria-labelledby="play-3d-heading">
     <div className="canvas-plot">
     <div className="canvas-controls">
-    <PlaybackControls targetStep={seekTarget} step={step} limit={twoParamSettings.count} playing={playing} guidePlay={guide.active === "playback"} guideDescribedBy={guide.textId} idSuffix="-play-3d" labelPrefix="Play 3D " describedBy="trial-seek-help-play-3d" onMove={moveTo}
+    <PlaybackControls targetStep={seekTarget} step={step} limit={twoParamSettings.count} playing={playing} speed={playbackSpeed} onSpeedChange={setPlaybackSpeed} guidePlay={guide.active === "playback"} guideDescribedBy={guide.textId} idSuffix="-play-3d" labelPrefix="Play 3D " describedBy="trial-seek-help-play-3d" onMove={moveTo}
       onToggle={() => { cancelSeek(); if (complete) moveTo(0); setPlaying(!playing || complete); }} />
 
     </div>

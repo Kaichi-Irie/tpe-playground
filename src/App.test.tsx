@@ -31,6 +31,7 @@ it("renders the density explorer with playback controls and an empty initial his
   expect(html).toContain("Next trial");
   expect(html).not.toContain("Run to end");
   expect(html).toContain('aria-label="Trial progress"');
+  expect(html).toContain('<select class="playback-speed" aria-label="Playback speed"><option value="0.5">0.5x</option><option value="1" selected="">1x</option><option value="4">4x</option><option value="10">10x</option></select>');
   expect(html).toContain("/ 200");
   expect(html).toContain("Previous trial");
   expect(html).toMatch(/<button class="play" aria-label="Play"[^>]*data-guide-target="true"[^>]*aria-describedby="play-guide-text-play-2d"/);

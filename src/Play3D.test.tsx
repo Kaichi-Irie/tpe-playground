@@ -7,6 +7,7 @@ it("starts a sequential Play 3D search with no observations and a preview of its
   const html = renderToStaticMarkup(<Play3D />);
   expect(html).toContain("Trial 0 / 200");
   expect(html).toContain('aria-label="Play 3D Trial progress"');
+  expect(html).toMatch(/<select class="playback-speed" aria-label="Play 3D Playback speed">.*<option value="1" selected="">1x<\/option>/);
   expect(html).toContain('aria-label="Play 3D Search seed">42</output>');
   expect(html).toContain('aria-label="Play 3D Bandwidth rule"');
   expect(html).not.toMatch(/aria-label="2[D] /);
