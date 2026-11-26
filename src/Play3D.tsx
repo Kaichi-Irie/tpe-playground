@@ -17,7 +17,7 @@ import { HelpMath } from "./HelpMath";
 import { constrainSettings } from "./searchSettings";
 import { readPlay3DSharedSearch, type SharedSearch } from "./shareSearch";
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
-import { buildTwoParamView, twoParamDefaultModelSettings, getTwoParamObjective, twoParamObjectivePresets, emptyTwoParamPlayback, moveTwoParamPlayback, proposeTwoParamTrial, twoParamProposalFromTrace, twoParamSettings, type DensityMode, type TwoParamObjectivePreset, type TwoParamModelSettings } from "./twoParamTpe";
+import { buildTwoParamView, twoParamDefaultModelSettings, getTwoParamObjective, twoParamObjectivePresets, emptyTwoParamPlayback, moveTwoParamPlayback, proposeTwoParamTrial, twoParamProposalFromTrace, twoParamSettings, type DensityMode, type TwoParamObjectivePreset, type TwoParamModelSettings, type TwoParamProposal } from "./twoParamTpe";
 
 type Surface = "objective" | "good" | "bad" | "acquisition";
 type Layer = Surface | "observations" | "candidates";
@@ -28,6 +28,133 @@ const layers: { key: Layer; label: string }[] = [
 ];
 const densityLayers = ["good", "bad", "acquisition"] as const;
 const axisCandidateTickLength = 0.38;
+const guideSegmentCount = 16;
+
+export interface Play3DCandidateInspectorEntry {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  selected: boolean;
+}
+
+export function buildPlay3DCandidateScene(
+  proposal: TwoParamProposal | null,
+  visible: boolean,
+  project: (x: number, y: number, height: number) => { x: number; y: number; depth: number },
+  onInspect: (label: string) => void,
+): {
+  items: Play3DSceneItem[];
+  hitTargets: Play3DSceneItem[];
+  inspectorEntries: Play3DCandidateInspectorEntry[];
+  defaultInspectorIndex: number;
+} {
+  if (!visible || !proposal) return { items: [], hitTargets: [], inspectorEntries: [], defaultInspectorIndex: 0 };
+  const items: Play3DSceneItem[] = [];
+  const hitTargets: Play3DSceneItem[] = [];
+  const inspectorEntries: Play3DCandidateInspectorEntry[] = [];
+  if (proposal.candidates.length > 0) {
+    proposal.candidates.forEach((candidate, index) => {
+      const selected = index === proposal.selectedCandidateIndex;
+      const p = project(candidate.x1, candidate.x2, 0);
+      const label = `${selected ? "Selected candidate" : "Candidate"} ${index + 1} · x₁ = ${candidate.x1.toFixed(2)}, x₂ = ${candidate.x2.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
+      const item: Play3DSceneItem = {
+        id: `candidate-${index}`,
+        kind: "candidate",
+        depth: p.depth + (selected ? 0.028 : 0.02),
+        x: p.x,
+        y: p.y,
+        selected,
+        inspect: () => onInspect(label),
+      };
+      items.push(item);
+      hitTargets.push(item);
+      inspectorEntries.push({ id: item.id, label, x: p.x, y: p.y, selected });
+    });
+    hitTargets.sort((a, b) => a.depth - b.depth);
+    return { items, hitTargets, inspectorEntries, defaultInspectorIndex: proposal.selectedCandidateIndex ?? 0 };
+  }
+  if (proposal.axisCandidates) {
+    const { x1, x2, selectedX1Index, selectedX2Index } = proposal.axisCandidates;
+    const combinedFloor = project(proposal.x1, proposal.x2, 0);
+    const x1Selected = x1[selectedX1Index];
+    const x2Selected = x2[selectedX2Index];
+    if (x1Selected && x2Selected) {
+      inspectorEntries.push({
+        id: "candidate-winners",
+        label: `Selected candidates · x₁ #${selectedX1Index + 1} = ${x1Selected.value.toFixed(2)} (log ℓ/g = ${x1Selected.logRatio.toFixed(3)}) · x₂ #${selectedX2Index + 1} = ${x2Selected.value.toFixed(2)} (log ℓ/g = ${x2Selected.logRatio.toFixed(3)})`,
+        x: combinedFloor.x,
+        y: combinedFloor.y,
+        selected: true,
+      });
+    }
+    x1.forEach((candidate, index) => {
+      const selected = index === selectedX1Index;
+      const start = project(candidate.value, -5, 0);
+      const end = project(candidate.value, -5 - axisCandidateTickLength, 0);
+      const label = `${selected ? "Selected x₁ candidate" : "x₁ candidate"} ${index + 1} · x₁ = ${candidate.value.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
+      const item: Play3DSceneItem = {
+        id: `candidate-x1-${index}`,
+        kind: "axis-candidate",
+        depth: selected ? start.depth + 0.028 : (start.depth + end.depth) / 2 + 0.02,
+        points: [start.x, start.y, end.x, end.y],
+        x: start.x,
+        y: start.y,
+        selected,
+        inspect: () => onInspect(label),
+      };
+      items.push(item);
+      hitTargets.push(item);
+      inspectorEntries.push({ id: item.id, label, x: start.x, y: start.y, selected });
+    });
+    x2.forEach((candidate, index) => {
+      const selected = index === selectedX2Index;
+      const start = project(-5, candidate.value, 0);
+      const end = project(-5 - axisCandidateTickLength, candidate.value, 0);
+      const label = `${selected ? "Selected x₂ candidate" : "x₂ candidate"} ${index + 1} · x₂ = ${candidate.value.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
+      const item: Play3DSceneItem = {
+        id: `candidate-x2-${index}`,
+        kind: "axis-candidate",
+        depth: selected ? start.depth + 0.028 : (start.depth + end.depth) / 2 + 0.02,
+        points: [start.x, start.y, end.x, end.y],
+        x: start.x,
+        y: start.y,
+        selected,
+        inspect: () => onInspect(label),
+      };
+      items.push(item);
+      hitTargets.push(item);
+      inspectorEntries.push({ id: item.id, label, x: start.x, y: start.y, selected });
+    });
+    const addSubdividedGuide = (prefix: string, startX1: number, startX2: number, endX1: number, endX2: number) => {
+      let prev = project(startX1, startX2, 0);
+      for (let i = 1; i <= guideSegmentCount; i++) {
+        const next = i === guideSegmentCount
+          ? project(endX1, endX2, 0)
+          : project(startX1 + (endX1 - startX1) * (i / guideSegmentCount), startX2 + (endX2 - startX2) * (i / guideSegmentCount), 0);
+        items.push({
+          id: `${prefix}-${i}`,
+          kind: "guide",
+          depth: (prev.depth + next.depth) / 2 + 0.018,
+          points: [prev.x, prev.y, next.x, next.y],
+        });
+        prev = next;
+      }
+    };
+    addSubdividedGuide("candidate-guide-x1", proposal.x1, -5, proposal.x1, proposal.x2);
+    addSubdividedGuide("candidate-guide-x2", -5, proposal.x2, proposal.x1, proposal.x2);
+    items.push({
+      id: "candidate-floor-anchor",
+      kind: "floor-anchor",
+      depth: combinedFloor.depth + 0.028,
+      x: combinedFloor.x,
+      y: combinedFloor.y,
+    });
+    hitTargets.sort((a, b) => a.depth - b.depth);
+    return { items, hitTargets, inspectorEntries, defaultInspectorIndex: 0 };
+  }
+  return { items: [], hitTargets: [], inspectorEntries: [], defaultInspectorIndex: 0 };
+}
 const initialView = { yaw: -0.65, pitch: 0.5, zoom: 1 };
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
@@ -169,6 +296,7 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
   const guideAcquisition = guide.active === "acquisition";
   const [view, setView] = useState(initialView);
   const [inspection, setInspection] = useState("");
+  const [focusedCandidate, setFocusedCandidate] = useState<number | null>(null);
   const drag = useRef<{ x: number; y: number; id: number } | null>(null);
   const cameraFrame = useRef<number | null>(null);
   const pendingRotation = useRef({ yaw: 0, pitch: 0 });
@@ -227,7 +355,14 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
     if (drag.current || event.target !== event.currentTarget) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const fit = fitPlay3DViewBox(viewBox, rect.width, rect.height);
-    const hit = hitTestPlay3DScene(scene, (event.clientX - rect.left - fit.x) / fit.scale, (event.clientY - rect.top - fit.y) / fit.scale, 3 / fit.scale);
+    const hit = hitTestPlay3DScene(
+      scene,
+      (event.clientX - rect.left - fit.x) / fit.scale,
+      (event.clientY - rect.top - fit.y) / fit.scale,
+      3 / fit.scale,
+      candidateScene.hitTargets,
+      fit.scale,
+    );
     if (hit) hit.inspect();
   }
   // Keep compact-screen detail stable while dragging: reuse the resting mesh
@@ -276,78 +411,18 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
     }
     return measurePlay3D("objective-sort", () => items.sort((a, b) => a.depth - b.depth));
   }), [preparedObjective, objectiveView, objectiveDefinition, heightScale, view, visible.objective]);
+  const candidateScene = useMemo(() => buildPlay3DCandidateScene(
+    proposal,
+    visible.candidates,
+    project,
+    (label) => { if (!drag.current) setInspection(label); },
+  // project depends only on the camera.
+  ), [proposal, visible.candidates, view]);
   const scene = useMemo(() => measurePlay3D("dynamic-project", () => {
-    const items: Play3DSceneItem[] = [];
+    const items: Play3DSceneItem[] = [...candidateScene.items];
     for (const key of densityLayers) {
       if (!visible[key] || !model.hasDensities) continue;
       items.push(...projectTwoParamSurface(preparedDensities[key], project));
-    }
-    if (visible.candidates && proposal) {
-      if (proposal.candidates.length > 0) {
-        proposal.candidates.forEach((candidate, index) => {
-          const selected = index === proposal.selectedCandidateIndex;
-          const p = project(candidate.x1, candidate.x2, 0);
-          const label = `${selected ? "Selected candidate" : "Candidate"} ${index + 1} · x₁ = ${candidate.x1.toFixed(2)}, x₂ = ${candidate.x2.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
-          items.push({
-            id: `candidate-${index}`,
-            kind: "candidate",
-            depth: p.depth + (selected ? 0.028 : 0.02),
-            x: p.x,
-            y: p.y,
-            selected,
-            inspect: () => { if (!drag.current) setInspection(label); },
-          });
-        });
-      } else if (proposal.axisCandidates) {
-        const { x1, x2, selectedX1Index, selectedX2Index } = proposal.axisCandidates;
-        x1.forEach((candidate, index) => {
-          const selected = index === selectedX1Index;
-          const start = project(candidate.value, -5, 0);
-          const end = project(candidate.value, -5 - axisCandidateTickLength, 0);
-          const label = `${selected ? "Selected x₁ candidate" : "x₁ candidate"} ${index + 1} · x₁ = ${candidate.value.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
-          items.push({
-            id: `candidate-x1-${index}`,
-            kind: "axis-candidate",
-            depth: selected ? start.depth + 0.028 : (start.depth + end.depth) / 2 + 0.02,
-            points: [start.x, start.y, end.x, end.y],
-            x: start.x,
-            y: start.y,
-            selected,
-            inspect: () => { if (!drag.current) setInspection(label); },
-          });
-        });
-        x2.forEach((candidate, index) => {
-          const selected = index === selectedX2Index;
-          const start = project(-5, candidate.value, 0);
-          const end = project(-5 - axisCandidateTickLength, candidate.value, 0);
-          const label = `${selected ? "Selected x₂ candidate" : "x₂ candidate"} ${index + 1} · x₂ = ${candidate.value.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
-          items.push({
-            id: `candidate-x2-${index}`,
-            kind: "axis-candidate",
-            depth: selected ? start.depth + 0.028 : (start.depth + end.depth) / 2 + 0.02,
-            points: [start.x, start.y, end.x, end.y],
-            x: start.x,
-            y: start.y,
-            selected,
-            inspect: () => { if (!drag.current) setInspection(label); },
-          });
-        });
-        const x1Winner = project(proposal.x1, -5, 0);
-        const x2Winner = project(-5, proposal.x2, 0);
-        const combinedFloor = project(proposal.x1, proposal.x2, 0);
-        items.push({
-          id: "candidate-guide-x1",
-          kind: "guide",
-          depth: (x1Winner.depth + combinedFloor.depth) / 2 + 0.018,
-          points: [x1Winner.x, x1Winner.y, combinedFloor.x, combinedFloor.y],
-        });
-        items.push({
-          id: "candidate-guide-x2",
-          kind: "guide",
-          depth: (x2Winner.depth + combinedFloor.depth) / 2 + 0.018,
-          points: [x2Winner.x, x2Winner.y, combinedFloor.x, combinedFloor.y],
-        });
-      }
     }
     if (visible.observations) for (const trial of model.trials) {
       const p = project(trial.x1, trial.x2, scale("objective", trial.value));
@@ -357,11 +432,11 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
     if (proposal) {
       const p = project(proposal.x1, proposal.x2, scale("objective", objectiveDefinition.evaluate(proposal.x1, proposal.x2)));
       const floor = project(proposal.x1, proposal.x2, 0);
-      items.push({ id: "next-trial", kind: "proposal", depth: p.depth + 0.03, x: p.x, y: p.y, floorX: floor.x, floorY: floor.y, highlightFloor: visible.candidates && proposal.axisCandidates !== null });
+      items.push({ id: "next-trial", kind: "proposal", depth: p.depth + 0.03, x: p.x, y: p.y, floorX: floor.x, floorY: floor.y });
     }
     return measurePlay3D("merge-sort", () => mergeDepthSorted(objectiveScene, items.sort((a, b) => a.depth - b.depth)));
   // Projection and scaling depend exclusively on these immutable inputs.
-  }), [model, view, visible, proposal, objectiveView, heightScale, objectiveScene, preparedDensities]);
+  }), [model, view, visible, proposal, objectiveView, heightScale, objectiveScene, preparedDensities, candidateScene]);
   // Painted markers live in the canvas; these invisible SVG twins keep trials
   // focusable, labelled and hoverable without adding per-frame paint work.
   const markerTargets = visible.observations ? model.trials.map((trial) => {
@@ -373,9 +448,13 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
   }) : null;
   const proposalLabel = proposal ? `Next evaluation · x₁ = ${proposal.x1.toFixed(3)}, x₂ = ${proposal.x2.toFixed(3)}` : null;
   const candidatesLabel = !visible.candidates || !proposal ? null
-    : proposal.candidates.length > 0 ? `TPE candidates · ${proposal.candidates.length} joint sample${proposal.candidates.length === 1 ? "" : "s"}`
-      : proposal.axisCandidates ? `TPE candidates · ${proposal.axisCandidates.x1.length} x₁ and ${proposal.axisCandidates.x2.length} x₂ axis sample${proposal.axisCandidates.x1.length === 1 ? "" : "s"}`
+    : proposal.candidates.length > 0 ? `TPE candidates · ${proposal.candidates.length} joint sample${proposal.candidates.length === 1 ? "" : "s"} · arrow keys inspect candidates`
+      : proposal.axisCandidates ? `TPE candidates · ${proposal.axisCandidates.x1.length} x₁ and ${proposal.axisCandidates.x2.length} x₂ axis sample${proposal.axisCandidates.x1.length === 1 ? "" : "s"} · arrow keys inspect candidates`
         : null;
+  const activeCandidateIndex = focusedCandidate !== null && focusedCandidate < candidateScene.inspectorEntries.length
+    ? focusedCandidate
+    : candidateScene.defaultInspectorIndex;
+  const activeCandidateEntry = candidateScene.inspectorEntries[activeCandidateIndex] ?? null;
   const optimumMarker = (() => {
     if (!visible.objective) return null;
     const optimum = objectiveView.optimum;
@@ -428,7 +507,30 @@ export default function Play3D({ sharedSettings = null }: { sharedSettings?: URL
       onKeyDown={(event) => { if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "+", "=", "-"].includes(event.key)) return; event.preventDefault(); if (["+", "=", "-"].includes(event.key)) zoom(event.key === "-" ? 1 / 1.15 : 1.15); else rotate(event.key === "ArrowLeft" ? -0.12 : event.key === "ArrowRight" ? 0.12 : 0, event.key === "ArrowUp" ? 0.1 : event.key === "ArrowDown" ? -0.1 : 0); }}>
       <title>Objective landscape, good and bad densities, and optional log density ratio</title>
       {markerTargets}
-      {candidatesLabel && <g className="candidates-play-3d" aria-label={candidatesLabel}><title>{candidatesLabel}</title></g>}
+      {candidatesLabel && activeCandidateEntry && <g className="candidates-play-3d" role="group" tabIndex={0} aria-label={`${candidatesLabel} · ${activeCandidateEntry.label}`}
+        onFocus={() => {
+          setFocusedCandidate(candidateScene.defaultInspectorIndex);
+          const entry = candidateScene.inspectorEntries[candidateScene.defaultInspectorIndex];
+          if (entry) setInspection(entry.label);
+        }}
+        onBlur={() => setFocusedCandidate(null)}
+        onKeyDown={(event) => {
+          const entries = candidateScene.inspectorEntries;
+          if (!entries.length) return;
+          let next: number | null = null;
+          if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (activeCandidateIndex + 1) % entries.length;
+          else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (activeCandidateIndex - 1 + entries.length) % entries.length;
+          else if (event.key === "Home") next = candidateScene.defaultInspectorIndex;
+          else if (event.key === "End") next = entries.length - 1;
+          if (next === null) return;
+          event.preventDefault();
+          event.stopPropagation();
+          setFocusedCandidate(next);
+          setInspection(entries[next].label);
+        }}>
+        <title>{`${candidatesLabel} · ${activeCandidateEntry.label}`}</title>
+        <circle cx={activeCandidateEntry.x} cy={activeCandidateEntry.y} r={7} className="candidate-focus-target-play-3d" />
+      </g>}
       {proposalLabel && <g className="proposal-play-3d" aria-label={proposalLabel}><title>{proposalLabel}</title></g>}
       {optimumMarker}
       <g className="axes-play-3d" pointerEvents="none">

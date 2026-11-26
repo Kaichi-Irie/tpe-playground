@@ -32,5 +32,20 @@ describe("canvas scene", () => {
     expect(hitTestPlay3DScene(items, 2.5, 2, 0.5)?.id).toBe("cand-winner");
     expect(hitTestPlay3DScene(items, 12, 10.6, 0.5)?.id).toBe("axis-x1");
     expect(hitTestPlay3DScene(items, 6, 2, 0.5)?.id).toBe("surface");
+    expect(hitTestPlay3DScene(items, 2, 2, 0.5, [])?.id).toBe("surface");
+  });
+
+  it("prefers painted candidate geometry over a nearer-depth neighbor in proximity range", () => {
+    const inspect = () => {};
+    const candidates: Play3DSceneItem[] = [
+      { id: "winner", kind: "candidate", depth: 0.2, x: 0, y: 0, selected: true, inspect },
+      { id: "nearby-front", kind: "candidate", depth: 0.5, x: 5, y: 0, selected: false, inspect },
+      { id: "far-back", kind: "candidate", depth: 0.1, x: 20, y: 0, selected: false, inspect },
+      { id: "far-front", kind: "candidate", depth: 0.6, x: 29, y: 0, selected: false, inspect },
+    ];
+    // At fitScale = 1, the ordinary dot's painted radius is 3.45 px, so 5 px away does not cover the winner.
+    expect(hitTestPlay3DScene([], 0, 0, 3, candidates, 1)?.id).toBe("winner");
+    // Outside painted radii of both (20, 0) and (29, 0), proximity resolves by distance rather than depth.
+    expect(hitTestPlay3DScene([], 24, 0, 3, candidates, 1)?.id).toBe("far-back");
   });
 });

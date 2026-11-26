@@ -363,6 +363,9 @@ progress::-moz-progress-bar { background: var(--accent); }
 .scaling-play-3d p { font-size: var(--type-sm); margin-top: 10px; max-width: 100ch; }
 @media (max-width: 700px) { .scene-play-3d { min-height: 360px; } .view-controls > span { flex-basis: 100%; } }
 .proposal-play-3d, .candidates-play-3d { pointer-events: none; }
+.candidate-focus-target-play-3d { fill: transparent; stroke: none; }
+.candidates-play-3d:focus { outline: none; }
+.candidates-play-3d:focus .candidate-focus-target-play-3d { stroke: var(--focus); stroke-width: 2.5; }
 .play-3d .proposal > p:last-child { flex-basis: 100%; margin-left: 0; }
 .play-3d .proposal p { font-size: var(--type-sm); color: var(--muted); }
 

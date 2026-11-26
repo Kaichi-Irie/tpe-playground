@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
-import Play3D, { Play3DConstraintSettings } from "./Play3D";
+import Play3D, { Play3DConstraintSettings, buildPlay3DCandidateScene } from "./Play3D";
 import * as twoParam from "./twoParamTpe";
 
 it("starts a sequential Play 3D search with no observations and a preview of its first proposal", () => {
@@ -124,7 +124,7 @@ it("describes candidate sampling per coordinate in the univariate proposal", () 
     const sharedSettings = new URLSearchParams("mode=univariate&startupTrials=2&candidates=8");
     const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} />);
     expect(html).toContain("Drew 8 candidates per coordinate from ℓ and picked the highest ℓ/g for each.");
-    expect(html).toContain('aria-label="TPE candidates · 8 x₁ and 8 x₂ axis samples"');
+    expect(html).toContain('class="candidates-play-3d" role="group" tabindex="0" aria-label="TPE candidates · 8 x₁ and 8 x₂ axis samples · arrow keys inspect candidates · Selected candidates · x₁ #');
     expect(html).toContain("axis ticks show per-coordinate candidates and dashed floor lines combine their winners.");
   } finally {
     initialPlayback.mockRestore();
@@ -137,11 +137,56 @@ it("summarizes joint candidates in multivariate TPE proposals", () => {
   try {
     const sharedSettings = new URLSearchParams("mode=multivariate&startupTrials=2&candidates=8");
     const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} />);
-    expect(html).toContain('aria-label="TPE candidates · 8 joint samples"');
+    expect(html).toContain('class="candidates-play-3d" role="group" tabindex="0" aria-label="TPE candidates · 8 joint samples · arrow keys inspect candidates · Selected candidate ');
     expect(html).toContain("floor dots show sampled candidates and the ringed anchor marks the winner.");
   } finally {
     initialPlayback.mockRestore();
   }
+});
+
+it("builds distinct multivariate, univariate, random, and hidden candidate scene items", () => {
+  const project = (x1: number, x2: number, height: number) => ({ x: x1 * 10, y: x2 * 10 - height * 20, depth: x1 + x2 + height * 10 });
+  const inspect = () => {};
+
+  const startup = twoParam.proposeTwoParamTrial([], 42, "multivariate");
+  expect(buildPlay3DCandidateScene(startup, true, project, inspect).items).toEqual([]);
+
+  const multiHistory = twoParam.moveTwoParamPlayback(twoParam.emptyTwoParamPlayback(), 2, 42, "multivariate", { startupTrials: 2, candidates: 6 });
+  const multiProposal = twoParam.proposeTwoParamTrial(multiHistory.trials, 42, "multivariate", { startupTrials: 2, candidates: 6 });
+  const multiScene = buildPlay3DCandidateScene(multiProposal, true, project, inspect);
+  expect(multiScene.items).toHaveLength(6);
+  expect(multiScene.items.every((item) => item.kind === "candidate")).toBe(true);
+  expect(multiScene.hitTargets).toHaveLength(6);
+  expect(multiScene.items.filter((item) => item.kind === "candidate" && item.selected)).toHaveLength(1);
+  expect(multiScene.defaultInspectorIndex).toBe(multiProposal.selectedCandidateIndex);
+  expect(buildPlay3DCandidateScene(multiProposal, false, project, inspect)).toEqual({
+    items: [],
+    hitTargets: [],
+    inspectorEntries: [],
+    defaultInspectorIndex: 0,
+  });
+
+  const uniHistory = twoParam.moveTwoParamPlayback(twoParam.emptyTwoParamPlayback(), 2, 42, "univariate", { startupTrials: 2, candidates: 6 });
+  const uniProposal = twoParam.proposeTwoParamTrial(uniHistory.trials, 42, "univariate", { startupTrials: 2, candidates: 6 });
+  const uniScene = buildPlay3DCandidateScene(uniProposal, true, project, inspect);
+  const axisItems = uniScene.items.filter((item) => item.kind === "axis-candidate");
+  const guides = uniScene.items.filter((item) => item.kind === "guide");
+  const anchors = uniScene.items.filter((item) => item.kind === "floor-anchor");
+  expect(uniScene.items.some((item) => item.kind === "candidate")).toBe(false);
+  expect(axisItems).toHaveLength(12);
+  expect(axisItems.filter((item) => item.selected)).toHaveLength(2);
+  expect(uniScene.hitTargets).toHaveLength(12);
+  expect(guides.length).toBeGreaterThan(2);
+  const x1Guides = guides.filter((item) => item.id.startsWith("candidate-guide-x1-"));
+  const x2Guides = guides.filter((item) => item.id.startsWith("candidate-guide-x2-"));
+  expect(x1Guides[0].points.slice(0, 2)).toEqual([uniProposal.x1 * 10, -50]);
+  expect(x1Guides[x1Guides.length - 1].points.slice(2, 4)).toEqual([uniProposal.x1 * 10, uniProposal.x2 * 10]);
+  expect(x2Guides[0].points.slice(0, 2)).toEqual([-50, uniProposal.x2 * 10]);
+  expect(x2Guides[x2Guides.length - 1].points.slice(2, 4)).toEqual([uniProposal.x1 * 10, uniProposal.x2 * 10]);
+  expect(anchors).toHaveLength(1);
+  expect(anchors[0]).toMatchObject({ x: uniProposal.x1 * 10, y: uniProposal.x2 * 10, depth: uniProposal.x1 + uniProposal.x2 + 0.028 });
+  expect(uniScene.inspectorEntries).toHaveLength(13);
+  expect(uniScene.inspectorEntries[0].id).toBe("candidate-winners");
 });
 
 it("states the feasible share only for an active constraint", () => {
