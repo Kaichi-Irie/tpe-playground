@@ -10,13 +10,14 @@
   --hover: #dce2ef;
   --accent: #52659e;
   --on-accent: #ffffff;
-  --comparison-tpe: #0072b2;
-  --comparison-random: #b95000;
-  --good: #0072b2;
+  --sampler-tpe: #0072b2;
+  --sampler-random: #b95000;
+  --good: var(--sampler-tpe);
   --bad: #d55e00;
   --objective: #454545;
   --acquisition: #a34780;
-  --cmaes: #0f9d58;
+  --sampler-cmaes: #0f9d58;
+  --cmaes: var(--sampler-cmaes);
   --cmaes-soft: #34a853;
   --cmaes-gen: #059669;
   --proposal: #626c7c;
@@ -58,13 +59,13 @@
   --hover: #3b4456;
   --accent: #a5b4e8;
   --on-accent: #21252b;
-  --comparison-tpe: #56b4e9;
-  --comparison-random: #e69f00;
-  --good: #56b4e9;
+  --sampler-tpe: #56b4e9;
+  --sampler-random: #e69f00;
+  --good: var(--sampler-tpe);
   --bad: #e69f00;
   --objective: #e5e5e5;
   --acquisition: #cc79a7;
-  --cmaes: #34d399;
+  --sampler-cmaes: #34d399;
   --cmaes-soft: #6ee7b7;
   --cmaes-gen: #34d399;
   --proposal: #abb2bf;
@@ -326,15 +327,15 @@ progress::-moz-progress-bar { background: var(--accent); }
 .comparison { margin-top: 16px; margin-bottom: 20px; }
 .comparison-values { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 0 22px 10px; font-size: var(--type-sm); }
 .comparison-values > span { display: inline-flex; align-items: center; gap: 8px; }
-.comparison-values i { width: 24px; border-top: 2.5px solid var(--comparison-tpe); }
-.comparison-values .comparison-random i { border-top: 2.5px dashed var(--comparison-random); }
+.comparison-values i { width: 24px; border-top: 2.5px solid var(--comparison-current, var(--sampler-tpe)); }
+.comparison-values .comparison-random i { border-top: 2.5px dashed var(--sampler-random); }
 .comparison-chart { padding: 0 12px; max-width: 864px; margin-inline: auto; }
 .comparison-chart svg { font-size: var(--chart-base); display: block; width: 100%; }
-.tpe-progress-line { fill: none; stroke: var(--comparison-tpe); stroke-width: 2.5; }
-.random-progress-line { fill: none; stroke: var(--comparison-random); stroke-width: 4; stroke-dasharray: 7 5; }
+.tpe-progress-line { fill: none; stroke: var(--comparison-current, var(--sampler-tpe)); stroke-width: 2.5; }
+.random-progress-line { fill: none; stroke: var(--sampler-random); stroke-width: 4; stroke-dasharray: 7 5; }
 .comparison-cursor { stroke: var(--border); stroke-dasharray: 3 4; }
-.tpe-progress-point { fill: var(--comparison-tpe); }
-.random-progress-point { fill: var(--surface); stroke: var(--comparison-random); stroke-width: 2; }
+.tpe-progress-point { fill: var(--comparison-current, var(--sampler-tpe)); }
+.random-progress-point { fill: var(--surface); stroke: var(--sampler-random); stroke-width: 2; }
 @media (max-width: 700px) {
   .section-heading { padding-inline: 16px; }
   .comparison-values { padding-inline: 16px; gap: 8px 16px; }
@@ -1120,7 +1121,6 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
 .cmaes-legend .meanPath .swatch { background: var(--cmaes); }
 .canvas-plot .cmaes-legend .generation .swatch { width: 7px; height: 7px; border-radius: 50%; background: var(--cmaes-gen); }
 .cmaes-legend .observations .swatch { background: var(--muted); }
-.progress-panel.is-cmaes { --comparison-tpe: var(--cmaes); }
 .cmaes-constraint-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; margin: 4px 20px 0; padding: 2px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-muted); font-size: var(--type-sm); }
 .cmaes-constraint-actions { display: inline-flex; gap: 2px; }
 .cmaes-constraint-notice button { min-height: 28px; padding: 2px 6px; border: 0; background: transparent; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }

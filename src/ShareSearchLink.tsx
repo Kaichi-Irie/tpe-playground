@@ -1,20 +1,18 @@
 import { useEffect, useId, useState } from "react";
 import { createShareUrl, type ShareExperiment } from "./shareSearch";
-import type { ModelSettings } from "./searchSettings";
 
 type Props = {
   experiment: ShareExperiment;
   seed: number;
-  settings?: ModelSettings;
 };
 
 const description = "Opens this search with the current settings at trial 0.";
 
-export function ShareSearchLink({ experiment, seed, settings }: Props) {
+export function ShareSearchLink({ experiment, seed }: Props) {
   const descriptionId = useId();
   const [result, setResult] = useState<{ url: string; copied: boolean } | null>(null);
   const [copying, setCopying] = useState(false);
-  const currentResult = result && result.url === createShareUrl(window.location.href, experiment, seed, settings) ? result : null;
+  const currentResult = result && result.url === createShareUrl(window.location.href, experiment, seed) ? result : null;
   const copied = currentResult?.copied === true;
   const needsFallback = currentResult?.copied === false;
 
@@ -25,7 +23,7 @@ export function ShareSearchLink({ experiment, seed, settings }: Props) {
   }, [result]);
 
   async function copy() {
-    const url = createShareUrl(window.location.href, experiment, seed, settings);
+    const url = createShareUrl(window.location.href, experiment, seed);
     setResult(null);
     setCopying(true);
     try {

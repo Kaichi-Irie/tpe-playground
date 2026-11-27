@@ -1,15 +1,12 @@
 import { useId, type ReactNode } from "react";
-import { Help } from "./Help";
 import { HelpMath } from "./HelpMath";
-import { ResponsiveSettings } from "./ResponsiveSettings";
-import { ShareSearchLink } from "./ShareSearchLink";
+import { SamplerSettingsShell } from "./SamplerSettingsShell";
 import type { ShareExperiment } from "./shareSearch";
-import { cmaEsPopulationSizeRange, cmaEsSigma0Range, cmaEsX0Range, matchesOptunaCmaEsPreset, optunaCmaEsPreset, twoParamCmaEsDefaults, type TwoParamCmaEsSettings } from "./twoParamCmaEs";
+import { cmaEsPopulationSizeRange, cmaEsSigma0Range, cmaEsX0Range, matchesOptunaCmaEsPreset, matchesTwoParamCmaEsDefaults, optunaCmaEsPreset, twoParamCmaEsDefaults, type TwoParamCmaEsSettings } from "./twoParamCmaEs";
 
 interface Props {
   children: ReactNode;
   experiment: Extract<ShareExperiment, { sampler: "cmaes" }>;
-  settings: TwoParamCmaEsSettings;
   onChange: (settings: TwoParamCmaEsSettings) => void;
   seed: number;
   onNewSeed: () => void;
@@ -25,33 +22,31 @@ const populationOptions = Array.from(
   (_, index) => cmaEsPopulationSizeRange.min + index,
 );
 
-export function CmaEsSettingsPanel({ children, experiment, settings, onChange, seed, onNewSeed, status }: Props) {
+export function CmaEsSettingsPanel({ children, experiment, onChange, seed, onNewSeed, status }: Props) {
   const id = useId();
+  const settings = experiment.cmaEsSettings ?? twoParamCmaEsDefaults;
   const { sigma0, populationSize, x0 } = settings;
   const populationText = populationSize === twoParamCmaEsDefaults.populationSize ? "6 · Auto" : String(populationSize);
   const changeSigma = (value: number) => onChange({ ...settings, sigma0: value });
   const changePopulation = (value: number) => onChange({ ...settings, populationSize: value });
-  return <div className="model-controls cmaes-model-controls">
-    <ResponsiveSettings footer={<>
-      <button type="button" className="settings-reset" disabled={matchesOptunaCmaEsPreset(settings)} onClick={() => onChange(twoParamCmaEsDefaults)}>Reset</button>
-      <span className="settings-preset-action">
-        <button type="button" disabled={matchesOptunaCmaEsPreset(settings)} onClick={() => onChange(optunaCmaEsPreset)}>Optuna preset</button>
-        <Help label="Optuna preset">
+  return (
+    <SamplerSettingsShell
+      className="cmaes-model-controls"
+      experiment={experiment}
+      seed={seed}
+      seedLabel="Play 3D Search seed"
+      onNewSeed={onNewSeed}
+      isDefault={matchesTwoParamCmaEsDefaults(settings)}
+      onReset={() => onChange(twoParamCmaEsDefaults)}
+      isOptunaPreset={matchesOptunaCmaEsPreset(settings)}
+      onOptunaPreset={() => onChange(optunaCmaEsPreset)}
+      optunaPresetHelp={<>
           Optuna’s CmaEsSampler defaults correspond to <HelpMath inline tex="\sigma_0=\mathrm{span}/6" /> (rounded to 1.67 here),
           {" "}<HelpMath inline tex="\lambda=6" /> in two dimensions, and <HelpMath inline tex="x_0=(0,0)" /> on this domain.
           The Playground uses zero startup trials and fixed-stride Box–Muller sampling. Optuna defaults to one startup trial and uses a different random stream, so the same seed can give a different trajectory.
-        </Help>
-      </span>
-      <ShareSearchLink experiment={experiment} seed={seed} />
-    </>}>
-      <div className="settings-form">
-        <fieldset className="settings-fields"><legend>Experiment</legend>
-          {children}
-          <div className="parameter seed-settings">
-            <div className="parameter-label"><span>Seed</span><output aria-label="Play 3D Search seed">{seed}</output></div>
-            <button type="button" className="resample" title="Restart the search with a random seed from 0 to 99" onClick={onNewSeed}>↻ New seed</button>
-          </div>
-        </fieldset>
+      </>}
+      experimentFields={children}
+      modelFields={
         <fieldset className="settings-fields"><legend>CMA-ES</legend>
           <div className="parameter">
             <div className="parameter-label"><label htmlFor={`${id}-sigma-settings`}>Initial σ₀</label></div>
@@ -79,18 +74,19 @@ export function CmaEsSettingsPanel({ children, experiment, settings, onChange, s
             </div>)}
           </fieldset>
         </fieldset>
-      </div>
-    </ResponsiveSettings>
-    <div className="model-status" aria-live="polite">{status}<span id="trial-seek-help-play-3d" className="sr-only">Seeking back discards later trials.</span></div>
-    <section className="config live-model-controls" aria-label="Live CMA-ES settings">
-      <div className="parameter">
-        <div className="parameter-label"><label htmlFor={`${id}-sigma`}>Initial σ₀</label><output>{sigma0.toFixed(2)}</output></div>
-        <input id={`${id}-sigma`} type="range" {...cmaEsSigma0Range} value={sigma0} onChange={(event) => changeSigma(Number(event.target.value))} />
-      </div>
-      <div className="parameter">
-        <div className="parameter-label"><label htmlFor={`${id}-population`}>Population λ</label><output>{populationText}</output></div>
-        <input id={`${id}-population`} type="range" {...cmaEsPopulationSizeRange} value={populationSize} aria-valuetext={populationText} onChange={(event) => changePopulation(Number(event.target.value))} />
-      </div>
-    </section>
-  </div>;
+      }
+      status={<>{status}<span id="trial-seek-help-play-3d" className="sr-only">Seeking back discards later trials.</span></>}
+      liveControlsLabel="Live CMA-ES settings"
+      liveControls={<>
+          <div className="parameter">
+            <div className="parameter-label"><label htmlFor={`${id}-sigma`}>Initial σ₀</label><output>{sigma0.toFixed(2)}</output></div>
+            <input id={`${id}-sigma`} type="range" {...cmaEsSigma0Range} value={sigma0} onChange={(event) => changeSigma(Number(event.target.value))} />
+          </div>
+          <div className="parameter">
+            <div className="parameter-label"><label htmlFor={`${id}-population`}>Population λ</label><output>{populationText}</output></div>
+            <input id={`${id}-population`} type="range" {...cmaEsPopulationSizeRange} value={populationSize} aria-valuetext={populationText} onChange={(event) => changePopulation(Number(event.target.value))} />
+          </div>
+      </>}
+    />
+  );
 }

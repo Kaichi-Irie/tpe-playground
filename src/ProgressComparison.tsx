@@ -5,6 +5,7 @@ import { PanelClose } from "./PanelClose";
 import { Help } from "./Help";
 import { HelpMath } from "./HelpMath";
 import { ProgressPlot } from "./ProgressPlot";
+import type { SamplerId } from "./samplers";
 import { trialLimit, defaults, runSearch, type Proposal, type Trial } from "./oneParamTpe";
 
 export const ProgressComparison = memo(function ProgressComparison({ trials, proposals, randomOnly, seed, objectivePreset }: { trials: readonly Trial[]; proposals: readonly Proposal[]; randomOnly: boolean; seed: number; objectivePreset: ObjectivePreset }) {
@@ -15,9 +16,10 @@ export const ProgressComparison = memo(function ProgressComparison({ trials, pro
 
 type MetricTrial = Trial & { feasible?: boolean };
 
-export function ComparisonPanel({ trials, currentLabel, randomTrials, minimum, relative = true, approximate = false, constrained }: {
+export function ComparisonPanel({ trials, currentLabel, currentSampler = "tpe", randomTrials, minimum, relative = true, approximate = false, constrained }: {
   trials: readonly MetricTrial[];
   currentLabel: string;
+  currentSampler?: SamplerId;
   randomTrials: readonly MetricTrial[];
   constrained?: { flippedLabel: string; flippedTrials: readonly MetricTrial[]; feasibleCount: string };
   minimum: number;
@@ -59,6 +61,6 @@ export function ComparisonPanel({ trials, currentLabel, randomTrials, minimum, r
       tpe={metric === "best" ? bestGap(trials) : averageRegret(trials, minimum)}
       random={metric === "best" ? bestGap(random) : averageRegret(random, minimum)}
       third={constrained && { label: constrained.flippedLabel, values: feasibleGap(constrained.flippedTrials.slice(0, trials.length)) }}
-      currentLabel={currentLabel} />
+      currentLabel={currentLabel} currentSampler={currentSampler} />
   </section>;
 }

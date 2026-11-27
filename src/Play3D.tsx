@@ -21,6 +21,7 @@ import { constrainSettings } from "./searchSettings";
 import { readPlay3DSharedSearch, type SharedSearch } from "./shareSearch";
 import { useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent } from "react";
 import { buildTwoParamView, twoParamDefaultModelSettings, getTwoParamObjective, twoParamObjectivePresets, emptyTwoParamPlayback, moveTwoParamPlayback, proposeTwoParamTrial, twoParamProposalFromTrace, twoParamSettings, type DensityMode, type TwoParamObjectivePreset, type TwoParamModelSettings, type TwoParamPlayback, type TwoParamProposal } from "./twoParamTpe";
+import { getSampler, samplersForPage } from "./samplers";
 import { buildTwoParamCmaEsView, emptyTwoParamCmaEsPlayback, moveTwoParamCmaEsPlayback, type TwoParamCmaEsSettings, type TwoParamSampler } from "./twoParamCmaEs";
 import { buildCmaEsBell, buildCmaEsScene } from "./play3dCmaEsScene";
 
@@ -216,7 +217,8 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     try { return globalThis.sessionStorage?.getItem(constraintHintKey) === "1"; } catch { return false; }
   });
   const constrained = constraintPreset !== "none";
-  const unsupported = isCmaEs && constrained;
+  const samplerDef = getSampler(sampler);
+  const unsupported = !samplerDef.supportsConstraints && constrained;
   const searchSettings = useMemo(() => ({ ...settings, objectivePreset, constraintPreset }), [settings, objectivePreset, constraintPreset]);
   function changeConstraint(preset: TwoParamConstraintPreset) {
     setConstraintPreset(preset);
@@ -748,7 +750,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
   const feasibleCount = `${feasibleTrials.length} / ${step} feasible`;
   const bestValue = feasibleTrials.length ? Math.min(...feasibleTrials.map((trial) => trial.value)).toFixed(3) : "—";
   const noFeasibleGood = proposal?.trace.method === "random" && proposal.trace.reason === "no-feasible-good";
-  const cmaEsStatus = unsupported ? "CMA-ES · constraints unsupported" : complete ? "Search complete"
+  const cmaEsStatus = unsupported ? `${samplerDef.label} · constraints unsupported` : complete ? "Search complete"
     : cmaEsSnapshot ? `CMA-ES · gen ${cmaEsSnapshot.generation} (${cmaEsSnapshot.generationProgress}/${cmaEsSettings.populationSize}) · trial ${step + 1}` : "";
   const newSeed = () => { setSeed(Math.floor(Math.random() * 100)); restart(); };
   const experimentSettings = <>
@@ -766,8 +768,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     <PlaybackControls targetStep={seekTarget} step={step} limit={twoParamSettings.count} playing={playing} speed={playbackSpeed} onSpeedChange={setPlaybackSpeed} guidePlay={guide.active === "playback"} guideDescribedBy={guide.textId} idSuffix="-play-3d" labelPrefix="Play 3D " describedBy="trial-seek-help-play-3d" onMove={moveTo} disabled={unsupported}
       onToggle={() => { cancelSeek(); if (complete) moveTo(0); setPlaying(!playing || complete); }} />
     <div className="sampler-toggle" role="group" aria-label="Play 3D sampler">
-      <button type="button" aria-pressed={!isCmaEs} onClick={() => changeSampler("tpe")}>TPE</button>
-      <button type="button" aria-pressed={isCmaEs} onClick={() => changeSampler("cmaes")}>CMA-ES</button>
+      {samplersForPage("play-3d").map(({ id, label }) => <button key={id} type="button" aria-pressed={sampler === id} onClick={() => changeSampler(id)}>{label}</button>)}
     </div>
     </div>
     <div className={`legend${isCmaEs ? " cmaes-legend" : ""}`} aria-label="Play 3D plot layers">{isCmaEs
@@ -775,7 +776,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
         onClick={() => { setCmaEsVisible((current) => ({ ...current, [key]: !current[key] })); setInspection(""); }}><span className="swatch" /><span className="layer-label">{label}</span><span className="layer-short" aria-hidden="true">{short}</span></button>)
       : layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} data-guide-target={key === "acquisition" && guideAcquisition || undefined} aria-describedby={key === "acquisition" && guideAcquisition ? guide.textId : undefined} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{key === "observations" && constrained ? "Observations · ✕ infeasible" : label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : key === "candidates" ? "Cand." : "Acquisition"}</span></button>)}</div>
     {unsupported && <div className="cmaes-constraint-notice" role="status">
-      <span>CMA-ES does not support constraints.</span>
+      <span>{samplerDef.label} does not support constraints.</span>
       <span className="cmaes-constraint-actions">
         <button type="button" onClick={() => changeConstraint("none")}>Remove constraint</button>
         <button type="button" onClick={() => changeSampler("tpe")}>Switch to TPE</button>
@@ -868,8 +869,8 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
 
     <h2 id="play-3d-heading" className="sr-only">Explore two dimensions</h2>
     {isCmaEs ? <CmaEsSettingsPanel experiment={{ page: "play-3d", sampler, preset: objectivePreset, constraint: constraintPreset, cmaEsSettings }}
-      settings={cmaEsSettings} onChange={editCmaEsSettings} seed={seed} onNewSeed={newSeed} status={cmaEsStatus}>{experimentSettings}</CmaEsSettingsPanel>
-    : <ModelSettingsPanel experiment={{ page: "play-3d", preset: objectivePreset, mode, constraint: constraintPreset }} className="settings-play-3d" idSuffix="-play-3d" labelPrefix="Play 3D " defaultSettings={constrained ? constrainedModelDefaults : twoParamDefaultModelSettings} trialLimit={twoParamSettings.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} disableEi={constrained} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={newSeed}
+      onChange={editCmaEsSettings} seed={seed} onNewSeed={newSeed} status={cmaEsStatus}>{experimentSettings}</CmaEsSettingsPanel>
+    : <ModelSettingsPanel experiment={{ page: "play-3d", preset: objectivePreset, mode, constraint: constraintPreset, settings }} className="settings-play-3d" idSuffix="-play-3d" labelPrefix="Play 3D " defaultSettings={constrained ? constrainedModelDefaults : twoParamDefaultModelSettings} trialLimit={twoParamSettings.count} domainWidth={domainWidth} widths={goodWidths} disableEi={constrained} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={newSeed}
       status={<div className="proposal">
         <span>{!proposal ? "Search complete" : noFeasibleGood ? `Uniform random · trial ${step + 1}` : proposal.method === "random" ? `Random start · ${step + 1} / ${settings.startupTrials}` : `TPE · trial ${step + 1}`}</span>
         <Help label="Play 3D trial playback">

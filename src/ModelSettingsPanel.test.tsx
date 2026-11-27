@@ -4,11 +4,10 @@ import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { applyOptunaPreset } from "./searchSettings";
 import { twoParamDefaultModelSettings, twoParamSettings } from "./twoParamTpe";
 
-function renderPanel(status?: string, props: Partial<React.ComponentProps<typeof ModelSettingsPanel>> = {}) {
+function renderPanel(status?: string, props: Partial<React.ComponentProps<typeof ModelSettingsPanel>> = {}, settings = twoParamDefaultModelSettings) {
   return renderToStaticMarkup(
     <ModelSettingsPanel
-      experiment={{ page: "play-3d", preset: "quadratic", mode: "multivariate", constraint: "none" }}
-      settings={twoParamDefaultModelSettings}
+      experiment={{ page: "play-3d", preset: "quadratic", mode: "multivariate", constraint: "none", settings }}
       defaultSettings={twoParamDefaultModelSettings}
       onChange={() => {}}
       seed={42}
@@ -25,9 +24,9 @@ function renderPanel(status?: string, props: Partial<React.ComponentProps<typeof
 it("uses the supplied filling default independently of EI availability", () => {
   const settings = { ...twoParamDefaultModelSettings, infeasibleFilling: false };
   const disabledReset = /<button[^>]*disabled=""[^>]*aria-label="Reset model defaults"/;
-  expect(renderPanel(undefined, { settings, disableEi: true })).toMatch(disabledReset);
+  expect(renderPanel(undefined, { disableEi: true }, settings)).toMatch(disabledReset);
   const defaultSettings = { ...twoParamDefaultModelSettings, infeasibleFilling: true };
-  expect(renderPanel(undefined, { settings, defaultSettings })).not.toMatch(disabledReset);
+  expect(renderPanel(undefined, { defaultSettings }, settings)).not.toMatch(disabledReset);
   expect(renderPanel(undefined, { defaultSettings })).toMatch(disabledReset);
 });
 
@@ -47,6 +46,7 @@ it("renders playback status between Settings and the live controls when provided
 it("keeps dialog actions in the footer and the seed in Experiment", () => {
   const html = renderPanel();
 
+  expect(html).toContain('data-sampler="tpe" class="model-controls"');
   const heading = html.match(/class="settings-dialog-heading">([\s\S]*?)<\/div>/)?.[1];
   expect(heading).toMatch(/^<h2[^>]*>Settings<\/h2><button[^>]*aria-label="Close settings"[^>]*>×<\/button>$/);
 
@@ -74,8 +74,7 @@ it("keeps dialog actions in the footer and the seed in Experiment", () => {
 it("marks only the guided slider as the coachmark target", () => {
   const html = renderToStaticMarkup(
     <ModelSettingsPanel
-      experiment={{ page: "play-3d", preset: "quadratic", mode: "multivariate", constraint: "none" }}
-      settings={twoParamDefaultModelSettings}
+      experiment={{ page: "play-3d", preset: "quadratic", mode: "multivariate", constraint: "none", settings: twoParamDefaultModelSettings }}
       defaultSettings={twoParamDefaultModelSettings}
       onChange={() => {}}
       seed={42}
@@ -95,7 +94,7 @@ it("marks only the guided slider as the coachmark target", () => {
 
 it("explains candidate sampling and Good for constrained univariate searches", () => {
   const html = renderPanel(undefined, {
-    experiment: { page: "play-3d", preset: "quadratic", mode: "univariate", constraint: "disk" },
+    experiment: { page: "play-3d", preset: "quadratic", mode: "univariate", constraint: "disk", settings: twoParamDefaultModelSettings },
   });
   expect(html).toContain("Draws this many candidates per coordinate from ℓ and picks the highest ℓ/g for each.");
   expect(html).toContain("The prior can be the only Good kernel.");
@@ -111,16 +110,16 @@ it("disables the Optuna preset when it matches and shows each coordinate's obser
     { label: "x₁", values: [4, 2, 3, 2] },
     { label: "x₂", values: [1, 3, 1, 2] },
   ];
-  const html = renderPanel(undefined, { settings, widths });
+  const html = renderPanel(undefined, { widths }, settings);
   expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Optuna preset<\/button>/);
   expect(html).toContain("x₁ 2.00–4.00 · x₂ 1.00–3.00");
   expect(html).toMatch(/<input id="bandwidth"[^>]*value="2.5"/);
-  expect(renderPanel(undefined, { settings: { ...settings, gamma: 0.2 } }))
+  expect(renderPanel(undefined, {}, { ...settings, gamma: 0.2 }))
     .toMatch(/<button type="button">Optuna preset<\/button>/);
 });
 
 it("labels the Optuna bandwidth rule on one short line", () => {
-  const html = renderPanel(undefined, { settings: applyOptunaPreset(twoParamDefaultModelSettings), widths: [{ label: "x₁", values: [0.5, 1] }] });
+  const html = renderPanel(undefined, { widths: [{ label: "x₁", values: [0.5, 1] }] }, applyOptunaPreset(twoParamDefaultModelSettings));
   expect(html).toContain('<option value="optuna" selected="">Optuna</option>');
   expect(html).toContain('<span class="bandwidth-mode">Optuna rule · Good KDE</span>');
   expect(html).not.toContain("Neighbor");
