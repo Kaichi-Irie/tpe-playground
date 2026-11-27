@@ -1,17 +1,20 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { comparisonAxis, comparisonFloor, comparisonTrialAxis } from "./comparison";
+import { getSampler, type SamplerId } from "./samplers";
 import { useChartTypeScale } from "./usePlotSize";
 
 type Series = readonly (number | null)[];
 
-export function ProgressPlot({ title, definition, tpe, random, third, currentLabel }: {
+export function ProgressPlot({ title, definition, tpe, random, third, currentLabel, currentSampler = "tpe" }: {
   title: string;
   definition: string;
   tpe: Series;
   random: Series;
   third?: { label: string; values: Series };
   currentLabel: string;
+  currentSampler?: SamplerId;
 }) {
+  const sampler = getSampler(currentSampler);
   const id = useId();
   const chartRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -64,14 +67,14 @@ export function ProgressPlot({ title, definition, tpe, random, third, currentLab
     const x = trialX(index + 1).toFixed(2), y = scaleY(value).toFixed(2);
     return index === 0 ? `M${x},${y}` : `H${x} V${y}`;
   }).join(" ");
-  return <section className={currentLabel === "CMA-ES" ? "progress-panel is-cmaes" : "progress-panel"} aria-label={title}>
+  return <section className="progress-panel" data-sampler={sampler.id} style={{ "--comparison-current": `var(${sampler.colorToken})` } as CSSProperties} aria-label={title}>
     <div className={third ? "comparison-values constrained-values" : "comparison-values"}>
       {[...series].reverse().map(({ name, label }) => <span key={name} className={`comparison-${name}`}><i aria-hidden="true" />{label}</span>)}
       {!third && <span className="comparison-direction">Lower is better ↓</span>}
     </div>
     <div className="comparison-chart" ref={chartRef}><svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={`${id}-title ${id}-description`}>
       <title id={`${id}-title`}>{`${title}: ${third ? [currentLabel, third.label, randomLabel].join(", ") : `${currentLabel} versus ${randomLabel}`}`}</title>
-      <desc id={`${id}-description`}>{definition} Shown through trial {step} on a logarithmic vertical axis. {hasInfeasiblePrefix ? "∞ marks trials before each run found its first feasible point. " : ""}The horizontal axis spans trials 1 to {trialAxis.upper} and adjusts in blocks of 10. {currentLabel} is solid {currentLabel === "CMA-ES" ? "green" : "blue"}. {third && `${third.label} is dotted purple. `}{randomLabel} is dashed orange.</desc>
+      <desc id={`${id}-description`}>{definition} Shown through trial {step} on a logarithmic vertical axis. {hasInfeasiblePrefix ? "∞ marks trials before each run found its first feasible point. " : ""}The horizontal axis spans trials 1 to {trialAxis.upper} and adjusts in blocks of 10. {currentLabel} is solid {sampler.colorName}. {third && `${third.label} is dotted purple. `}{randomLabel} is dashed orange.</desc>
       {yTicks.map(({ value, label }) => <g key={label}>
         <line className="grid" x1={plot.left} x2={plot.right} y1={scaleY(value)} y2={scaleY(value)} />
         <text x={plot.left - 10 * typeScale} y={scaleY(value) + 4 * typeScale} textAnchor="end">{label}</text>

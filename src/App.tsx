@@ -228,7 +228,7 @@ export default function App({ initialRoute = { page: "play-2d", share: null } }:
         {guide.active && <LabHintBubble textId={guide.textId} message={playGuides[guide.active].action} phase="action" placement="bottom" onDismiss={guide.dismiss} />}
       </section>
       <ModelSettingsPanel key={page === "play-2d" ? route.visit : "hidden"}
-        experiment={{ page: "play-2d", preset: objectivePreset }} settings={settings}
+        experiment={{ page: "play-2d", preset: objectivePreset, settings }}
         defaultSettings={defaultSearch.settings} guide={guide.settingsGuide}
         onChange={(next) => {
           if (next.gamma !== gamma) guide.retire("gamma");

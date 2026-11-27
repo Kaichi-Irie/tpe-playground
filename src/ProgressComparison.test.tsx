@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { defaults, runSearch, trialLimit } from "./oneParamTpe";
-import { ProgressComparison } from "./ProgressComparison";
+import { ComparisonPanel, ProgressComparison } from "./ProgressComparison";
 
 it.each([0, 5])("labels default Play 2D performance as TPE at trial %i", (step) => {
   const seed = 42;
@@ -28,4 +28,13 @@ it("keeps the Play 2D TPE label when the current setting changes to random only 
   const run = runSearch(seed, 12, 0, { ...defaults, objectivePreset });
   const html = renderToStaticMarkup(<ProgressComparison {...run} randomOnly seed={seed} objectivePreset={objectivePreset} />);
   expect(html).toContain('class="comparison-tpe"><i aria-hidden="true"></i>TPE');
+});
+
+it.each([
+  ["Current run", "cmaes", "cmaes", "green"],
+  ["CMA-ES", undefined, "tpe", "blue"],
+] as const)("colors the %s series from the sampler ID", (currentLabel, currentSampler, sampler, color) => {
+  const html = renderToStaticMarkup(<ComparisonPanel trials={[]} randomTrials={[]} minimum={1} currentLabel={currentLabel} currentSampler={currentSampler} />);
+  expect(html).toContain(`data-sampler="${sampler}" style="--comparison-current:var(--sampler-${sampler})"`);
+  expect(html).toContain(`${currentLabel} is solid ${color}.`);
 });

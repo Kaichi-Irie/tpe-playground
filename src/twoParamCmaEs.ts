@@ -3,7 +3,7 @@ import type { CmaEsProposalTrace } from "./model/cmaes/types";
 import { advanceHistory } from "./model/history";
 import { getTwoParamObjective, twoParamObservations, twoParamProblem, twoParamDefaultSeed, twoParamTrialLimit, type TwoParamObjectivePreset, type TwoParamTrial } from "./twoParamProblem";
 
-export type TwoParamSampler = "tpe" | "cmaes";
+export type { SamplerId as TwoParamSampler } from "./samplers";
 
 export interface TwoParamCmaEsSettings {
   sigma0: number;
@@ -21,9 +21,17 @@ export const twoParamCmaEsDefaults: TwoParamCmaEsSettings = {
 };
 export const optunaCmaEsPreset: TwoParamCmaEsSettings = { sigma0: 1.67, populationSize: 6, x0: { x1: 0, x2: 0 } };
 
-export function matchesOptunaCmaEsPreset({ sigma0, populationSize, x0 }: TwoParamCmaEsSettings): boolean {
-  return sigma0 === optunaCmaEsPreset.sigma0 && populationSize === optunaCmaEsPreset.populationSize
-    && x0.x1 === optunaCmaEsPreset.x0.x1 && x0.x2 === optunaCmaEsPreset.x0.x2;
+function matchesCmaEsSettings({ sigma0, populationSize, x0 }: TwoParamCmaEsSettings, target: TwoParamCmaEsSettings): boolean {
+  return sigma0 === target.sigma0 && populationSize === target.populationSize
+    && x0.x1 === target.x0.x1 && x0.x2 === target.x0.x2;
+}
+
+export function matchesOptunaCmaEsPreset(settings: TwoParamCmaEsSettings): boolean {
+  return matchesCmaEsSettings(settings, optunaCmaEsPreset);
+}
+
+export function matchesTwoParamCmaEsDefaults(settings: TwoParamCmaEsSettings): boolean {
+  return matchesCmaEsSettings(settings, twoParamCmaEsDefaults);
 }
 
 export interface TwoParamCmaEsProposal {

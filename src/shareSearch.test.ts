@@ -19,7 +19,7 @@ const play3DDefaults: SharedSearch<TwoParamObjectivePreset> = {
 const legacySamplerDefaults = { sampler: "tpe", cmaEsSettings: twoParamCmaEsDefaults };
 
 function roundTripPlay2D(search: SharedSearch<ObjectivePreset>) {
-  const url = createShareUrl(pageUrl, { page: "play-2d", preset: search.preset }, search.seed, search.settings);
+  const url = createShareUrl(pageUrl, { page: "play-2d", preset: search.preset, settings: search.settings }, search.seed);
   return readSharedSearch(readRoute(new URL(url).hash).share, play2DDefaults, objectivePresets, trialLimit, 10);
 }
 
@@ -40,7 +40,7 @@ describe("share links", () => {
   it("round-trips custom CMA-ES settings and a constraint without TPE parameters", () => {
     const cmaEsSettings = { sigma0: 2.31, populationSize: 24, x0: { x1: -4.5, x2: 5 } };
     const experiment = { page: "play-3d", sampler: "cmaes", preset: "rosenbrock", constraint: "disk", cmaEsSettings } as const;
-    const hash = new URL(createShareUrl(pageUrl, experiment, 25, play3DDefaults.settings)).hash;
+    const hash = new URL(createShareUrl(pageUrl, experiment, 25)).hash;
     expect(hash).toBe("#play-3d?sampler=cmaes&seed=25&preset=rosenbrock&sigma0=2.31&popsize=24&x0x1=-4.5&x0x2=5&constraint=disk");
     expect(decodePlay3D(readRoute(hash).share)).toMatchObject({ seed: 25, preset: "rosenbrock", constraint: "disk", sampler: "cmaes", cmaEsSettings });
     expect(decodePlay3D(new URLSearchParams("sampler=cmaes&constraint=circle")).constraint).toBe("disk");
@@ -59,6 +59,24 @@ describe("share links", () => {
     expect(decodePlay3D(new URLSearchParams(`sampler=cmaes&${settings}`)).cmaEsSettings)
       .toEqual({ sigma0: 0.1, populationSize: 6, x0: { x1: -5, x2: 0.5 } });
     expect(decodePlay3D(new URLSearchParams(`sampler=unknown&${settings}`))).toMatchObject(legacySamplerDefaults);
+  });
+
+  it.each([legacyPlay2DUrl, legacyPlay3DUrl, legacyConstrainedPlay3DUrl])("recreates the exact v1.0.0 URL %s", (url) => {
+    const route = readRoute(new URL(url).hash);
+    if (route.page === "play-2d") {
+      const { seed, preset, settings } = readSharedSearch(route.share, play2DDefaults, objectivePresets, trialLimit, 10);
+      expect(createShareUrl(pageUrl, { page: "play-2d", preset, sampler: "tpe", settings }, seed)).toBe(url);
+    } else {
+      const { seed, preset, mode, constraint, settings } = decodePlay3D(route.share);
+      expect(createShareUrl(pageUrl, { page: "play-3d", preset, mode, constraint, settings }, seed)).toBe(url);
+    }
+  });
+
+  it("shares default CMA-ES settings when omitted", () => {
+    const experiment = { page: "play-3d", sampler: "cmaes", preset: "quadratic", constraint: "none" } as const;
+    const url = createShareUrl(pageUrl, experiment, 42);
+    expect(url).toBe(createShareUrl(pageUrl, { ...experiment, cmaEsSettings: twoParamCmaEsDefaults }, 42));
+    expect(decodePlay3D(readRoute(new URL(url).hash).share).cmaEsSettings).toEqual(twoParamCmaEsDefaults);
   });
 
   it("reads existing Play 2D links with every linked setting", () => {
@@ -118,7 +136,7 @@ describe("share links", () => {
   });
 
   it("writes the Play 2D hash for new Play 2D share links", () => {
-    const url = new URL(createShareUrl(pageUrl, { page: "play-2d", preset: play2DDefaults.preset }, play2DDefaults.seed, play2DDefaults.settings));
+    const url = new URL(createShareUrl(pageUrl, { page: "play-2d", preset: play2DDefaults.preset, settings: play2DDefaults.settings }, play2DDefaults.seed));
     expect(url.hash).toMatch(/^#play-2d\?seed=/);
     expect(readRoute(url.hash).share?.has("v")).toBe(false);
   });
@@ -126,7 +144,7 @@ describe("share links", () => {
   it("copies current settings when the address still contains an earlier experiment", () => {
     const originalUrl = "https://kaichi-irie.github.io/tpe-playground/#play-2d?seed=3&preset=quadratic&gamma=0.15";
     const settings = { ...play2DDefaults.settings, gamma: 0.35 };
-    const newUrl = createShareUrl(originalUrl, { page: "play-2d", preset: "boundary" }, 7, settings);
+    const newUrl = createShareUrl(originalUrl, { page: "play-2d", preset: "boundary", settings }, 7);
     const originalShare = readRoute(new URL(originalUrl).hash).share;
     const newShare = readRoute(new URL(newUrl).hash).share;
 
@@ -139,7 +157,7 @@ describe("share links", () => {
   });
 
   it("preserves the base path and writes the Play 3D hash and density mode without tracking parameters", () => {
-    const url = new URL(createShareUrl(pageUrl, { page: "play-3d", preset: "rosenbrock", mode: "univariate", constraint: "none" }, 99, play3DDefaults.settings));
+    const url = new URL(createShareUrl(pageUrl, { page: "play-3d", preset: "rosenbrock", mode: "univariate", constraint: "none", settings: play3DDefaults.settings }, 99));
     const route = readRoute(url.hash);
     expect(url.pathname).toBe("/tpe-playground/");
     expect(url.search).toBe("");
@@ -155,14 +173,14 @@ describe("share links", () => {
   it("writes the constraint and infeasible filling only for constrained Play 3D links", () => {
     const experiment = { page: "play-3d", preset: "rosenbrock", mode: "univariate", constraint: "none" } as const;
     const shareUrl = (infeasibleFilling: boolean | undefined) =>
-      createShareUrl(pageUrl, { ...experiment, constraint: "disk" }, 99, { ...play3DDefaults.settings, infeasibleFilling });
-    const unconstrained = createShareUrl(pageUrl, experiment, 99, { ...play3DDefaults.settings, infeasibleFilling: false });
+      createShareUrl(pageUrl, { ...experiment, constraint: "disk", settings: { ...play3DDefaults.settings, infeasibleFilling } }, 99);
+    const unconstrained = createShareUrl(pageUrl, { ...experiment, settings: { ...play3DDefaults.settings, infeasibleFilling: false } }, 99);
 
     expect(unconstrained).not.toMatch(/constraint=|infeasibleFilling=/);
     expect(shareUrl(undefined)).toBe(`${unconstrained}&constraint=disk&infeasibleFilling=true`);
     expect(shareUrl(true)).toBe(`${unconstrained}&constraint=disk&infeasibleFilling=true`);
     expect(shareUrl(false)).toBe(`${unconstrained}&constraint=disk&infeasibleFilling=false`);
-    const play2D = createShareUrl(pageUrl, { page: "play-2d", preset: play2DDefaults.preset }, 99, { ...play2DDefaults.settings, infeasibleFilling: false });
+    const play2D = createShareUrl(pageUrl, { page: "play-2d", preset: play2DDefaults.preset, settings: { ...play2DDefaults.settings, infeasibleFilling: false } }, 99);
     expect(play2D).not.toMatch(/constraint=|infeasibleFilling=/);
   });
 
@@ -190,7 +208,7 @@ describe("share links", () => {
 
   it("round-trips explorer defaults, preset IDs, and every model control value", () => {
     expect(roundTripPlay2D(play2DDefaults)).toEqual(play2DDefaults);
-    const url = new URL(createShareUrl(pageUrl, { page: "play-3d", preset: play3DDefaults.preset, mode: "multivariate", constraint: "none" }, play3DDefaults.seed, play3DDefaults.settings));
+    const url = new URL(createShareUrl(pageUrl, { page: "play-3d", preset: play3DDefaults.preset, mode: "multivariate", constraint: "none", settings: play3DDefaults.settings }, play3DDefaults.seed));
     expect(decodePlay3D(readRoute(url.hash).share)).toEqual({ ...play3DDefaults, ...legacySamplerDefaults, mode: "multivariate", constraint: "none" });
     for (const preset of ["multimodal", "quadratic", "narrow", "boundary"] as const) {
       expect(roundTripPlay2D({ ...play2DDefaults, preset }).preset).toBe(preset);
@@ -236,7 +254,7 @@ describe("share links", () => {
     expect(runSearch(one.seed, 12, one.settings.priorWeight, { ...one.settings, objectivePreset: one.preset }))
       .toEqual(runSearch(seed, 12, settings.priorWeight, { ...settings, objectivePreset: "boundary" }));
 
-    const fragment = new URL(createShareUrl(pageUrl, { page: "play-3d", preset: "rosenbrock", mode: "univariate", constraint: "none" }, seed, settings)).hash;
+    const fragment = new URL(createShareUrl(pageUrl, { page: "play-3d", preset: "rosenbrock", mode: "univariate", constraint: "none", settings }, seed)).hash;
     const two = decodePlay3D(readRoute(fragment).share);
     expect(moveTwoParamPlayback(emptyTwoParamPlayback(), 12, two.seed, two.mode, { ...two.settings, objectivePreset: two.preset }))
       .toEqual(moveTwoParamPlayback(emptyTwoParamPlayback(), 12, seed, "univariate", { ...settings, objectivePreset: "rosenbrock" }));
@@ -248,7 +266,7 @@ describe("share links", () => {
     const objectivePreset = "quadratic";
     const constraintPreset = "band";
     const settings = { ...play3DDefaults.settings, startupTrials: 2, infeasibleFilling: false };
-    const url = createShareUrl(pageUrl, { page: "play-3d", preset: objectivePreset, mode, constraint: constraintPreset }, seed, settings);
+    const url = createShareUrl(pageUrl, { page: "play-3d", preset: objectivePreset, mode, constraint: constraintPreset, settings }, seed);
     const route = readRoute(new URL(url).hash);
     const shared = decodePlay3D(route.share);
 
@@ -287,15 +305,15 @@ describe("Optuna share alias", () => {
   it("writes only the alias when all preset values match, ignoring the Constant width", () => {
     const settings = { ...applyOptunaPreset(play3DDefaults.settings), bandwidth: 0.73 };
     const experiment = { page: "play-3d", preset: "rosenbrock", mode: "univariate", constraint: "disk" } as const;
-    const url = createShareUrl(pageUrl, experiment, 17, settings);
+    const url = createShareUrl(pageUrl, { ...experiment, settings }, 17);
     expect(new URL(url).hash).toBe("#play-3d?seed=17&preset=rosenbrock&tpe=optuna&mode=univariate&constraint=disk");
-    expect(createShareUrl(pageUrl, { page: "play-2d", preset: "boundary" }, 17, settings))
+    expect(createShareUrl(pageUrl, { page: "play-2d", preset: "boundary", settings }, 17))
       .toContain("#play-2d?seed=17&preset=boundary&tpe=optuna");
     for (const change of [
       { gamma: 0.2 }, { bandwidthRule: "constant" }, { weights: "uniform" }, { priorWeight: 0 },
       { startupTrials: 2 }, { candidates: 8 }, { infeasibleFilling: false },
     ] as const) {
-      const individual = createShareUrl(pageUrl, experiment, 17, { ...settings, ...change });
+      const individual = createShareUrl(pageUrl, { ...experiment, settings: { ...settings, ...change } }, 17);
       expect(individual).not.toContain("tpe=");
       expect(individual).toContain("bandwidth=0.73");
     }

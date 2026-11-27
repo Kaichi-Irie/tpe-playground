@@ -9,6 +9,8 @@ it("starts a sequential Play 3D search with no observations and a preview of its
   const html = renderToStaticMarkup(<Play3D />);
   expect(html).toContain('aria-label="Play 3D sampler"');
   expect(html).toContain('aria-pressed="true">TPE</button>');
+  expect(html).toContain('aria-pressed="false">CMA-ES</button>');
+  expect(html).toContain('data-sampler="tpe" class="model-controls"');
   expect(html).toContain("Trial 0 / 200");
   expect(html).toContain('aria-label="Play 3D Trial progress"');
   expect(html).toContain('<button type="button" class="playback-speed" aria-label="Play 3D Playback speed: 1x"');
@@ -54,6 +56,12 @@ it.each(["3d", "top"] as const)("renders CMA-ES layers, settings and markers in 
   const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} initialViewMode={initialViewMode} />);
   expect(html).toContain('role="group" aria-label="Play 3D sampler"');
   expect(html).toContain('aria-pressed="true">CMA-ES</button>');
+  expect(html).toContain('aria-pressed="false">TPE</button>');
+  expect(html).toContain('data-sampler="cmaes" class="model-controls cmaes-model-controls"');
+  expect(html).toMatch(/class="settings-reset" disabled="" aria-label="Reset model defaults"><svg aria-hidden="true"/);
+  expect(html).toContain('aria-label="Play 3D Search seed">42</output>');
+  expect(html).toContain('aria-describedby="trial-seek-help-play-3d"');
+  expect(html).toContain('id="trial-seek-help-play-3d" class="sr-only">Seeking back discards later trials.</span>');
   const legend = html.match(/<div class="legend cmaes-legend"[^>]*>(.*?)<\/div>/)?.[1] ?? "";
   expect(legend.match(/aria-pressed="true"/g)).toHaveLength(5);
   for (const label of ["Objective contours", "Distribution (1σ/2σ)", "Generation", "Mean path", "Observations"]) expect(legend).toContain(label);
@@ -71,6 +79,12 @@ it.each(["3d", "top"] as const)("renders CMA-ES layers, settings and markers in 
   expect(live).toContain("Population λ");
   expect(live).toContain("6 · Auto");
   expect(html).not.toContain("Good KDE");
+});
+
+it("enables CMA-ES Reset and Optuna preset for custom settings from a share link", () => {
+  const html = renderToStaticMarkup(<Play3D sharedSettings={new URLSearchParams("sampler=cmaes&x0x2=0.5")} />);
+  expect(html).toContain('class="settings-reset" aria-label="Reset model defaults"');
+  expect(html).toContain('<button type="button">Optuna preset</button>');
 });
 
 it("builds a clipped CMA-ES bell with exact Gaussian heights and ring levels", () => {

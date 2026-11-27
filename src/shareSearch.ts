@@ -10,8 +10,8 @@ export const playPageHrefs = { "play-2d": import.meta.env.BASE_URL, "play-3d": "
 const playShareHashes = { "play-2d": "#play-2d", "play-3d": playPageHrefs["play-3d"] } as const;
 export type Page = keyof typeof playPageHrefs | "lab" | "about";
 export type ShareExperiment =
-  | { page: "play-2d"; preset: string }
-  | { page: "play-3d"; preset: string; mode: DensityMode; constraint: TwoParamConstraintPreset; sampler?: "tpe" }
+  | { page: "play-2d"; preset: string; sampler?: "tpe"; settings: ModelSettings }
+  | { page: "play-3d"; preset: string; mode: DensityMode; constraint: TwoParamConstraintPreset; sampler?: "tpe"; settings: ModelSettings }
   | { page: "play-3d"; preset: string; mode?: DensityMode; constraint: TwoParamConstraintPreset; sampler: "cmaes"; cmaEsSettings?: TwoParamCmaEsSettings };
 
 export type SharedSearch<Preset extends string> = {
@@ -32,10 +32,10 @@ export function readRoute(hash: string): Route {
   return { page: path === "#lab" ? "lab" : path === "#about" ? "about" : "play-2d", share: null };
 }
 
-export function createShareUrl(documentUrl: string, experiment: ShareExperiment, seed: number, settings?: ModelSettings) {
+export function createShareUrl(documentUrl: string, experiment: ShareExperiment, seed: number) {
   const url = new URL(documentUrl);
   url.search = "";
-  if (experiment.page === "play-3d" && experiment.sampler === "cmaes") {
+  if (experiment.sampler === "cmaes") {
     const cmaEsSettings = experiment.cmaEsSettings ?? twoParamCmaEsDefaults;
     const { sigma0, populationSize, x0 } = cmaEsSettings;
     const params = new URLSearchParams({ sampler: "cmaes", seed: String(seed), preset: experiment.preset });
@@ -50,7 +50,7 @@ export function createShareUrl(documentUrl: string, experiment: ShareExperiment,
     url.hash = `${playShareHashes[experiment.page]}?${params}`;
     return url.href;
   }
-  if (!settings) throw new Error("TPE sharing requires model settings.");
+  const { settings } = experiment;
   const model = {
     gamma: settings.gamma.toFixed(2),
     bandwidth: settings.bandwidth.toFixed(2),

@@ -18,10 +18,13 @@ it("compares CMA-ES with Random and explains the constraint limitation", () => {
   const render = (constraintPreset: "none" | "disk") => renderToStaticMarkup(
     <Play3DPerformance {...run} seed={42} objectivePreset="rosenbrock" sampler="cmaes" cmaEsSettings={twoParamCmaEsDefaults} constraintPreset={constraintPreset} />,
   );
-  expect(render("none")).toContain("Best so far: CMA-ES versus Random search");
-  expect(render("none")).toContain("CMA-ES is solid green.");
-  expect(render("disk")).toContain("CMA-ES does not support constraints.");
-  expect(render("disk")).not.toContain("Average regret");
+  const unconstrained = render("none");
+  expect(unconstrained).toContain("Best so far: CMA-ES versus Random search");
+  expect(unconstrained).toContain("CMA-ES is solid green.");
+  expect(unconstrained).toContain('data-sampler="cmaes" style="--comparison-current:var(--sampler-cmaes)"');
+  const constrained = render("disk");
+  expect(constrained).toContain("CMA-ES does not support constraints. Remove the constraint to compare CMA-ES with Random.");
+  expect(constrained).not.toContain('class="progress-panel"');
 });
 
 it("uses a reproducible random baseline sharing startup observations for every Play 3D objective", () => {
