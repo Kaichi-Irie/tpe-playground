@@ -1,6 +1,7 @@
 import { twoParamConstraintPresets, type TwoParamConstraintPreset } from "./twoParamConstraints";
 import { isBandwidthRule } from "./model/tpe/bandwidth";
 import type { DensityMode } from "./model/tpe/types";
+import { cmaEsPopulationSizeRange, cmaEsSigma0Range, cmaEsX0Range, matchesOptunaCmaEsPreset, optunaCmaEsPreset, twoParamCmaEsDefaults, type TwoParamCmaEsSettings, type TwoParamSampler } from "./twoParamCmaEs";
 import {
   applyOptunaPreset, bandwidthRange, candidateCounts, constrainSettings, gammaRange, matchesOptunaPreset, priorWeights, startupTrialCounts, weightOptions, type ModelSettings,
 } from "./searchSettings";
@@ -10,7 +11,8 @@ const playShareHashes = { "play-2d": "#play-2d", "play-3d": playPageHrefs["play-
 export type Page = keyof typeof playPageHrefs | "lab" | "about";
 export type ShareExperiment =
   | { page: "play-2d"; preset: string }
-  | { page: "play-3d"; preset: string; mode: DensityMode; constraint: TwoParamConstraintPreset };
+  | { page: "play-3d"; preset: string; mode: DensityMode; constraint: TwoParamConstraintPreset; sampler?: "tpe" }
+  | { page: "play-3d"; preset: string; mode?: DensityMode; constraint: TwoParamConstraintPreset; sampler: "cmaes"; cmaEsSettings?: TwoParamCmaEsSettings };
 
 export type SharedSearch<Preset extends string> = {
   seed: number;
@@ -30,9 +32,25 @@ export function readRoute(hash: string): Route {
   return { page: path === "#lab" ? "lab" : path === "#about" ? "about" : "play-2d", share: null };
 }
 
-export function createShareUrl(documentUrl: string, experiment: ShareExperiment, seed: number, settings: ModelSettings) {
+export function createShareUrl(documentUrl: string, experiment: ShareExperiment, seed: number, settings?: ModelSettings) {
   const url = new URL(documentUrl);
   url.search = "";
+  if (experiment.page === "play-3d" && experiment.sampler === "cmaes") {
+    const cmaEsSettings = experiment.cmaEsSettings ?? twoParamCmaEsDefaults;
+    const { sigma0, populationSize, x0 } = cmaEsSettings;
+    const params = new URLSearchParams({ sampler: "cmaes", seed: String(seed), preset: experiment.preset });
+    if (matchesOptunaCmaEsPreset(cmaEsSettings)) params.set("cmaes", "optuna");
+    else {
+      params.set("sigma0", String(sigma0));
+      params.set("popsize", String(populationSize));
+      params.set("x0x1", String(x0.x1));
+      params.set("x0x2", String(x0.x2));
+    }
+    if (experiment.constraint !== "none") params.set("constraint", experiment.constraint);
+    url.hash = `${playShareHashes[experiment.page]}?${params}`;
+    return url.href;
+  }
+  if (!settings) throw new Error("TPE sharing requires model settings.");
   const model = {
     gamma: settings.gamma.toFixed(2),
     bandwidth: settings.bandwidth.toFixed(2),
@@ -108,14 +126,41 @@ export function readPlay3DSharedSearch<Preset extends string>(
   presets: Record<Preset, unknown>,
   trialLimit: number,
   domainWidth: number,
-): Omit<SharedSearch<Preset>, "settings"> & { settings: ModelSettings; mode: DensityMode; constraint: TwoParamConstraintPreset } {
+): Omit<SharedSearch<Preset>, "settings"> & {
+  settings: ModelSettings;
+  mode: DensityMode;
+  constraint: TwoParamConstraintPreset;
+  sampler: TwoParamSampler;
+  cmaEsSettings: TwoParamCmaEsSettings;
+} {
   const search = readSharedSearch(params, defaults, presets, trialLimit, domainWidth);
   const mode = params?.get("mode") === "univariate" ? "univariate" : "multivariate";
-  const value = params?.get("constraint");
+  const sampler = params?.get("sampler") === "cmaes" ? "cmaes" : "tpe";
+  const constraintParam = params?.get("constraint");
+  const value = sampler === "cmaes" && constraintParam === "circle" ? "disk" : constraintParam;
   const constraint = value && Object.hasOwn(twoParamConstraintPresets, value) ? value as TwoParamConstraintPreset : "none";
   const settings = constraint === "none" ? search.settings : constrainSettings({
     ...search.settings,
     infeasibleFilling: search.settings.infeasibleFilling ?? (params?.get("infeasibleFilling") !== "false"),
   });
-  return { ...search, settings, mode, constraint };
+  const cmaEsSettings = sampler === "cmaes" ? readCmaEsSettings(params) : twoParamCmaEsDefaults;
+  return { ...search, settings, mode, constraint, sampler, cmaEsSettings };
+}
+
+function readCmaEsSettings(params: URLSearchParams | null): TwoParamCmaEsSettings {
+  if (!params) return twoParamCmaEsDefaults;
+  if (params.get("cmaes") === "optuna") return optunaCmaEsPreset;
+  const read = (key: string, range: { min: number; max: number; step: number }, fallback: number) => {
+    const raw = params.get(key);
+    const value = raw !== null && /^-?\d+(?:\.\d{1,2})?$/.test(raw) ? Number(raw) : NaN;
+    return onStep(value, range.min, range.max, range.step) ? value : fallback;
+  };
+  return {
+    sigma0: read("sigma0", cmaEsSigma0Range, twoParamCmaEsDefaults.sigma0),
+    populationSize: read("popsize", cmaEsPopulationSizeRange, twoParamCmaEsDefaults.populationSize),
+    x0: {
+      x1: read("x0x1", cmaEsX0Range, twoParamCmaEsDefaults.x0.x1),
+      x2: read("x0x2", cmaEsX0Range, twoParamCmaEsDefaults.x0.x2),
+    },
+  };
 }

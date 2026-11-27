@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { Play3DPerformance } from "./Play3DPerformance";
 import { ProgressPlot } from "./ProgressPlot";
+import { emptyTwoParamCmaEsPlayback, moveTwoParamCmaEsPlayback, twoParamCmaEsDefaults } from "./twoParamCmaEs";
 import { twoParamDefaultModelSettings, emptyTwoParamPlayback, findTwoParamObjectiveMinimum, moveTwoParamPlayback, twoParamObjectivePresets, twoParamSettings } from "./twoParamTpe";
 
 it.each([0, 5])("labels default Play 3D performance as TPE at trial %i", (step) => {
@@ -10,6 +11,17 @@ it.each([0, 5])("labels default Play 3D performance as TPE at trial %i", (step) 
   const html = renderToStaticMarkup(<Play3DPerformance {...run} seed={seed} objectivePreset="multimodal" />);
   expect(html).toContain('class="comparison-tpe"><i aria-hidden="true"></i>TPE');
   expect(html).toContain("Best so far: TPE versus Random search");
+});
+
+it("compares CMA-ES with Random and explains the constraint limitation", () => {
+  const run = moveTwoParamCmaEsPlayback(emptyTwoParamCmaEsPlayback(), 12, 42, twoParamCmaEsDefaults, "rosenbrock");
+  const render = (constraintPreset: "none" | "disk") => renderToStaticMarkup(
+    <Play3DPerformance {...run} seed={42} objectivePreset="rosenbrock" sampler="cmaes" cmaEsSettings={twoParamCmaEsDefaults} constraintPreset={constraintPreset} />,
+  );
+  expect(render("none")).toContain("Best so far: CMA-ES versus Random search");
+  expect(render("none")).toContain("CMA-ES is solid green.");
+  expect(render("disk")).toContain("CMA-ES does not support constraints.");
+  expect(render("disk")).not.toContain("Average regret");
 });
 
 it("uses a reproducible random baseline sharing startup observations for every Play 3D objective", () => {

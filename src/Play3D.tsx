@@ -14,12 +14,15 @@ import LabHintBubble from "./LabHintBubble";
 import { playGuides } from "./playGuides";
 import { usePlayGuide } from "./usePlayGuide";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
+import { CmaEsSettingsPanel } from "./CmaEsSettingsPanel";
 import { Help } from "./Help";
 import { HelpMath } from "./HelpMath";
 import { constrainSettings } from "./searchSettings";
 import { readPlay3DSharedSearch, type SharedSearch } from "./shareSearch";
 import { useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent } from "react";
-import { buildTwoParamView, twoParamDefaultModelSettings, getTwoParamObjective, twoParamObjectivePresets, emptyTwoParamPlayback, moveTwoParamPlayback, proposeTwoParamTrial, twoParamProposalFromTrace, twoParamSettings, type DensityMode, type TwoParamObjectivePreset, type TwoParamModelSettings, type TwoParamProposal } from "./twoParamTpe";
+import { buildTwoParamView, twoParamDefaultModelSettings, getTwoParamObjective, twoParamObjectivePresets, emptyTwoParamPlayback, moveTwoParamPlayback, proposeTwoParamTrial, twoParamProposalFromTrace, twoParamSettings, type DensityMode, type TwoParamObjectivePreset, type TwoParamModelSettings, type TwoParamPlayback, type TwoParamProposal } from "./twoParamTpe";
+import { buildTwoParamCmaEsView, emptyTwoParamCmaEsPlayback, moveTwoParamCmaEsPlayback, type TwoParamCmaEsSettings, type TwoParamSampler } from "./twoParamCmaEs";
+import { buildCmaEsBell, buildCmaEsScene } from "./play3dCmaEsScene";
 
 type Surface = "objective" | "good" | "bad" | "acquisition";
 type Layer = Surface | "observations" | "candidates";
@@ -28,6 +31,13 @@ const layers: { key: Layer; label: string }[] = [
   { key: "bad", label: "Bad KDE g(x)" }, { key: "observations", label: "Observations" },
   { key: "candidates", label: "Candidates" }, { key: "acquisition", label: "Acquisition" },
 ];
+const cmaEsLayers = [
+  { key: "objective", label: "Objective contours", short: "f(x)" },
+  { key: "ellipse", label: "Distribution (1σ/2σ)", short: "Gauss" },
+  { key: "generation", label: "Generation", short: "Gen" },
+  { key: "meanPath", label: "Mean path", short: "Mean" },
+  { key: "observations", label: "Observations", short: "Points" },
+] as const;
 const densityLayers = ["good", "bad", "acquisition"] as const;
 const axisCandidateTickLength = 0.38;
 const guideSegmentCount = 16;
@@ -185,6 +195,10 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
   const { ref: sceneRef, width: sceneWidth, height: sceneHeight, typeScale } = usePlotSize();
   const compact = sceneWidth < 640;
   const [playback, setPlayback] = useState(emptyTwoParamPlayback);
+  const [cmaEsPlayback, setCmaEsPlayback] = useState(emptyTwoParamCmaEsPlayback);
+  const [sampler, setSampler] = useState(initialSearch.sampler);
+  const [cmaEsSettings, setCmaEsSettings] = useState(initialSearch.cmaEsSettings);
+  const isCmaEs = sampler === "cmaes";
   const [seekTarget, setSeekTarget] = useState<number | null>(null);
   const seekController = useRef<AbortController | null>(null);
   function cancelSeek() {
@@ -202,13 +216,14 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     try { return globalThis.sessionStorage?.getItem(constraintHintKey) === "1"; } catch { return false; }
   });
   const constrained = constraintPreset !== "none";
+  const unsupported = isCmaEs && constrained;
   const searchSettings = useMemo(() => ({ ...settings, objectivePreset, constraintPreset }), [settings, objectivePreset, constraintPreset]);
   function changeConstraint(preset: TwoParamConstraintPreset) {
     setConstraintPreset(preset);
     if (preset === "none") setConstraintHint(false);
     else {
       setSettings(constrainSettings);
-      if (!constraintHintSeen) {
+      if (!isCmaEs && !constraintHintSeen) {
         setConstraintHintSeen(true);
         setConstraintHint(true);
         try { globalThis.sessionStorage?.setItem(constraintHintKey, "1"); } catch { /* The page still remembers the hint. */ }
@@ -230,6 +245,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
   function restart() {
     cancelSeek();
     setPlayback(emptyTwoParamPlayback());
+    setCmaEsPlayback(emptyTwoParamCmaEsPlayback());
     setPlaying(false);
     setInspection("");
   }
@@ -237,7 +253,8 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
   const [playing, setPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(defaultPlaybackSpeed);
   const [comparisonOpen, setComparisonOpen] = useState(false);
-  const step = playback.trials.length;
+  const activePlayback = isCmaEs ? cmaEsPlayback : playback;
+  const step = activePlayback.trials.length;
   const complete = step === twoParamSettings.count;
   // Slider drags and seeks emit many updates per second. Rebuilding the model and
   // scene for each one queued more work than a phone could finish, freezing the
@@ -245,8 +262,12 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
   // input, so only the latest observations and settings are drawn.
   const liveSceneInput = useMemo(() => ({ trials: playback.trials, mode, settings: searchSettings }), [playback.trials, mode, searchSettings]);
   const sceneInput = useDeferredValue(liveSceneInput);
-  const model = useMemo(() => measurePlay3D("model", () => buildTwoParamView(sceneInput.trials, sceneInput.mode, sceneInput.settings)), [sceneInput]);
-  const goodWidths = model.fitted?.snapshot.groups.flatMap((group) => {
+  const model = useMemo(() => isCmaEs ? null
+    : measurePlay3D("model", () => buildTwoParamView(sceneInput.trials, sceneInput.mode, sceneInput.settings)), [isCmaEs, sceneInput]);
+  const cmaEsModel = useMemo(() => isCmaEs && !unsupported
+    ? measurePlay3D("model", () => buildTwoParamCmaEsView(cmaEsPlayback.trials, cmaEsSettings, objectivePreset)) : null,
+  [isCmaEs, unsupported, cmaEsPlayback.trials, cmaEsSettings, objectivePreset]);
+  const goodWidths = model?.fitted?.snapshot.groups.flatMap((group) => {
     const kernels = group.good.kernels.filter((kernel) => kernel.source.kind === "observation");
     return group.parameterIds.map((id) => ({
       label: id === "x1" ? "x₁" : "x₂",
@@ -255,24 +276,26 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
   }) ?? [];
   const proposal = useMemo(() => {
     const { trials, mode, settings } = sceneInput;
-    if (trials.length === twoParamSettings.count) return null;
+    if (!model || trials.length === twoParamSettings.count) return null;
     return model.fitted && trials.length >= (settings.startupTrials ?? twoParamSettings.startupTrials) ? twoParamProposalFromTrace(model.fitted.propose(seed)) : proposeTwoParamTrial(trials, seed, mode, settings);
-  }, [sceneInput, model.fitted, seed]);
+  }, [sceneInput, model, seed]);
+  const nextPoint = useMemo(() => {
+    if (!cmaEsModel) return proposal;
+    return complete ? null : cmaEsModel.fitted.propose(seed).selected;
+  }, [cmaEsModel, complete, proposal, seed]);
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || unsupported) return;
     if (complete) { setPlaying(false); return; }
     const timer = window.setTimeout(() => {
-      setPlayback((current) => moveTwoParamPlayback(current, current.trials.length + 1, seed, mode, searchSettings));
+      if (isCmaEs) setCmaEsPlayback((current) => moveTwoParamCmaEsPlayback(current, current.trials.length + 1, seed, cmaEsSettings, objectivePreset));
+      else setPlayback((current) => moveTwoParamPlayback(current, current.trials.length + 1, seed, mode, searchSettings));
       setInspection("");
     }, 1000 / playbackSpeed);
     return () => window.clearTimeout(timer);
-  }, [playing, playbackSpeed, complete, step, seed, mode, searchSettings]);
-  function moveTo(next: number) {
-    setPlaying(false);
-    cancelSeek();
-    setInspection("");
-    if (next <= step + 1) {
-      setPlayback(moveTwoParamPlayback(playback, next, seed, mode, searchSettings));
+  }, [playing, playbackSpeed, complete, step, seed, mode, searchSettings, isCmaEs, unsupported, cmaEsSettings, objectivePreset]);
+  function moveTpeTo(next: number, onComplete: (result: TwoParamPlayback) => void) {
+    if (next <= playback.trials.length + 1) {
+      onComplete(moveTwoParamPlayback(playback, next, seed, mode, searchSettings));
       return;
     }
     const controller = new AbortController();
@@ -280,7 +303,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     setSeekTarget(next);
     void seekTwoParamPlayback(playback, next, seed, mode, searchSettings, controller.signal).then((result) => {
       if (controller.signal.aborted) return;
-      if (result) setPlayback(result);
+      if (result) onComplete(result);
       seekController.current = null;
       setSeekTarget(null);
     }).catch((error: unknown) => {
@@ -290,9 +313,45 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
       setInspection(error instanceof Error ? error.message : "Could not complete the seek.");
     });
   }
+  function moveTo(next: number) {
+    if (unsupported) return;
+    setPlaying(false);
+    cancelSeek();
+    setInspection("");
+    if (isCmaEs) setCmaEsPlayback(moveTwoParamCmaEsPlayback(cmaEsPlayback, next, seed, cmaEsSettings, objectivePreset));
+    else moveTpeTo(next, setPlayback);
+  }
+  function changeSampler(next: TwoParamSampler) {
+    if (next === sampler) return;
+    cancelSeek();
+    setPlaying(false);
+    setInspection("");
+    setFocusedCandidate(null);
+    setConstraintHint(false);
+    if (next === "cmaes") {
+      const from = emptyTwoParamCmaEsPlayback();
+      setCmaEsPlayback(constrained ? from : moveTwoParamCmaEsPlayback(from, step, seed, cmaEsSettings, objectivePreset));
+      setSampler(next);
+    } else {
+      moveTpeTo(step, (result) => {
+        setPlayback(result);
+        setSampler(next);
+      });
+    }
+  }
+  function editCmaEsSettings(next: TwoParamCmaEsSettings) {
+    cancelSeek();
+    setPlaying(false);
+    setInspection("");
+    setCmaEsSettings(next);
+    if (!unsupported) setCmaEsPlayback(moveTwoParamCmaEsPlayback(emptyTwoParamCmaEsPlayback(), step, seed, next, objectivePreset));
+  }
 
   const [visible, setVisible] = useState<Record<Layer, boolean>>({ objective: true, good: true, bad: true, observations: true, candidates: true, acquisition: false });
-  const guide = usePlayGuide({ page: "play-3d", step, startupTrials: settings.startupTrials, acquisitionVisible: visible.acquisition, seeking: seekTarget !== null }, !constraintHint);
+  const [cmaEsVisible, setCmaEsVisible] = useState({ objective: true, ellipse: true, generation: true, meanPath: true, observations: true });
+  const objectiveVisible = isCmaEs ? cmaEsVisible.objective : visible.objective;
+  const observationsVisible = isCmaEs ? cmaEsVisible.observations : visible.observations;
+  const guide = usePlayGuide({ page: "play-3d", step: playback.trials.length, startupTrials: settings.startupTrials, acquisitionVisible: visible.acquisition, seeking: seekTarget !== null }, !constraintHint && !isCmaEs);
   useEffect(() => {
     if (!constraintHint) return;
     function onEscape(event: KeyboardEvent) {
@@ -339,12 +398,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     drag.current = null;
     flushRotation();
   }
-  const scale = (layer: Surface, value: number) => {
-    if (layer === "objective") return 0.25 + 0.75 * objectiveView.normalize(value, heightScale);
-    const [low, high] = model.scales[layer];
-    const normalized = (value - low) / (high - low);
-    return normalized;
-  };
+  const objectiveHeight = (value: number) => 0.25 + 0.75 * objectiveView.normalize(value, heightScale);
   const cosYaw = Math.cos(view.yaw), sinYaw = Math.sin(view.yaw);
   const cosPitch = Math.cos(view.pitch), sinPitch = Math.sin(view.pitch);
   const project3D = (x: number, y: number, height: number) => {
@@ -365,16 +419,23 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
   const fitHeight = fitWidth / aspect;
   const chartZoom = isTop ? 1 : fitWidth / sceneWidth;
   const labelScale = chartZoom * typeScale;
+  const heightLabel = isCmaEs && (unsupported || !cmaEsVisible.ellipse) ? "Objective · 1" : "Objective / Density · 1";
   const heightLabelRef = useRef<SVGTextElement>(null);
   const [heightLabelWidth, setHeightLabelWidth] = useState(0);
   useLayoutEffect(() => {
     const label = heightLabelRef.current;
     if (label) setHeightLabelWidth(label.getComputedTextLength());
-  }, [chartZoom, typeScale, isTop]);
+  }, [chartZoom, typeScale, isTop, heightLabel]);
   const viewX = (minX + maxX - fitWidth) / 2, viewY = (minY + maxY - fitHeight) / 2;
   const perspectiveBox = useMemo<Play3DViewBox>(() => ({ x: viewX, y: viewY, width: fitWidth, height: fitHeight }), [viewX, viewY, fitWidth, fitHeight]);
   const viewBox = isTop ? topLayout.viewBox : perspectiveBox;
   const sceneBox = `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`;
+  const projectFloor = (x1: number, x2: number) => isTop ? topLayout.project(x1, x2) : project3D(x1, x2, 0);
+  const cmaEsSnapshot = cmaEsModel?.snapshot;
+  const cmaEsBell = useMemo(() => !isTop && cmaEsSnapshot && cmaEsVisible.ellipse
+    ? buildCmaEsBell(cmaEsSnapshot.ellipse) : [], [isTop, cmaEsSnapshot, cmaEsVisible.ellipse]);
+  const highlightedGenIds = cmaEsVisible.generation && cmaEsModel
+    ? (cmaEsModel.snapshot.generationProgress === 0 ? cmaEsModel.lastGenIds : cmaEsModel.currentGenIds) : null;
   function inspectAt(event: Pick<PointerEvent<SVGSVGElement>, "currentTarget" | "target" | "clientX" | "clientY">) {
     if (drag.current || topDrag.current || event.target !== event.currentTarget) return;
     const rect = event.currentTarget.getBoundingClientRect();
@@ -390,7 +451,16 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
         }
       }
       const point = topLayout.unproject(x, y);
-      setInspection(point ? formatTopInspection(point, model, visible, objectiveView.feasible) : "");
+      if (!point) setInspection("");
+      else if (model) setInspection(formatTopInspection(point, model, visible, objectiveView.feasible));
+      else {
+        const { x1, x2 } = point;
+        const values = cmaEsModel && cmaEsVisible.ellipse ? cmaEsModel.evaluate(x1, x2) : null;
+        const objective = values?.objective ?? objectiveDefinition.evaluate(x1, x2);
+        const feasibility = objectiveView.feasible?.(x1, x2) === false ? " · Infeasible" : "";
+        const density = values ? ` · CMA-ES log p(x) = ${values.logDensity.toPrecision(4)}` : "";
+        setInspection(`x₁ = ${x1.toFixed(3)}, x₂ = ${x2.toFixed(3)} · f(x) = ${objective.toPrecision(4)}${feasibility}${density}`);
+      }
       return;
     }
     // Surfaces and candidates are pixels now; find the topmost painted item.
@@ -402,10 +472,10 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
   const objectiveStride = compact ? 2 : 1;
   const densityStride = compact ? 2 : 1;
   const objectiveMesh = useMemo(() => isTop ? [] : twoParamSurfaceMesh(objectiveView.grid, objectiveStride,
-    (point) => 0.25 + 0.75 * objectiveView.normalize(point.objective, heightScale)), [isTop, objectiveView, objectiveStride, heightScale]);
+    (point) => objectiveHeight(point.objective)), [isTop, objectiveView, objectiveStride, heightScale]);
   const densityMeshes = useMemo(() => measurePlay3D("density-grid-mesh", () => {
     const mesh = (key: "good" | "bad" | "acquisition") => {
-      if (isTop || !visible[key] || !model.hasDensities) return [];
+      if (isTop || !visible[key] || !model?.hasDensities) return [];
       const [low, high] = model.scales[key];
       return twoParamSurfaceMesh(model.grid, densityStride, (point) => (point[key] - low) / (high - low));
     };
@@ -418,23 +488,23 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
   }
   const preparedObjective = useMemo(() => measurePlay3D("objective-surface-prepare", () => prepareSurface(objectiveMesh, "objective", "Objective contours", objectiveDefinition.evaluate, objectiveView.feasible)), [objectiveMesh, objectiveDefinition, objectiveView.feasible]);
   const preparedDensities = useMemo(() => measurePlay3D("density-surface-prepare", () => ({
-    good: prepareSurface(densityMeshes.good, "good", "Good KDE ℓ(x)", (x1, x2) => model.evaluate(x1, x2).good),
-    bad: prepareSurface(densityMeshes.bad, "bad", "Bad KDE g(x)", (x1, x2) => model.evaluate(x1, x2).bad),
-    acquisition: prepareSurface(densityMeshes.acquisition, "acquisition", "Acquisition", (x1, x2) => model.evaluate(x1, x2).acquisition),
+    good: prepareSurface(densityMeshes.good, "good", "Good KDE ℓ(x)", (x1, x2) => model?.evaluate(x1, x2).good ?? 0),
+    bad: prepareSurface(densityMeshes.bad, "bad", "Bad KDE g(x)", (x1, x2) => model?.evaluate(x1, x2).bad ?? 0),
+    acquisition: prepareSurface(densityMeshes.acquisition, "acquisition", "Acquisition", (x1, x2) => model?.evaluate(x1, x2).acquisition ?? 0),
   })), [densityMeshes, model]);
   // Objective geometry and React elements do not depend on the trial history.
   // Reuse them on each search step, including the thousands of contour segments.
   const objectiveScene = useMemo(() => measurePlay3D("objective-project", () => {
-    if (isTop || !visible.objective) return [];
+    if (isTop || !objectiveVisible) return [];
     const items: Play3DSceneItem[] = projectTwoParamSurface(preparedObjective, project3D);
     objectiveView.contours.forEach(({ level, a, b, muted }, index) => {
-      const start = project3D(a.x1, a.x2, scale("objective", level));
-      const end = project3D(b.x1, b.x2, scale("objective", level));
+      const start = project3D(a.x1, a.x2, objectiveHeight(level));
+      const end = project3D(b.x1, b.x2, objectiveHeight(level));
       items.push({ id: `contour-${index}`, kind: "segment", muted, depth: (start.depth + end.depth) / 2 + 0.01, points: [start.x, start.y, end.x, end.y], inspect: () => { if (!drag.current) setInspection(`Objective contour · f(x) = ${level.toPrecision(4)}`); } });
     });
     for (const [lineIndex, line] of objectiveView.boundaries.entries()) {
       for (const onSurface of [false, true]) {
-        const points = line.map(({ x1, x2, objective }) => project3D(x1, x2, onSurface ? scale("objective", objective) : 0));
+        const points = line.map(({ x1, x2, objective }) => project3D(x1, x2, onSurface ? objectiveHeight(objective) : 0));
         for (let index = 1; index < points.length; index++) {
           const a = points[index - 1], b = points[index];
           items.push({ id: `boundary-${lineIndex}-${onSurface}-${index}`, kind: "boundary", depth: (a.depth + b.depth) / 2 + 0.015, points: [a.x, a.y, b.x, b.y] });
@@ -442,12 +512,12 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
       }
     }
     return measurePlay3D("objective-sort", () => items.sort((a, b) => a.depth - b.depth));
-  }), [isTop, preparedObjective, objectiveView, objectiveDefinition, heightScale, view, visible.objective]);
-  const topTint = useMemo(() => isTop && visible.objective ? createTopObjectiveTint(objectiveDefinition.evaluate, objectiveView) : [],
-    [isTop, visible.objective, objectiveDefinition, objectiveView]);
-  const topFields = useMemo(() => isTop ? createTopFieldItems(model, visible) : [], [isTop, model, visible]);
+  }), [isTop, preparedObjective, objectiveView, objectiveDefinition, heightScale, view, objectiveVisible]);
+  const topTint = useMemo(() => isTop && objectiveVisible ? createTopObjectiveTint(objectiveDefinition.evaluate, objectiveView) : [],
+    [isTop, objectiveVisible, objectiveDefinition, objectiveView]);
+  const topFields = useMemo(() => isTop && model ? createTopFieldItems(model, visible) : [], [isTop, model, visible]);
   const projectTrial = (x1: number, x2: number, value: number) => isTop
-    ? topLayout.project(x1, x2) : project3D(x1, x2, scale("objective", value));
+    ? topLayout.project(x1, x2) : project3D(x1, x2, objectiveHeight(value));
   const candidateScene = useMemo(() => buildPlay3DCandidateScene(
     proposal,
     visible.candidates,
@@ -477,7 +547,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
         const [x1, x2, x3, x4] = item.points;
         items.push({ ...item, points: line(x1, x2, x3, x4) });
       }
-      if (visible.objective) {
+      if (objectiveVisible) {
         objectiveView.contours.forEach(({ a, b, muted }, index) => {
           items.push({ id: `contour-${index}`, kind: "segment", muted, depth: 0, points: line(a.x1, a.x2, b.x1, b.x2) });
         });
@@ -492,35 +562,41 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     } else {
       items.push(...candidateScene.items);
       for (const key of densityLayers) {
-        if (!visible[key] || !model.hasDensities) continue;
+        if (!visible[key] || !model?.hasDensities) continue;
         items.push(...projectTwoParamSurface(preparedDensities[key], project3D));
       }
     }
-    if (visible.observations) for (const trial of model.trials) {
+    if (cmaEsSnapshot) items.push(...buildCmaEsScene(
+      cmaEsSnapshot, cmaEsBell, isTop ? projectFloor : project3D, isTop, cmaEsVisible.ellipse, cmaEsVisible.meanPath, setInspection,
+    ));
+    const sceneTrials = cmaEsModel?.trials ?? model?.trials ?? [];
+    if (observationsVisible) for (const trial of sceneTrials) {
       const p = projectTrial(trial.x1, trial.x2, trial.value);
-      const group = !model.hasPartition ? "unclassified" : model.goodIds.has(trial.id) ? "good" : "bad";
-      items.push({ id: `trial-${trial.id}`, kind: "trial", depth: p.depth + 0.02, x: p.x, y: p.y, group, feasible: model.feasibleIds.has(trial.id) });
+      const group = cmaEsModel ? (highlightedGenIds?.has(trial.id) ? "cmaes-current" : "cmaes-past")
+        : !model?.hasPartition ? "unclassified" : model.goodIds.has(trial.id) ? "good" : "bad";
+      items.push({ id: `trial-${trial.id}`, kind: "trial", depth: p.depth + 0.02, x: p.x, y: p.y, group, feasible: model?.feasibleIds.has(trial.id) });
     }
-    if (proposal) {
-      const p = projectTrial(proposal.x1, proposal.x2, objectiveDefinition.evaluate(proposal.x1, proposal.x2));
-      const floor = isTop ? p : project3D(proposal.x1, proposal.x2, 0);
+    if (nextPoint) {
+      const p = projectTrial(nextPoint.x1, nextPoint.x2, objectiveDefinition.evaluate(nextPoint.x1, nextPoint.x2));
+      const floor = projectFloor(nextPoint.x1, nextPoint.x2);
       items.push({ id: "next-trial", kind: "proposal", depth: p.depth + 0.03, x: p.x, y: p.y, floorX: floor.x, floorY: floor.y });
     }
     if (isTop) return items;
     return measurePlay3D("merge-sort", () => mergeDepthSorted(objectiveScene, items.sort((a, b) => a.depth - b.depth)));
   // Projection and scaling depend exclusively on these immutable inputs.
-  }), [model, view, visible, proposal, objectiveView, heightScale, objectiveScene, preparedDensities, candidateScene, isTop, topLayout, topTint, topFields]);
+  }), [model, view, visible, cmaEsModel, cmaEsSnapshot, cmaEsBell, cmaEsVisible, objectiveVisible, observationsVisible, highlightedGenIds, nextPoint, objectiveView, heightScale, objectiveScene, preparedDensities, candidateScene, isTop, topLayout, topTint, topFields]);
   // Painted markers live in the canvas; these invisible SVG twins keep trials
   // focusable, labelled and hoverable without adding per-frame paint work.
-  const markerTargets = visible.observations ? model.trials.map((trial) => {
+  const markerTargets = observationsVisible ? (cmaEsModel?.trials ?? model?.trials ?? []).map((trial) => {
     const p = projectTrial(trial.x1, trial.x2, trial.value);
     if (isTop && !topLayout.contains(p.x, p.y)) return null;
-    const group = !model.hasPartition ? "Unclassified" : model.goodIds.has(trial.id) ? "Good" : "Bad";
-    const feasibility = sceneInput.settings.constraintPreset === "none" ? "" : trial.violation === 0 ? " · Feasible" : ` · Infeasible · violation ${trial.violation.toPrecision(3)}`;
-    const label = `Trial ${trial.id} · ${group}${feasibility} · x₁ = ${trial.x1.toFixed(2)}, x₂ = ${trial.x2.toFixed(2)} · f(x) = ${trial.value.toFixed(3)}`;
+    const group = cmaEsModel ? (highlightedGenIds?.has(trial.id) ? " · Highlighted generation" : "")
+      : !model?.hasPartition ? " · Unclassified" : model.goodIds.has(trial.id) ? " · Good" : " · Bad";
+    const feasibility = !model || sceneInput.settings.constraintPreset === "none" ? "" : trial.violation === 0 ? " · Feasible" : ` · Infeasible · violation ${trial.violation.toPrecision(3)}`;
+    const label = `Trial ${trial.id}${group}${feasibility} · x₁ = ${trial.x1.toFixed(2)}, x₂ = ${trial.x2.toFixed(2)} · f(x) = ${trial.value.toFixed(3)}`;
     return <circle key={`trial-${trial.id}`} cx={p.x} cy={p.y} r={4.5} className="observation-target-play-3d" tabIndex={0} aria-label={label} onFocus={() => setInspection(label)} onPointerEnter={(event) => { if (!drag.current && !topDrag.current && (!isTop || event.pointerType !== "touch")) setInspection(label); }} onClick={() => { if (isTop && !topDidPan.current) setInspection(label); }}><title>{label}</title></circle>;
   }) : null;
-  const proposalLabel = proposal ? `Next evaluation · x₁ = ${proposal.x1.toFixed(3)}, x₂ = ${proposal.x2.toFixed(3)}` : null;
+  const proposalLabel = nextPoint ? `Next evaluation · x₁ = ${nextPoint.x1.toFixed(3)}, x₂ = ${nextPoint.x2.toFixed(3)}` : null;
   const candidatesLabel = !visible.candidates || !proposal ? null
     : proposal.candidates.length > 0 ? `TPE candidates · ${proposal.candidates.length} joint sample${proposal.candidates.length === 1 ? "" : "s"} · arrow keys inspect candidates`
       : proposal.axisCandidates ? `TPE candidates · ${proposal.axisCandidates.x1.length} x₁ and ${proposal.axisCandidates.x2.length} x₂ axis sample${proposal.axisCandidates.x1.length === 1 ? "" : "s"} · arrow keys inspect candidates`
@@ -530,7 +606,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     : candidateScene.defaultInspectorIndex;
   const activeCandidateEntry = candidateScene.inspectorEntries[activeCandidateIndex] ?? null;
   const optimumMarker = (() => {
-    if (!visible.objective) return null;
+    if (!objectiveVisible) return null;
     const optimum = objectiveView.optimum;
     const p = projectTrial(optimum.x1, optimum.x2, optimum.value);
     if (isTop && !topLayout.contains(p.x, p.y)) return null;
@@ -539,6 +615,21 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
       <title>{label}</title><path d={`M${p.x},${p.y - 7} l7,7 l-7,7 l-7,-7 Z`} /><text x={p.x + 12 * labelScale} y={p.y - 12 * labelScale}>{constrained ? "Constrained optimum" : `Optimum (${optimum.x1.toFixed(objectivePreset === "multimodal" ? 2 : 1)}, ${optimum.x2.toFixed(objectivePreset === "multimodal" ? 2 : 1)})`}</text>
     </g>;
   })();
+  const meanMarker = (() => {
+    if (!cmaEsSnapshot || !cmaEsVisible.meanPath) return null;
+    const { mean, generation, sigma } = cmaEsSnapshot;
+    const p = projectFloor(mean.x1, mean.x2);
+    if (isTop && !topLayout.contains(p.x, p.y)) return null;
+    const label = `CMA-ES mean · Gen ${generation} · m = (${mean.x1.toFixed(2)}, ${mean.x2.toFixed(2)}) · σ = ${sigma.toPrecision(3)}`;
+    return <circle cx={p.x} cy={p.y} r={8 * chartZoom} className="observation-target-play-3d" role="img" tabIndex={0} aria-label={label}
+      onFocus={() => setInspection(label)} onPointerEnter={(event) => {
+        if (!drag.current && !topDrag.current && (!isTop || event.pointerType !== "touch")) setInspection(label);
+      }} onClick={() => { if (isTop && !topDidPan.current) setInspection(label); }}><title>{label}</title></circle>;
+  })();
+  const clipEllipseToFloor = !isTop && !!cmaEsSnapshot && cmaEsVisible.ellipse;
+  const floorOutline = useMemo(() => clipEllipseToFloor
+    ? [[-5, -5], [5, -5], [5, 5], [-5, 5]].map(([x1, x2]) => project3D(x1, x2, 0)) : undefined,
+  [clipEllipseToFloor, view]);
   const floor = useMemo(() => topTicks.flatMap((tick) => [[project3D(tick, -5, 0), project3D(tick, 5, 0)], [project3D(-5, tick, 0), project3D(5, tick, 0)]].map(([a, b]) => [a.x, a.y, b.x, b.y] as const)),
   // project depends only on the camera.
   [view]);
@@ -652,22 +743,47 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     <title>{`${candidatesLabel} · ${activeCandidateEntry.label}`}</title>
     <circle cx={activeCandidateEntry.x} cy={activeCandidateEntry.y} r={7} className="candidate-focus-target-play-3d" />
   </g> : null;
-  const markers = <>{markerTargets}{candidateInspector}{proposalLabel && <g className="proposal-play-3d" aria-label={proposalLabel}><title>{proposalLabel}</title></g>}{optimumMarker}</>;
-  const feasibleTrials = constrained ? playback.trials.filter((trial) => trial.violation === 0) : playback.trials;
+  const markers = <>{markerTargets}{candidateInspector}{proposalLabel && <g className="proposal-play-3d" aria-label={proposalLabel}><title>{proposalLabel}</title></g>}{optimumMarker}{meanMarker}</>;
+  const feasibleTrials = constrained ? activePlayback.trials.filter((trial) => trial.violation === 0) : activePlayback.trials;
   const feasibleCount = `${feasibleTrials.length} / ${step} feasible`;
   const bestValue = feasibleTrials.length ? Math.min(...feasibleTrials.map((trial) => trial.value)).toFixed(3) : "—";
   const noFeasibleGood = proposal?.trace.method === "random" && proposal.trace.reason === "no-feasible-good";
+  const cmaEsStatus = unsupported ? "CMA-ES · constraints unsupported" : complete ? "Search complete"
+    : cmaEsSnapshot ? `CMA-ES · gen ${cmaEsSnapshot.generation} (${cmaEsSnapshot.generationProgress}/${cmaEsSettings.populationSize}) · trial ${step + 1}` : "";
+  const newSeed = () => { setSeed(Math.floor(Math.random() * 100)); restart(); };
+  const experimentSettings = <>
+    <div className="scene-toolbar-group">
+      <div className="objective-picker parameter">
+        <div className="parameter-label"><label htmlFor="objective-preset-play-3d">Objective</label><Help label="Play 3D objective preset"><strong>{objectiveDefinition.label}</strong><br />{objectiveDefinition.description} Minimize over <HelpMath inline tex="[-5,5]^2" />:<HelpMath tex={objectiveDefinition.formula} />Changing it restarts the search.</Help></div><select id="objective-preset-play-3d" value={objectivePreset} onChange={(event) => { setObjectivePreset(event.target.value as TwoParamObjectivePreset); restart(); }}>{(Object.keys(twoParamObjectivePresets) as TwoParamObjectivePreset[]).map((preset) => <option key={preset} value={preset}>{twoParamObjectivePresets[preset].label}</option>)}</select>
+      </div>
+    </div>
+    <Play3DConstraintSettings preset={constraintPreset} infeasibleFilling={settings.infeasibleFilling ?? true} onPresetChange={changeConstraint}
+      onFillingChange={isCmaEs ? undefined : (infeasibleFilling) => editSettings({ ...settings, infeasibleFilling })} />
+  </>;
   return <section className="visual-workspace play-3d" ref={guide.workspaceRef} onKeyDown={guide.onKeyDown} aria-labelledby="play-3d-heading">
     <div className="canvas-plot">
     <div className="canvas-controls">
-    <PlaybackControls targetStep={seekTarget} step={step} limit={twoParamSettings.count} playing={playing} speed={playbackSpeed} onSpeedChange={setPlaybackSpeed} guidePlay={guide.active === "playback"} guideDescribedBy={guide.textId} idSuffix="-play-3d" labelPrefix="Play 3D " describedBy="trial-seek-help-play-3d" onMove={moveTo}
+    <PlaybackControls targetStep={seekTarget} step={step} limit={twoParamSettings.count} playing={playing} speed={playbackSpeed} onSpeedChange={setPlaybackSpeed} guidePlay={guide.active === "playback"} guideDescribedBy={guide.textId} idSuffix="-play-3d" labelPrefix="Play 3D " describedBy="trial-seek-help-play-3d" onMove={moveTo} disabled={unsupported}
       onToggle={() => { cancelSeek(); if (complete) moveTo(0); setPlaying(!playing || complete); }} />
-
+    <div className="sampler-toggle" role="group" aria-label="Play 3D sampler">
+      <button type="button" aria-pressed={!isCmaEs} onClick={() => changeSampler("tpe")}>TPE</button>
+      <button type="button" aria-pressed={isCmaEs} onClick={() => changeSampler("cmaes")}>CMA-ES</button>
     </div>
-    <div className="legend" aria-label="Play 3D plot layers">{layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} data-guide-target={key === "acquisition" && guideAcquisition || undefined} aria-describedby={key === "acquisition" && guideAcquisition ? guide.textId : undefined} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{key === "observations" && constrained ? "Observations · ✕ infeasible" : label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : key === "candidates" ? "Cand." : "Acquisition"}</span></button>)}</div>
+    </div>
+    <div className={`legend${isCmaEs ? " cmaes-legend" : ""}`} aria-label="Play 3D plot layers">{isCmaEs
+      ? cmaEsLayers.map(({ key, label, short }) => <button key={key} type="button" className={`layer ${key}`} title={key === "ellipse" ? "Current CMA-ES Gaussian distribution with 1σ and 2σ contours" : undefined} aria-label={label} aria-pressed={cmaEsVisible[key]}
+        onClick={() => { setCmaEsVisible((current) => ({ ...current, [key]: !current[key] })); setInspection(""); }}><span className="swatch" /><span className="layer-label">{label}</span><span className="layer-short" aria-hidden="true">{short}</span></button>)
+      : layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} data-guide-target={key === "acquisition" && guideAcquisition || undefined} aria-describedby={key === "acquisition" && guideAcquisition ? guide.textId : undefined} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{key === "observations" && constrained ? "Observations · ✕ infeasible" : label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : key === "candidates" ? "Cand." : "Acquisition"}</span></button>)}</div>
+    {unsupported && <div className="cmaes-constraint-notice" role="status">
+      <span>CMA-ES does not support constraints.</span>
+      <span className="cmaes-constraint-actions">
+        <button type="button" onClick={() => changeConstraint("none")}>Remove constraint</button>
+        <button type="button" onClick={() => changeSampler("tpe")}>Switch to TPE</button>
+      </span>
+    </div>}
     <div className="scene-stage">
-    <Play3DCanvas items={scene} floor={isTop ? emptyFloor : floor} viewBox={viewBox} clipRect={isTop ? topClip : undefined} />
-    <svg className={`scene-play-3d${isTop ? " is-top" : ""}${pannable ? " is-pannable" : ""}`} ref={sceneRef} viewBox={sceneBox} style={{ "--chart-zoom": chartZoom } as CSSProperties} role="group" aria-label={isTop ? "Interactive top-down objective and density contours" : "Interactive 3D landscape and KDE surfaces"} data-guide-target={showRotateGuide || undefined} aria-describedby={showRotateGuide ? `view-help ${guide.textId}` : "view-help"} tabIndex={0}
+    <Play3DCanvas items={scene} floor={isTop ? emptyFloor : floor} viewBox={viewBox} clipRect={isTop ? topClip : undefined} floorOutline={floorOutline} />
+    <svg className={`scene-play-3d${isTop ? " is-top" : ""}${pannable ? " is-pannable" : ""}`} ref={sceneRef} viewBox={sceneBox} style={{ "--chart-zoom": chartZoom } as CSSProperties} role="group" aria-label={isCmaEs ? `Interactive ${isTop ? "top-down" : "3D"} objective and CMA-ES view` : isTop ? "Interactive top-down objective and density contours" : "Interactive 3D landscape and KDE surfaces"} data-guide-target={showRotateGuide || undefined} aria-describedby={showRotateGuide ? `view-help ${guide.textId}` : "view-help"} tabIndex={0}
       onPointerDown={onScenePointerDown} onPointerMove={onScenePointerMove}
       onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={endDrag}
       onPointerLeave={(event) => {
@@ -677,7 +793,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
       }}
       onClick={(event) => { if (isTop && !topDidPan.current) inspectAt(event); }}
       onKeyDown={onSceneKeyDown}>
-      <title>{isTop ? "Objective and density contours viewed from above" : "Objective landscape, good and bad densities, and optional log density ratio"}</title>
+      <title>{isCmaEs ? "Objective, CMA-ES Gaussian distribution and mean path" : isTop ? "Objective and density contours viewed from above" : "Objective landscape, good and bad densities, and optional log density ratio"}</title>
       {isTop ? <>
         <defs><clipPath id={topClipId}><rect {...topClip} /></clipPath></defs>
         <g clipPath={`url(#${topClipId})`}>{markers}</g>
@@ -706,7 +822,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
         <g className="axes-play-3d" pointerEvents="none">
           {axes.map(({ end, label, value }) => <g key={label}><line x1={origin.x} y1={origin.y} x2={end.x} y2={end.y} /><text x={end.x} y={end.y - 12 * labelScale} textAnchor="middle">{label} · {value}</text></g>)}
           <line x1={origin.x} y1={origin.y} x2={heightEnd.x} y2={heightEnd.y} />
-          <text ref={heightLabelRef} x={heightEnd.x} y={heightEnd.y - 12 * labelScale} textAnchor={heightLabelAnchor}>Objective / Density · 1</text>
+          <text ref={heightLabelRef} x={heightEnd.x} y={heightEnd.y - 12 * labelScale} textAnchor={heightLabelAnchor}>{heightLabel}</text>
           <text x={originLabelX} y={origin.y + 24 * labelScale} textAnchor="middle">−5, −5 · 0</text>
         </g>
       </>}
@@ -727,7 +843,12 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     </div>
     <details className="scaling-play-3d"><summary aria-label="How to read this view">?</summary><div className="scaling-content">
       <h3>How to read this view</h3>
-      {isTop ? <>
+      {isCmaEs ? <>
+        <p>{isTop ? "Hover or tap the map to inspect coordinates, objective values, and log density when Distribution is visible." : "Drag or use arrow keys to rotate. Hover the bell to inspect relative density and log density."} Use + / − to zoom.</p>
+        <p>The green bell in 3D shows the current CMA-ES multivariate Gaussian N(m, σ²C), normalized to a peak of 1. The solid 1σ and dashed 2σ rings appear on the bell and on the floor. In Top view, stronger green shading marks higher density.</p>
+        <p>The Mean path traces how the distribution center m moved generation by generation (m₀ → m<sub>g</sub>). Each dot marks an earlier generation and the diamond marks the current mean. Focus it to inspect the generation and σ.</p>
+        <p>Green points mark the active generation, or the last finished generation until a new trial arrives. CMA-ES updates its mean and covariance after each population. The hollow marker is the next evaluation.</p>
+      </> : isTop ? <>
         <p>Hover or tap the map to inspect coordinates and values. Use + / − to zoom, then drag or use arrow keys to pan.</p>
         <p>Lines trace equal values of the objective and visible fitted layers. Stronger shading marks higher values within each fitted layer. When Acquisition has positive values, it highlights regions where ℓ(x) &gt; g(x).</p>
         <p>{constrained ? "The diamond marks the constrained optimum and the boundary outlines the feasible region. ✕ marks infeasible trials. KDEs appear after 2 observations if Good has trials or a prior." : "The diamond marks the optimum (estimated for Multimodal). KDEs appear after 2 observations."} The hollow marker is the next evaluation. {mode === "univariate" ? "When TPE proposes, axis ticks show per-coordinate candidates and dashed lines combine their winners." : "When TPE proposes, dots show sampled candidates and the ringed anchor marks the winner."}</p>
@@ -745,7 +866,10 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     {guide.active && (guide.active !== "rotate" || showRotateGuide) && <LabHintBubble textId={guide.textId} message={playGuides[guide.active].action} phase="action" placement="bottom" onDismiss={guide.dismiss} />}
     </div>
 
-    <ModelSettingsPanel experiment={{ page: "play-3d", preset: objectivePreset, mode, constraint: constraintPreset }} className="settings-play-3d" idSuffix="-play-3d" labelPrefix="Play 3D " defaultSettings={constrained ? constrainedModelDefaults : twoParamDefaultModelSettings} trialLimit={twoParamSettings.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} disableEi={constrained} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={() => { setSeed(Math.floor(Math.random() * 100)); restart(); }}
+    <h2 id="play-3d-heading" className="sr-only">Explore two dimensions</h2>
+    {isCmaEs ? <CmaEsSettingsPanel experiment={{ page: "play-3d", sampler, preset: objectivePreset, constraint: constraintPreset, cmaEsSettings }}
+      settings={cmaEsSettings} onChange={editCmaEsSettings} seed={seed} onNewSeed={newSeed} status={cmaEsStatus}>{experimentSettings}</CmaEsSettingsPanel>
+    : <ModelSettingsPanel experiment={{ page: "play-3d", preset: objectivePreset, mode, constraint: constraintPreset }} className="settings-play-3d" idSuffix="-play-3d" labelPrefix="Play 3D " defaultSettings={constrained ? constrainedModelDefaults : twoParamDefaultModelSettings} trialLimit={twoParamSettings.count} domainWidth={domainWidth} widths={goodWidths} settings={settings} disableEi={constrained} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={newSeed}
       status={<div className="proposal">
         <span>{!proposal ? "Search complete" : noFeasibleGood ? `Uniform random · trial ${step + 1}` : proposal.method === "random" ? `Random start · ${step + 1} / ${settings.startupTrials}` : `TPE · trial ${step + 1}`}</span>
         <Help label="Play 3D trial playback">
@@ -756,21 +880,14 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
         </Help>
         {constrained && <span> · {feasibleCount}</span>}
       </div>}>
-      <h2 id="play-3d-heading" className="sr-only">Explore two dimensions</h2>
-      <div className="scene-toolbar-group">
-        <div className="objective-picker parameter">
-          <div className="parameter-label"><label htmlFor="objective-preset-play-3d">Objective</label><Help label="Play 3D objective preset"><strong>{objectiveDefinition.label}</strong><br />{objectiveDefinition.description} Minimize over <HelpMath inline tex="[-5,5]^2" />:<HelpMath tex={objectiveDefinition.formula} />Changing it restarts the search.</Help></div><select id="objective-preset-play-3d" value={objectivePreset} onChange={(event) => { setObjectivePreset(event.target.value as TwoParamObjectivePreset); restart(); }}>{(Object.keys(twoParamObjectivePresets) as TwoParamObjectivePreset[]).map((preset) => <option key={preset} value={preset}>{twoParamObjectivePresets[preset].label}</option>)}</select>
-        </div>
-      </div>
-      <Play3DConstraintSettings preset={constraintPreset} infeasibleFilling={settings.infeasibleFilling ?? true} onPresetChange={changeConstraint}
-        onFillingChange={(infeasibleFilling) => editSettings({ ...settings, infeasibleFilling })} />
+      {experimentSettings}
       <div className="scene-toolbar-group">
         <div className="parameter density-picker"><div className="parameter-label"><label className="sr-only" htmlFor="density-mode">Density model</label><Help label="Play 3D density model"><strong>{mode === "multivariate" ? "Multivariate" : "Univariate"}</strong><br />Multivariate: kernels span both coordinates, keeping each (x₁, x₂) pair together. Univariate: each coordinate has its own KDE and candidate draw.</Help></div><select id="density-mode" value={mode} onChange={(event) => { cancelSeek(); setMode(event.target.value as DensityMode); setPlaying(false); setInspection(""); }}><option value="multivariate">Multivariate</option><option value="univariate">Univariate</option></select></div>
         </div>
-    </ModelSettingsPanel>
+    </ModelSettingsPanel>}
     <details className="performance-monitor" onToggle={(event) => setComparisonOpen(event.currentTarget.open)}>
       <summary><span className="performance-caption">Best f(x) <strong title={bestValue}>{bestValue}</strong></span><span>Performance <span aria-hidden="true">⌄</span></span></summary>
-      {comparisonOpen && <Play3DPerformance trials={playback.trials} proposals={playback.proposals} seed={seed} objectivePreset={objectivePreset} constraintPreset={constraintPreset} mode={mode} settings={settings} />}
+      {comparisonOpen && <Play3DPerformance trials={activePlayback.trials} proposals={activePlayback.proposals} seed={seed} objectivePreset={objectivePreset} constraintPreset={constraintPreset} mode={mode} settings={settings} sampler={sampler} cmaEsSettings={cmaEsSettings} />}
     </details>
   </section>;
 }
@@ -779,7 +896,7 @@ export function Play3DConstraintSettings({ preset, infeasibleFilling, onPresetCh
   preset: TwoParamConstraintPreset;
   infeasibleFilling: boolean;
   onPresetChange: (preset: TwoParamConstraintPreset) => void;
-  onFillingChange: (enabled: boolean) => void;
+  onFillingChange?: (enabled: boolean) => void;
 }) {
   const definition = getTwoParamConstraint(preset);
   return <>
@@ -794,7 +911,7 @@ export function Play3DConstraintSettings({ preset, infeasibleFilling, onPresetCh
         {Object.entries(twoParamConstraintPresets).map(([id, constraint]) => <option key={id} value={id}>{constraint.label}</option>)}
       </select>
     </div>
-    {preset !== "none" && <div className="parameter infeasible-filling">
+    {preset !== "none" && onFillingChange && <div className="parameter infeasible-filling">
       <label><input type="checkbox" checked={infeasibleFilling} onChange={(event) => onFillingChange(event.target.checked)} /> Infeasible filling</label>
       <Help label="infeasible filling">Good takes feasible trials first. With filling on, the least-violating infeasible trials, those closest to the feasible region, fill open slots. With filling off, Good can fall short of its target size.</Help>
     </div>}

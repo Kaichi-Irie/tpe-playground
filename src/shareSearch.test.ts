@@ -4,6 +4,7 @@ import { applyOptunaPreset, bandwidthRange, candidateCounts, gammaRange, priorWe
 import { objectivePresets, type ObjectivePreset } from "./objectives";
 import { defaults, prior, runSearch, searchDefaults, trialLimit } from "./oneParamTpe";
 import { twoParamDefaultModelSettings, emptyTwoParamPlayback, moveTwoParamPlayback, twoParamObjectivePresets, twoParamSettings, type TwoParamObjectivePreset } from "./twoParamTpe";
+import { optunaCmaEsPreset, twoParamCmaEsDefaults } from "./twoParamCmaEs";
 
 const pageUrl = "https://kaichi-irie.github.io/tpe-playground/?tracking=123#about";
 const legacyPlay2DUrl = "https://kaichi-irie.github.io/tpe-playground/#play-2d?seed=7&preset=boundary&gamma=0.15&bandwidth=0.73&bandwidthRule=scott&weights=ei&priorWeight=2&startupTrials=5&candidates=8";
@@ -15,6 +16,7 @@ const play2DDefaults: SharedSearch<ObjectivePreset> = {
 const play3DDefaults: SharedSearch<TwoParamObjectivePreset> = {
   seed: twoParamSettings.seed, preset: "multimodal", settings: { ...twoParamDefaultModelSettings, bandwidthRule: "constant" },
 };
+const legacySamplerDefaults = { sampler: "tpe", cmaEsSettings: twoParamCmaEsDefaults };
 
 function roundTripPlay2D(search: SharedSearch<ObjectivePreset>) {
   const url = createShareUrl(pageUrl, { page: "play-2d", preset: search.preset }, search.seed, search.settings);
@@ -26,6 +28,39 @@ function decodePlay3D(params: URLSearchParams | null) {
 }
 
 describe("share links", () => {
+  it("round-trips the CMA-ES Optuna preset", () => {
+    const experiment = { page: "play-3d", sampler: "cmaes", preset: "quadratic", constraint: "none", cmaEsSettings: optunaCmaEsPreset } as const;
+    const hash = new URL(createShareUrl(pageUrl, experiment, 7)).hash;
+    expect(hash).toBe("#play-3d?sampler=cmaes&seed=7&preset=quadratic&cmaes=optuna");
+    expect(decodePlay3D(readRoute(hash).share)).toEqual({
+      ...play3DDefaults, seed: 7, preset: "quadratic", mode: "multivariate", constraint: "none", sampler: "cmaes", cmaEsSettings: optunaCmaEsPreset,
+    });
+  });
+
+  it("round-trips custom CMA-ES settings and a constraint without TPE parameters", () => {
+    const cmaEsSettings = { sigma0: 2.31, populationSize: 24, x0: { x1: -4.5, x2: 5 } };
+    const experiment = { page: "play-3d", sampler: "cmaes", preset: "rosenbrock", constraint: "disk", cmaEsSettings } as const;
+    const hash = new URL(createShareUrl(pageUrl, experiment, 25, play3DDefaults.settings)).hash;
+    expect(hash).toBe("#play-3d?sampler=cmaes&seed=25&preset=rosenbrock&sigma0=2.31&popsize=24&x0x1=-4.5&x0x2=5&constraint=disk");
+    expect(decodePlay3D(readRoute(hash).share)).toMatchObject({ seed: 25, preset: "rosenbrock", constraint: "disk", sampler: "cmaes", cmaEsSettings });
+    expect(decodePlay3D(new URLSearchParams("sampler=cmaes&constraint=circle")).constraint).toBe("disk");
+  });
+
+  it.each([
+    "sigma0=0&popsize=25&x0x1=-5.5&x0x2=5.5",
+    "sigma0=1.001&popsize=5.5&x0x1=-0.1&x0x2=0.01",
+    "sigma0=1e0&popsize=0x08&x0x1=Infinity&x0x2=%204",
+  ])("rejects invalid CMA-ES settings in %s", (query) => {
+    expect(decodePlay3D(new URLSearchParams(`sampler=cmaes&${query}`)).cmaEsSettings).toEqual(twoParamCmaEsDefaults);
+  });
+
+  it("keeps valid CMA-ES fields when another is invalid and ignores CMA-ES parameters on TPE links", () => {
+    const settings = "sigma0=0.1&popsize=bad&x0x1=-5&x0x2=0.5";
+    expect(decodePlay3D(new URLSearchParams(`sampler=cmaes&${settings}`)).cmaEsSettings)
+      .toEqual({ sigma0: 0.1, populationSize: 6, x0: { x1: -5, x2: 0.5 } });
+    expect(decodePlay3D(new URLSearchParams(`sampler=unknown&${settings}`))).toMatchObject(legacySamplerDefaults);
+  });
+
   it("reads existing Play 2D links with every linked setting", () => {
     const route = readRoute(new URL(legacyPlay2DUrl).hash);
     expect(route.page).toBe("play-2d");
@@ -42,7 +77,7 @@ describe("share links", () => {
     const route = readRoute(new URL(legacyPlay3DUrl).hash);
     expect(route.page).toBe("play-3d");
     expect(decodePlay3D(route.share)).toStrictEqual({
-      seed: 99, preset: "rosenbrock", mode: "univariate", constraint: "none",
+      ...legacySamplerDefaults, seed: 99, preset: "rosenbrock", mode: "univariate", constraint: "none",
       settings: {
         gamma: 0.35, bandwidth: 0.82, bandwidthRule: "optuna", weights: "ei",
         priorWeight: 0.5, startupTrials: 20, candidates: 64,
@@ -54,7 +89,7 @@ describe("share links", () => {
     const route = readRoute(new URL(legacyConstrainedPlay3DUrl).hash);
     expect(route.page).toBe("play-3d");
     expect(decodePlay3D(route.share)).toStrictEqual({
-      seed: 17, preset: "quadratic", mode: "multivariate", constraint: "band",
+      ...legacySamplerDefaults, seed: 17, preset: "quadratic", mode: "multivariate", constraint: "band",
       settings: {
         gamma: 0.3, bandwidth: 0.55, bandwidthRule: "constant", weights: "recency",
         priorWeight: 0, startupTrials: 2, candidates: 4, infeasibleFilling: false,
@@ -111,6 +146,7 @@ describe("share links", () => {
     expect(url.hash).toMatch(/^#play-3d\?seed=/);
     expect(route.share?.has("v")).toBe(false);
     expect(route.page).toBe("play-3d");
+    expect(route.share?.has("sampler")).toBe(false);
     expect(decodePlay3D(route.share).mode).toBe("univariate");
     expect(route.share?.get("seed")).toBe("99");
     expect(route.share?.get("preset")).toBe("rosenbrock");
@@ -131,7 +167,7 @@ describe("share links", () => {
   });
 
   it("decodes Play 3D defaults and falls back to an unconstrained search", () => {
-    const unconstrained = { ...play3DDefaults, mode: "multivariate", constraint: "none" };
+    const unconstrained = { ...play3DDefaults, ...legacySamplerDefaults, mode: "multivariate", constraint: "none" };
     expect(decodePlay3D(null)).toStrictEqual(unconstrained);
     for (const query of ["infeasibleFilling=false", "constraint=none", "constraint=unknown", "constraint=__proto__"]) {
       expect(decodePlay3D(new URLSearchParams(query))).toStrictEqual(unconstrained);
@@ -144,18 +180,18 @@ describe("share links", () => {
   it("decodes the constraint and infeasible filling for a constrained Play 3D search", () => {
     for (const query of ["constraint=disk", "constraint=disk&infeasibleFilling=true", "constraint=disk&infeasibleFilling=invalid"]) {
       expect(decodePlay3D(new URLSearchParams(query))).toEqual({
-        ...play3DDefaults, mode: "multivariate", constraint: "disk", settings: { ...play3DDefaults.settings, infeasibleFilling: true },
+        ...play3DDefaults, ...legacySamplerDefaults, mode: "multivariate", constraint: "disk", settings: { ...play3DDefaults.settings, infeasibleFilling: true },
       });
     }
     expect(decodePlay3D(new URLSearchParams("constraint=disk&infeasibleFilling=false&weights=ei"))).toEqual({
-      ...play3DDefaults, mode: "multivariate", constraint: "disk", settings: { ...play3DDefaults.settings, weights: "uniform", infeasibleFilling: false },
+      ...play3DDefaults, ...legacySamplerDefaults, mode: "multivariate", constraint: "disk", settings: { ...play3DDefaults.settings, weights: "uniform", infeasibleFilling: false },
     });
   });
 
   it("round-trips explorer defaults, preset IDs, and every model control value", () => {
     expect(roundTripPlay2D(play2DDefaults)).toEqual(play2DDefaults);
     const url = new URL(createShareUrl(pageUrl, { page: "play-3d", preset: play3DDefaults.preset, mode: "multivariate", constraint: "none" }, play3DDefaults.seed, play3DDefaults.settings));
-    expect(decodePlay3D(readRoute(url.hash).share)).toEqual({ ...play3DDefaults, mode: "multivariate", constraint: "none" });
+    expect(decodePlay3D(readRoute(url.hash).share)).toEqual({ ...play3DDefaults, ...legacySamplerDefaults, mode: "multivariate", constraint: "none" });
     for (const preset of ["multimodal", "quadratic", "narrow", "boundary"] as const) {
       expect(roundTripPlay2D({ ...play2DDefaults, preset }).preset).toBe(preset);
     }
@@ -186,7 +222,7 @@ describe("share links", () => {
     });
     const params = readRoute("#play-3d?seed=100&preset=boundary&gamma=Infinity&bandwidth=0&priorWeight=2&startupTrials=2").share;
     expect(decodePlay3D(params)).toEqual({
-      ...play3DDefaults, mode: "multivariate", constraint: "none", settings: { ...play3DDefaults.settings, priorWeight: 2, startupTrials: 2 },
+      ...play3DDefaults, ...legacySamplerDefaults, mode: "multivariate", constraint: "none", settings: { ...play3DDefaults.settings, priorWeight: 2, startupTrials: 2 },
     });
   });
 
@@ -217,7 +253,7 @@ describe("share links", () => {
     const shared = decodePlay3D(route.share);
 
     expect(route.page).toBe("play-3d");
-    expect(shared).toEqual({ seed, preset: objectivePreset, settings, mode, constraint: constraintPreset });
+    expect(shared).toEqual({ ...legacySamplerDefaults, seed, preset: objectivePreset, settings, mode, constraint: constraintPreset });
     expect(moveTwoParamPlayback(emptyTwoParamPlayback(), 12, shared.seed, shared.mode, {
       ...shared.settings, objectivePreset: shared.preset, constraintPreset: shared.constraint,
     })).toEqual(moveTwoParamPlayback(emptyTwoParamPlayback(), 12, seed, mode, { ...settings, objectivePreset, constraintPreset }));
@@ -232,7 +268,7 @@ describe("Optuna share alias", () => {
       startupTrials: 10, candidates: 24, infeasibleFilling: true,
     };
     expect(decodePlay3D(params)).toEqual({
-      seed: 17, preset: "quadratic", mode: "univariate", constraint: "band",
+      ...legacySamplerDefaults, seed: 17, preset: "quadratic", mode: "univariate", constraint: "band",
       settings: { ...preset, bandwidth: play3DDefaults.settings.bandwidth },
     });
     expect(readSharedSearch(params, play2DDefaults, objectivePresets, trialLimit, 10)).toEqual({
@@ -243,7 +279,7 @@ describe("Optuna share alias", () => {
   it("ignores unknown aliases and accepts the standalone Optuna bandwidth rule and weights", () => {
     const params = new URLSearchParams("mode=univariate&tpe=unknown&gamma=0.35&bandwidthRule=optuna&weights=optuna");
     expect(decodePlay3D(params)).toEqual({
-      ...play3DDefaults, mode: "univariate", constraint: "none",
+      ...play3DDefaults, ...legacySamplerDefaults, mode: "univariate", constraint: "none",
       settings: { ...play3DDefaults.settings, gamma: 0.35, bandwidthRule: "optuna", weights: "optuna" },
     });
   });
