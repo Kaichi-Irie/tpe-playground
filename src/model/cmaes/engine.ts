@@ -1,4 +1,6 @@
 import { randomSample, validateRandomSeed } from "../numpyRandom";
+import { dataKey, freezeData, historyKeyFor } from "../provenance";
+import { inParameterRange, isBoxPoint, validateObservations, validateProblem } from "../validation";
 import type { Observation, Parameter, Point, Problem } from "../types";
 import { applyInvSqrtCovariance, applySqrtCovariance, buildCovarianceEllipse, decomposeSymmetric2x2 } from "./eigen";
 import type { CmaEsConfig, CmaEsProposalTrace, CmaEsSnapshot, Matrix2x2, ResolvedCmaEsConfig, Vector2 } from "./types";
@@ -18,14 +20,9 @@ export function defaultCmaEsSigma0(problem: Problem): number {
   return Math.max(Number.MIN_VALUE, span / 6);
 }
 
-function validateProblem(problem: Problem): asserts problem is Problem & { parameters: Axes } {
+function validateCmaEsProblem(problem: Problem): asserts problem is Problem & { parameters: Axes } {
   if (problem.parameters.length !== dimension) throw new Error("CMA-ES requires exactly two parameters.");
-  const [first, second] = problem.parameters;
-  if (first.id === second.id || problem.parameters.some(({ id, low, high }) =>
-    typeof id !== "string" || !id || !Number.isFinite(low) || !Number.isFinite(high)
-    || low >= high || !Number.isFinite(high - low))) {
-    throw new Error("Invalid CMA-ES search space.");
-  }
+  validateProblem(problem, "Invalid CMA-ES search space.");
   if (problem.directions.length !== 1 || !["minimize", "maximize"].includes(problem.directions[0])) {
     throw new Error("CMA-ES requires one minimize or maximize objective.");
   }
@@ -39,15 +36,6 @@ function toVector(point: Point, [x, y]: Axes): Vector2 {
 
 function toPoint([x, y]: Vector2, [first, second]: Axes): Point {
   return { [first.id]: x, [second.id]: y };
-}
-
-function inRange(value: number, { low, high }: Parameter): boolean {
-  return Number.isFinite(value) && value >= low && value <= high;
-}
-
-function isBoxPoint(point: Point, axes: Axes): boolean {
-  return Object.keys(point).length === dimension
-    && axes.every((axis) => Object.hasOwn(point, axis.id) && inRange(point[axis.id], axis));
 }
 
 function clampToBox([x, y]: Vector2, [first, second]: Axes): Vector2 {
@@ -75,43 +63,16 @@ function resolveConfig(problem: Problem, axes: Axes, config: CmaEsConfig): Resol
 }
 
 export function resolveCmaEsConfig(problem: Problem, config: CmaEsConfig = {}): ResolvedCmaEsConfig {
-  validateProblem(problem);
+  validateCmaEsProblem(problem);
   return resolveConfig(problem, problem.parameters, config);
 }
 
 function validateCmaEsInput(problem: Problem, observations: readonly Observation[], config: CmaEsConfig) {
-  validateProblem(problem);
+  validateCmaEsProblem(problem);
   const axes = problem.parameters;
   const resolved = resolveConfig(problem, axes, config);
-  const ids = new Set<number>();
-  for (const { id, params, objectives, constraints } of observations) {
-    if (!Number.isInteger(id) || id < 0 || ids.has(id) || objectives.length !== 1
-      || !Number.isFinite(objectives[0]) || constraints.length !== 0 || !isBoxPoint(params, axes)) {
-      throw new Error("Invalid CMA-ES observations.");
-    }
-    ids.add(id);
-  }
+  validateObservations(problem, observations, { message: "Invalid CMA-ES observations." });
   return { axes, resolved };
-}
-
-function freezeData<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.values(value).forEach(freezeData);
-    Object.freeze(value);
-  }
-  return value;
-}
-
-// Provenance key for serialized model inputs, matching the TPE key format.
-function dataKey(value: unknown): string {
-  const text = JSON.stringify(value);
-  let a = 2166136261;
-  let b = 5381;
-  for (let i = 0; i < text.length; i++) {
-    a = Math.imul(a ^ text.charCodeAt(i), 16777619);
-    b = Math.imul(b, 33) ^ text.charCodeAt(i);
-  }
-  return `${(a >>> 0).toString(16)}-${(b >>> 0).toString(16)}`;
 }
 
 function strategyParameters(populationSize: number) {
@@ -249,7 +210,7 @@ function modelRuntime(snapshot: CmaEsSnapshot): FittedCmaEsModel {
         const angle = 2 * Math.PI * u2;
         const [dx, dy] = applySqrtCovariance(ellipse, [radius * Math.cos(angle), radius * Math.sin(angle)]);
         candidate = [addScaledStep(mx, sigma, dx), addScaledStep(my, sigma, dy)];
-        if (inRange(candidate[0], axes[0]) && inRange(candidate[1], axes[1])) break;
+        if (inParameterRange(candidate[0], axes[0]) && inParameterRange(candidate[1], axes[1])) break;
         clamped = attempt === maxResampleAttempts;
       }
       return freezeData({
@@ -284,8 +245,7 @@ export function fitCmaEs(problem: Problem, observations: readonly Observation[],
     meanPath.push(toPoint(state.mean, axes));
   }
   const inputTrialIds = observations.map(({ id }) => id);
-  const historyKey = dataKey(observations.map(({ id, params, objectives, constraints }) =>
-    [id, toVector(params, axes), objectives, constraints]));
+  const historyKey = historyKeyFor(problem, observations);
   const generationStart = generation * populationSize;
   const { mean, sigma, covariance, pc, ps } = state;
   return modelRuntime(freezeData({

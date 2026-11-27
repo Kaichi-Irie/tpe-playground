@@ -1,4 +1,4 @@
-import { trialLimit, type Trial } from "./oneParamTpe";
+import { trialLimit, type Trial } from "./oneParamProblem";
 import type { ProposalTrace } from "./model/tpe/types";
 
 export function currentRunLabel(proposals: readonly { trace: ProposalTrace }[], randomOnly: boolean, currentFilling?: boolean): string {

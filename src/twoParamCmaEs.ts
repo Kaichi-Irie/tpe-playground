@@ -1,7 +1,7 @@
 import { defaultCmaEsPopulationSize, defaultCmaEsSigma0, fitCmaEs, proposeCmaEs } from "./model/cmaes/engine";
 import type { CmaEsProposalTrace } from "./model/cmaes/types";
 import { advanceHistory } from "./model/history";
-import { getTwoParamObjective, twoParamObservations, twoParamProblem, twoParamSettings, type TwoParamObjectivePreset, type TwoParamTrial } from "./twoParamTpe";
+import { getTwoParamObjective, twoParamObservations, twoParamProblem, twoParamDefaultSeed, twoParamTrialLimit, type TwoParamObjectivePreset, type TwoParamTrial } from "./twoParamProblem";
 
 export type TwoParamSampler = "tpe" | "cmaes";
 
@@ -61,12 +61,12 @@ export function buildTwoParamCmaEsView(
 export function moveTwoParamCmaEsPlayback(
   state: TwoParamCmaEsPlayback,
   next: number,
-  seed = twoParamSettings.seed,
+  seed = twoParamDefaultSeed,
   settings: TwoParamCmaEsSettings = twoParamCmaEsDefaults,
   objectivePreset?: TwoParamObjectivePreset,
 ): TwoParamCmaEsPlayback {
   const objective = getTwoParamObjective(objectivePreset);
-  const { trials, proposals } = advanceHistory(state.trials, state.proposals, next, twoParamSettings.count,
+  const { trials, proposals } = advanceHistory(state.trials, state.proposals, next, twoParamTrialLimit,
     (past): TwoParamCmaEsProposal => {
       const trace = proposeCmaEs(twoParamProblem, twoParamObservations(past), settings, seed);
       return { method: trace.method, x1: trace.selected.x1, x2: trace.selected.x2, trace };
