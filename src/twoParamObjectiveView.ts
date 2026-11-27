@@ -1,6 +1,6 @@
 import { getTwoParamConstraint, violation, type TwoParamConstraintPreset } from "./twoParamConstraints";
 import { objectiveContours, type ContourPoint, type ContourSegment } from "./contours";
-import { findTwoParamObjectiveOptimum, getTwoParamObjective, type TwoParamObjectivePreset } from "./twoParamTpe";
+import { findTwoParamObjectiveOptimum, getTwoParamObjective, type TwoParamObjectivePreset } from "./twoParamProblem";
 
 export type ObjectiveHeightScale = "linear" | "log";
 

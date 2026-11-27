@@ -2,13 +2,11 @@ import { validateBandwidthRule, type BandwidthRule } from "./model/tpe/bandwidth
 import { fitTpe, proposeTpe } from "./model/tpe/engine";
 import { rankSplit, validateWeightStrategy } from "./model/tpe/partition";
 import { evaluateField } from "./model/tpe/visualization";
-import type { Observation, Problem } from "./model/types";
 import type { ProposalTrace, TpeConfig, WeightStrategy } from "./model/tpe/types";
 import { getObjective, type ObjectivePreset } from "./objectives";
+import { domain, oneParamObservations, oneParamProblem, trialLimit, type Trial } from "./oneParamProblem";
 
-export interface Trial { id: number; x: number; y: number }
-export const trialLimit = 200;
-export const domain = [-5, 5] as const;
+export { domain, oneParamObservations, oneParamProblem, trialLimit, type Trial } from "./oneParamProblem";
 export type { WeightStrategy } from "./model/tpe/types";
 interface ModelConfig { bandwidthRule?: BandwidthRule; bandwidth: number; gamma: number; weights?: WeightStrategy }
 export const defaults = { bandwidthRule: "constant" as BandwidthRule, bandwidth: 0.4, gamma: 0.2, weights: "uniform" as WeightStrategy };
@@ -31,8 +29,6 @@ function validatePriorWeight(weight: number): void {
   if (!Number.isFinite(weight) || weight < 0) throw new Error("Prior weight must be finite and nonnegative.");
 }
 
-const oneParamProblem: Problem = { id: "multimodal", parameters: [{ id: "x", low: -5, high: 5 }], directions: ["minimize"], constraintCount: 0 };
-const oneParamObservations = (trials: readonly Trial[]): Observation[] => trials.map((t) => ({ id: t.id, params: { x: t.x }, objectives: [t.y], constraints: [] }));
 const oneParamConfig = (config: SearchConfig, priorWeight: number): TpeConfig => ({ mode: "univariate", bandwidth: config.bandwidth, bandwidthRule: config.bandwidthRule ?? "constant", gamma: config.gamma, weights: config.weights ?? "uniform", priorWeight, startupTrials: config.startupTrials ?? searchDefaults.startupTrials, candidates: config.candidates ?? searchDefaults.candidates });
 
 export function fitOneParamModel(trials: readonly Trial[], priorWeight = 0, config: SearchConfig = defaults) {

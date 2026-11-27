@@ -1,4 +1,4 @@
-import type { TwoParamObjectivePreset } from "./twoParamTpe";
+import type { TwoParamObjectivePreset } from "./twoParamProblem";
 
 type Coordinate = readonly [x1: number, x2: number];
 type Constraint = (x1: number, x2: number) => number;
