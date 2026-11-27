@@ -1,4 +1,4 @@
-import { twoParamConstraintPresets, getTwoParamConstraint, type TwoParamConstraintPreset } from "./twoParamConstraints";
+import type { TwoParamConstraintPreset } from "./twoParamConstraints";
 import { prepareTwoParamSurface, projectTwoParamSurface } from "./projectTwoParamSurface";
 import { measurePlay3D } from "./play3dProfiling";
 import { seekTwoParamPlayback } from "./seekTwoParamPlayback";
@@ -20,162 +20,36 @@ import { HelpMath } from "./HelpMath";
 import { constrainSettings } from "./searchSettings";
 import { readPlay3DSharedSearch, type SharedSearch } from "./shareSearch";
 import { useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent } from "react";
-import { buildTwoParamView, twoParamDefaultModelSettings, getTwoParamObjective, twoParamObjectivePresets, emptyTwoParamPlayback, moveTwoParamPlayback, proposeTwoParamTrial, twoParamProposalFromTrace, twoParamSettings, type DensityMode, type TwoParamObjectivePreset, type TwoParamModelSettings, type TwoParamPlayback, type TwoParamProposal } from "./twoParamTpe";
+import { buildTwoParamView, twoParamDefaultModelSettings, getTwoParamObjective, twoParamObjectivePresets, emptyTwoParamPlayback, moveTwoParamPlayback, proposeTwoParamTrial, twoParamProposalFromTrace, twoParamSettings, type DensityMode, type TwoParamObjectivePreset, type TwoParamModelSettings, type TwoParamPlayback } from "./twoParamTpe";
 import { getSampler, samplersForPage } from "./samplers";
 import { buildTwoParamCmaEsView, emptyTwoParamCmaEsPlayback, moveTwoParamCmaEsPlayback, type TwoParamCmaEsSettings, type TwoParamSampler } from "./twoParamCmaEs";
 import { buildCmaEsBell, buildCmaEsScene } from "./play3dCmaEsScene";
+import { buildPlay3DCandidateScene } from "./play3dTpeScene";
+import { Play3DConstraintSettings } from "./Play3DConstraintSettings";
+import { PlotLegend, type PlotLayerItem } from "./PlotLegend";
+
+export { buildPlay3DCandidateScene, type Play3DCandidateInspectorEntry } from "./play3dTpeScene";
+export { Play3DConstraintSettings } from "./Play3DConstraintSettings";
 
 type Surface = "objective" | "good" | "bad" | "acquisition";
 type Layer = Surface | "observations" | "candidates";
-const layers: { key: Layer; label: string }[] = [
-  { key: "objective", label: "Objective contours" }, { key: "good", label: "Good KDE ℓ(x)" },
-  { key: "bad", label: "Bad KDE g(x)" }, { key: "observations", label: "Observations" },
-  { key: "candidates", label: "Candidates" }, { key: "acquisition", label: "Acquisition" },
-];
-const cmaEsLayers = [
+const layers: readonly PlotLayerItem<Layer>[] = [
   { key: "objective", label: "Objective contours", short: "f(x)" },
-  { key: "ellipse", label: "Distribution (1σ/2σ)", short: "Gauss" },
+  { key: "good", label: "Good KDE ℓ(x)", short: "Good" },
+  { key: "bad", label: "Bad KDE g(x)", short: "Bad" },
+  { key: "observations", label: "Observations", short: "Points" },
+  { key: "candidates", label: "Candidates", short: "Cand." },
+  { key: "acquisition", label: "Acquisition", short: "Acquisition" },
+];
+const cmaEsLayers = ([
+  { key: "objective", label: "Objective contours", short: "f(x)" },
+  { key: "ellipse", label: "Distribution (1σ/2σ)", short: "Gauss", title: "Current CMA-ES Gaussian distribution with 1σ and 2σ contours" },
   { key: "generation", label: "Generation", short: "Gen" },
   { key: "meanPath", label: "Mean path", short: "Mean" },
   { key: "observations", label: "Observations", short: "Points" },
-] as const;
+] as const satisfies readonly PlotLayerItem[]).map((item) => ({ ...item, ariaLabel: item.label }));
 const densityLayers = ["good", "bad", "acquisition"] as const;
-const axisCandidateTickLength = 0.38;
-const guideSegmentCount = 16;
 
-export interface Play3DCandidateInspectorEntry {
-  id: string;
-  label: string;
-  x: number;
-  y: number;
-  selected: boolean;
-}
-
-export function buildPlay3DCandidateScene(
-  proposal: TwoParamProposal | null,
-  visible: boolean,
-  project: (x: number, y: number, height: number) => { x: number; y: number; depth: number },
-  onInspect: (label: string) => void,
-  options: { tickDirection?: -1 | 1; includeFloorAnchor?: boolean } = {},
-): {
-  items: Play3DSceneItem[];
-  hitTargets: Play3DSceneItem[];
-  inspectorEntries: Play3DCandidateInspectorEntry[];
-  defaultInspectorIndex: number;
-} {
-  if (!visible || !proposal) return { items: [], hitTargets: [], inspectorEntries: [], defaultInspectorIndex: 0 };
-  const tickOffset = (options.tickDirection ?? -1) * axisCandidateTickLength;
-  const includeFloorAnchor = options.includeFloorAnchor ?? true;
-  const items: Play3DSceneItem[] = [];
-  const hitTargets: Play3DSceneItem[] = [];
-  const inspectorEntries: Play3DCandidateInspectorEntry[] = [];
-  if (proposal.candidates.length > 0) {
-    proposal.candidates.forEach((candidate, index) => {
-      const selected = index === proposal.selectedCandidateIndex;
-      const p = project(candidate.x1, candidate.x2, 0);
-      const label = `${selected ? "Selected candidate" : "Candidate"} ${index + 1} · x₁ = ${candidate.x1.toFixed(2)}, x₂ = ${candidate.x2.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
-      const item: Play3DSceneItem = {
-        id: `candidate-${index}`,
-        kind: "candidate",
-        depth: p.depth + (selected ? 0.028 : 0.02),
-        x: p.x,
-        y: p.y,
-        selected,
-        inspect: () => onInspect(label),
-      };
-      items.push(item);
-      hitTargets.push(item);
-      inspectorEntries.push({ id: item.id, label, x: p.x, y: p.y, selected });
-    });
-    hitTargets.sort((a, b) => a.depth - b.depth);
-    return { items, hitTargets, inspectorEntries, defaultInspectorIndex: proposal.selectedCandidateIndex ?? 0 };
-  }
-  if (proposal.axisCandidates) {
-    const { x1, x2, selectedX1Index, selectedX2Index } = proposal.axisCandidates;
-    const combinedFloor = project(proposal.x1, proposal.x2, 0);
-    const x1Selected = x1[selectedX1Index];
-    const x2Selected = x2[selectedX2Index];
-    if (x1Selected && x2Selected) {
-      inspectorEntries.push({
-        id: "candidate-winners",
-        label: `Selected candidates · x₁ #${selectedX1Index + 1} = ${x1Selected.value.toFixed(2)} (log ℓ/g = ${x1Selected.logRatio.toFixed(3)}) · x₂ #${selectedX2Index + 1} = ${x2Selected.value.toFixed(2)} (log ℓ/g = ${x2Selected.logRatio.toFixed(3)})`,
-        x: combinedFloor.x,
-        y: combinedFloor.y,
-        selected: true,
-      });
-    }
-    x1.forEach((candidate, index) => {
-      const selected = index === selectedX1Index;
-      const start = project(candidate.value, -5, 0);
-      const end = project(candidate.value, -5 + tickOffset, 0);
-      const label = `${selected ? "Selected x₁ candidate" : "x₁ candidate"} ${index + 1} · x₁ = ${candidate.value.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
-      const item: Play3DSceneItem = {
-        id: `candidate-x1-${index}`,
-        kind: "axis-candidate",
-        depth: selected ? start.depth + 0.028 : (start.depth + end.depth) / 2 + 0.02,
-        points: [start.x, start.y, end.x, end.y],
-        x: start.x,
-        y: start.y,
-        selected,
-        inspect: () => onInspect(label),
-      };
-      items.push(item);
-      hitTargets.push(item);
-      inspectorEntries.push({ id: item.id, label, x: start.x, y: start.y, selected });
-    });
-    x2.forEach((candidate, index) => {
-      const selected = index === selectedX2Index;
-      const start = project(-5, candidate.value, 0);
-      const end = project(-5 + tickOffset, candidate.value, 0);
-      const label = `${selected ? "Selected x₂ candidate" : "x₂ candidate"} ${index + 1} · x₂ = ${candidate.value.toFixed(2)} · log ℓ/g = ${candidate.logRatio.toFixed(3)}`;
-      const item: Play3DSceneItem = {
-        id: `candidate-x2-${index}`,
-        kind: "axis-candidate",
-        depth: selected ? start.depth + 0.028 : (start.depth + end.depth) / 2 + 0.02,
-        points: [start.x, start.y, end.x, end.y],
-        x: start.x,
-        y: start.y,
-        selected,
-        inspect: () => onInspect(label),
-      };
-      items.push(item);
-      hitTargets.push(item);
-      inspectorEntries.push({ id: item.id, label, x: start.x, y: start.y, selected });
-    });
-    const addSubdividedGuide = (prefix: string, startX1: number, startX2: number, endX1: number, endX2: number) => {
-      let prev = project(startX1, startX2, 0);
-      let dashOffset = 0;
-      for (let i = 1; i <= guideSegmentCount; i++) {
-        const next = i === guideSegmentCount
-          ? project(endX1, endX2, 0)
-          : project(startX1 + (endX1 - startX1) * (i / guideSegmentCount), startX2 + (endX2 - startX2) * (i / guideSegmentCount), 0);
-        items.push({
-          id: `${prefix}-${i}`,
-          kind: "guide",
-          depth: (prev.depth + next.depth) / 2 + 0.018,
-          points: [prev.x, prev.y, next.x, next.y],
-          dashOffset,
-        });
-        dashOffset += Math.hypot(next.x - prev.x, next.y - prev.y);
-        prev = next;
-      }
-    };
-    addSubdividedGuide("candidate-guide-x1", proposal.x1, -5, proposal.x1, proposal.x2);
-    addSubdividedGuide("candidate-guide-x2", -5, proposal.x2, proposal.x1, proposal.x2);
-    if (includeFloorAnchor) {
-      items.push({
-        id: "candidate-floor-anchor",
-        kind: "floor-anchor",
-        depth: combinedFloor.depth + 0.028,
-        x: combinedFloor.x,
-        y: combinedFloor.y,
-      });
-    }
-    hitTargets.sort((a, b) => a.depth - b.depth);
-    return { items, hitTargets, inspectorEntries, defaultInspectorIndex: 0 };
-  }
-  return { items: [], hitTargets: [], inspectorEntries: [], defaultInspectorIndex: 0 };
-}
 const initialView = { yaw: -0.65, pitch: 0.5, zoom: 1 };
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
@@ -771,10 +645,16 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
       {samplersForPage("play-3d").map(({ id, label }) => <button key={id} type="button" aria-pressed={sampler === id} onClick={() => changeSampler(id)}>{label}</button>)}
     </div>
     </div>
-    <div className={`legend${isCmaEs ? " cmaes-legend" : ""}`} aria-label="Play 3D plot layers">{isCmaEs
-      ? cmaEsLayers.map(({ key, label, short }) => <button key={key} type="button" className={`layer ${key}`} title={key === "ellipse" ? "Current CMA-ES Gaussian distribution with 1σ and 2σ contours" : undefined} aria-label={label} aria-pressed={cmaEsVisible[key]}
-        onClick={() => { setCmaEsVisible((current) => ({ ...current, [key]: !current[key] })); setInspection(""); }}><span className="swatch" /><span className="layer-label">{label}</span><span className="layer-short" aria-hidden="true">{short}</span></button>)
-      : layers.map(({ key, label }) => <button key={key} className={`layer ${key}`} aria-pressed={visible[key]} data-guide-target={key === "acquisition" && guideAcquisition || undefined} aria-describedby={key === "acquisition" && guideAcquisition ? guide.textId : undefined} onClick={() => setVisible((v) => ({ ...v, [key]: !v[key] }))}><span className="swatch" /><span className="layer-label">{key === "observations" && constrained ? "Observations · ✕ infeasible" : label}</span><span className="layer-short" aria-hidden="true">{key === "objective" ? "f(x)" : key === "good" ? "Good" : key === "bad" ? "Bad" : key === "observations" ? "Points" : key === "candidates" ? "Cand." : "Acquisition"}</span></button>)}</div>
+    {isCmaEs
+      ? <PlotLegend ariaLabel="Play 3D plot layers" className="cmaes-legend" items={cmaEsLayers} visible={cmaEsVisible}
+        onToggle={(key) => { setCmaEsVisible((current) => ({ ...current, [key]: !current[key] })); setInspection(""); }} />
+      : <PlotLegend ariaLabel="Play 3D plot layers" visible={visible}
+        items={layers.map((item) => {
+          if (item.key === "observations" && constrained) return { ...item, label: "Observations · ✕ infeasible" };
+          if (item.key === "acquisition" && guideAcquisition) return { ...item, guideTarget: true, describedBy: guide.textId };
+          return item;
+        })}
+        onToggle={(key) => setVisible((current) => ({ ...current, [key]: !current[key] }))} />}
     {unsupported && <div className="cmaes-constraint-notice" role="status">
       <span>{samplerDef.label} does not support constraints.</span>
       <span className="cmaes-constraint-actions">
@@ -891,30 +771,4 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
       {comparisonOpen && <Play3DPerformance trials={activePlayback.trials} proposals={activePlayback.proposals} seed={seed} objectivePreset={objectivePreset} constraintPreset={constraintPreset} mode={mode} settings={settings} sampler={sampler} cmaEsSettings={cmaEsSettings} />}
     </details>
   </section>;
-}
-
-export function Play3DConstraintSettings({ preset, infeasibleFilling, onPresetChange, onFillingChange }: {
-  preset: TwoParamConstraintPreset;
-  infeasibleFilling: boolean;
-  onPresetChange: (preset: TwoParamConstraintPreset) => void;
-  onFillingChange?: (enabled: boolean) => void;
-}) {
-  const definition = getTwoParamConstraint(preset);
-  return <>
-    <div className="parameter constraint-picker">
-      <div className="parameter-label"><label htmlFor="constraint-preset-play-3d">Constraint</label>
-        <Help label="Play 3D constraint preset"><strong>{definition.label}</strong><br />
-          {definition.description}{definition.formula && <> Feasible when:<HelpMath tex={definition.formula} /></>}{preset === "none" && <br />}
-          {preset !== "none" && <>About {definition.feasibleShare} of the domain is feasible. </>}Changing the constraint restarts the search.
-        </Help>
-      </div>
-      <select id="constraint-preset-play-3d" value={preset} onChange={(event) => onPresetChange(event.target.value as TwoParamConstraintPreset)}>
-        {Object.entries(twoParamConstraintPresets).map(([id, constraint]) => <option key={id} value={id}>{constraint.label}</option>)}
-      </select>
-    </div>
-    {preset !== "none" && onFillingChange && <div className="parameter infeasible-filling">
-      <label><input type="checkbox" checked={infeasibleFilling} onChange={(event) => onFillingChange(event.target.checked)} /> Infeasible filling</label>
-      <Help label="infeasible filling">Good takes feasible trials first. With filling on, the least-violating infeasible trials, those closest to the feasible region, fill open slots. With filling off, Good can fall short of its target size.</Help>
-    </div>}
-  </>;
 }
