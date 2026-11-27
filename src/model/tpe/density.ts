@@ -1,5 +1,6 @@
-import type { DensitySnapshot, Kernel, Parameter, Point } from "./types";
-import { choiceIndex } from "./numpyRandom";
+import type { Parameter, Point } from "../types";
+import type { DensitySnapshot, Kernel } from "./types";
+import { choiceIndex } from "../numpyRandom";
 import { logTruncatedNormalPeak, truncnormPpf } from "./truncnorm";
 
 export function createDensity(parameters: readonly Parameter[], samples: readonly { id: number; params: Point }[], bandwidth: number, weights: readonly number[], priorWeight = 0): DensitySnapshot {

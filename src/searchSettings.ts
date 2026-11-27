@@ -1,4 +1,4 @@
-import type { TpeConfig } from "./model/types";
+import type { TpeConfig } from "./model/tpe/types";
 
 export type ModelSettings = Omit<TpeConfig, "mode">;
 

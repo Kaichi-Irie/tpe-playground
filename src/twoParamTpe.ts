@@ -1,10 +1,11 @@
-import { fitTpe, needsFeasibleGood, proposeTpe } from "./model/engine";
-import { totalViolation } from "./model/partition";
+import { fitTpe, needsFeasibleGood, proposeTpe } from "./model/tpe/engine";
+import { totalViolation } from "./model/tpe/partition";
 import { twoParamConstrainedOptima, getTwoParamConstraint, type TwoParamConstraintPreset } from "./twoParamConstraints";
 import { advanceHistory } from "./model/history";
-import { createFieldEvaluator, evaluateFieldGrid2D } from "./model/visualization";
-import type { DensityMode, Observation, Problem, ProposalTrace, TpeConfig } from "./model/types";
-export type { DensityMode } from "./model/types";
+import { createFieldEvaluator, evaluateFieldGrid2D } from "./model/tpe/visualization";
+import type { Observation, Problem } from "./model/types";
+import type { DensityMode, ProposalTrace, TpeConfig } from "./model/tpe/types";
+export type { DensityMode } from "./model/tpe/types";
 
 export interface TwoParamTrial { id: number; x1: number; x2: number; value: number; constraints: number[]; violation: number }
 export const twoParamSettings = { bandwidth: 0.65, gamma: 0.25, count: 200, seed: 42, startupTrials: 10, candidates: 24 };

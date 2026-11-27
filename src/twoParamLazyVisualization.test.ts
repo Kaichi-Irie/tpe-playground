@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import * as fields from "./model/visualization";
+import * as fields from "./model/tpe/visualization";
 import { buildTwoParamView, emptyTwoParamPlayback, moveTwoParamPlayback } from "./twoParamTpe";
 
 it("fits and proposes without a display grid, then builds it once when needed", () => {

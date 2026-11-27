@@ -1,8 +1,8 @@
 import { domain, fitOneParamModel, type Trial, type WeightStrategy } from "./oneParamTpe";
 import { getObjective, type ObjectivePreset } from "./objectives";
-import { createLogDensity } from "./model/density";
-import { logTruncatedNormalPeak } from "./model/truncnorm";
-import type { Kernel } from "./model/types";
+import { createLogDensity } from "./model/tpe/density";
+import { logTruncatedNormalPeak } from "./model/tpe/truncnorm";
+import type { Kernel } from "./model/tpe/types";
 
 export interface ExplanationExample {
   label: string;

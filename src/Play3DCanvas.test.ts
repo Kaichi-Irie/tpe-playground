@@ -62,12 +62,59 @@ describe("canvas scene", () => {
   });
 });
 
+it("paints the CMA-ES bell, clips only the footprint to the floor, and draws mean markers", () => {
+  const strokes: { color: string; alpha: number; width: number }[] = [];
+  const fills: string[] = [];
+  const ctx = {
+    setTransform: vi.fn(), clearRect: vi.fn(), save: vi.fn(), restore: vi.fn(), clip: vi.fn(),
+    beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), closePath: vi.fn(), arc: vi.fn(), setLineDash: vi.fn(),
+    strokeStyle: "", fillStyle: "", globalAlpha: 1, lineWidth: 0,
+    stroke: () => strokes.push({ color: ctx.strokeStyle, alpha: ctx.globalAlpha, width: ctx.lineWidth }),
+    fill: () => fills.push(ctx.fillStyle),
+  };
+  const canvas = { clientWidth: 200, clientHeight: 200, getContext: () => ctx } as unknown as HTMLCanvasElement;
+  vi.stubGlobal("getComputedStyle", () => ({ getPropertyValue: (token: string) => token }));
+  try {
+    drawScene(canvas, [
+      { id: "bell", kind: "triangle", layer: "cmaes", depth: 0, points: [0, 0, 10, 10, 20, 0], inspect: vi.fn() },
+      { id: "inner", footprint: true, kind: "ellipse-segment", depth: 0, sigmaLevel: 1, points: [10, 10, 20, 20, 10, 10] },
+      { id: "outer", footprint: true, kind: "ellipse-segment", depth: 0, sigmaLevel: 2, points: [0, 0, 30, 30, 0, 0] },
+      { id: "rise", kind: "ellipse-segment", depth: 0, sigmaLevel: 2, points: [0, 0, 30, 30], dashOffset: -20 },
+      { id: "drop", kind: "mean-drop", depth: 0, points: [10, 10, 10, 0] },
+      { id: "step", kind: "mean-step", depth: 0, x: 5, y: 5 },
+      { id: "path", kind: "mean-path", depth: 0, points: [5, 5, 10, 10] },
+      { id: "mean", kind: "mean-marker", depth: 0, x: 10, y: 10 },
+      { id: "current", kind: "trial", depth: 0, x: 5, y: 5, group: "cmaes-current" },
+      { id: "past", kind: "trial", depth: 0, x: 20, y: 20, group: "cmaes-past" },
+    ], [], { x: 0, y: 0, width: 100, height: 100 }, undefined,
+    [{ x: 1, y: 1 }, { x: 90, y: 1 }, { x: 90, y: 90 }, { x: 1, y: 90 }]);
+    expect(ctx.clip).toHaveBeenCalledTimes(2);
+    expect(ctx.restore).toHaveBeenCalledTimes(2);
+    expect(ctx.setLineDash.mock.calls).toEqual([[[2.5, 2]], [[]], [[2.5, 2]], [[]], [[2.5, 2]], [[]]]);
+    expect(strokes.slice(1, 8)).toEqual([
+      { color: "--cmaes", alpha: 0.28, width: 0.35 },
+      { color: "--cmaes", alpha: 0.45, width: 1 },
+      { color: "--cmaes-soft", alpha: 0.35, width: 0.75 },
+      { color: "--cmaes-soft", alpha: 0.9, width: 0.75 },
+      { color: "--cmaes", alpha: 0.5, width: 0.5 },
+      { color: "--surface", alpha: 0.9, width: 0.5 },
+      { color: "--cmaes", alpha: 0.8, width: 0.9 },
+    ]);
+    expect(ctx.arc).toHaveBeenCalledWith(5, 5, 1.25, 0, 2 * Math.PI);
+    expect(fills).toEqual(["--cmaes", "--cmaes", "--cmaes", "--cmaes-gen", "--muted"]);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 it("clips flat scene items and paints field colors without a proposal drop-line", () => {
   const ctx = {
     setTransform: vi.fn(), clearRect: vi.fn(), save: vi.fn(), clip: vi.fn(), rect: vi.fn(), restore: vi.fn(),
-    beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), fillRect: vi.fn(), stroke: vi.fn(),
+    beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), closePath: vi.fn(), fillRect: vi.fn(), stroke: vi.fn(),
     arc: vi.fn(), fill: vi.fn(), setLineDash: vi.fn(), fillStyle: "", strokeStyle: "", globalAlpha: 1,
   };
+  const fills: { color: string; alpha: number }[] = [];
+  ctx.fill.mockImplementation(() => fills.push({ color: ctx.fillStyle, alpha: ctx.globalAlpha }));
   ctx.fillRect.mockImplementation(() => {
     expect(ctx.fillStyle).toBe("--good");
     expect(ctx.globalAlpha).toBe(0.2);
@@ -79,6 +126,7 @@ it("clips flat scene items and paints field colors without a proposal drop-line"
       { id: "grid", kind: "grid", depth: 0, points: [0, 50, 100, 50] },
       { id: "quad", kind: "quad", depth: 0, layer: "good", alpha: 0.2, points: [0, 50, 20, 30] },
       { id: "iso", kind: "field-contour", depth: 0, layer: "good", points: [20, 10, 10, 30] },
+      { id: "band", kind: "ellipse-fill", depth: 0, alpha: 0.14, points: [5, 5, 50, 20, 20, 50] },
       { id: "proposal", kind: "proposal", depth: 0, x: 50, y: 50, floorX: 50, floorY: 50 },
     ], [], { x: 0, y: 0, width: 100, height: 100 }, { x: 10, y: 10, width: 80, height: 80 });
     expect(ctx.rect).toHaveBeenCalledWith(10, 10, 80, 80);
@@ -86,6 +134,7 @@ it("clips flat scene items and paints field colors without a proposal drop-line"
     expect(ctx.fillRect).toHaveBeenCalledWith(0, 50, 20, -20);
     expect(ctx.lineTo).toHaveBeenCalledWith(10, 30);
     expect(ctx.arc).toHaveBeenCalledBefore(ctx.restore);
+    expect(fills).toEqual([{ color: "--cmaes", alpha: 0.14 }, { color: "--surface", alpha: 1 }]);
     expect(ctx.setLineDash).not.toHaveBeenCalled();
   } finally {
     vi.unstubAllGlobals();

@@ -1,14 +1,15 @@
-import { validateBandwidthRule, type BandwidthRule } from "./model/bandwidth";
-import { fitTpe, proposeTpe } from "./model/engine";
-import { rankSplit, validateWeightStrategy } from "./model/partition";
-import { evaluateField } from "./model/visualization";
-import type { Observation, Problem, ProposalTrace, TpeConfig, WeightStrategy } from "./model/types";
+import { validateBandwidthRule, type BandwidthRule } from "./model/tpe/bandwidth";
+import { fitTpe, proposeTpe } from "./model/tpe/engine";
+import { rankSplit, validateWeightStrategy } from "./model/tpe/partition";
+import { evaluateField } from "./model/tpe/visualization";
+import type { Observation, Problem } from "./model/types";
+import type { ProposalTrace, TpeConfig, WeightStrategy } from "./model/tpe/types";
 import { getObjective, type ObjectivePreset } from "./objectives";
 
 export interface Trial { id: number; x: number; y: number }
 export const trialLimit = 200;
 export const domain = [-5, 5] as const;
-export type { WeightStrategy } from "./model/types";
+export type { WeightStrategy } from "./model/tpe/types";
 interface ModelConfig { bandwidthRule?: BandwidthRule; bandwidth: number; gamma: number; weights?: WeightStrategy }
 export const defaults = { bandwidthRule: "constant" as BandwidthRule, bandwidth: 0.4, gamma: 0.2, weights: "uniform" as WeightStrategy };
 export const prior = { mean: 0, bandwidth: domain[1] - domain[0], weight: 1 };

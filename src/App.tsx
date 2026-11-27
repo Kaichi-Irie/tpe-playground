@@ -20,7 +20,7 @@ import { HelpMath } from "./HelpMath";
 import { ProgressComparison } from "./ProgressComparison";
 
 import { emptyPlayback, keepObservations, movePlayback } from "./playback";
-import { logTruncatedNormalPeak } from "./model/truncnorm";
+import { logTruncatedNormalPeak } from "./model/tpe/truncnorm";
 
 const StepExplanation = lazy(() => import("./StepExplanation"));
 

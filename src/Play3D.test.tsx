@@ -2,9 +2,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import Play3D, { Play3DConstraintSettings, buildPlay3DCandidateScene } from "./Play3D";
 import * as twoParam from "./twoParamTpe";
+import * as cmaEs from "./twoParamCmaEs";
+import { buildCmaEsBell, buildCmaEsScene } from "./play3dCmaEsScene";
 
 it("starts a sequential Play 3D search with no observations and a preview of its first proposal", () => {
   const html = renderToStaticMarkup(<Play3D />);
+  expect(html).toContain('aria-label="Play 3D sampler"');
+  expect(html).toContain('aria-pressed="true">TPE</button>');
   expect(html).toContain("Trial 0 / 200");
   expect(html).toContain('aria-label="Play 3D Trial progress"');
   expect(html).toContain('<button type="button" class="playback-speed" aria-label="Play 3D Playback speed: 1x"');
@@ -43,6 +47,133 @@ it("starts a sequential Play 3D search with no observations and a preview of its
   expect(html).not.toContain('class="observation-target-play-3d');
   expect(html).toContain('class="layer candidates" aria-pressed="true"');
   expect(html).not.toContain('class="candidates-play-3d"');
+});
+
+it.each(["3d", "top"] as const)("renders CMA-ES layers, settings and markers in %s view", (initialViewMode) => {
+  const sharedSettings = new URLSearchParams("sampler=cmaes&cmaes=optuna");
+  const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} initialViewMode={initialViewMode} />);
+  expect(html).toContain('role="group" aria-label="Play 3D sampler"');
+  expect(html).toContain('aria-pressed="true">CMA-ES</button>');
+  const legend = html.match(/<div class="legend cmaes-legend"[^>]*>(.*?)<\/div>/)?.[1] ?? "";
+  expect(legend.match(/aria-pressed="true"/g)).toHaveLength(5);
+  for (const label of ["Objective contours", "Distribution (1σ/2σ)", "Generation", "Mean path", "Observations"]) expect(legend).toContain(label);
+  expect(legend).toContain('aria-hidden="true">Gauss</span>');
+  expect(html).toContain("normalized to a peak of 1");
+  expect(html).toContain("m₀ → m<sub>g</sub>");
+  expect(html).toContain("CMA-ES · gen 0 (0/6) · trial 1");
+  expect(html).toContain('aria-label="CMA-ES mean · Gen 0 · m = (0.00, 0.00) · σ = 1.67"');
+  expect(html).toContain("Next evaluation ·");
+  expect(html).toContain('disabled="">Optuna preset</button>');
+  expect(html).toContain("<legend>Initial mean x₀</legend>");
+  const live = html.match(/<section[^>]*aria-label="Live CMA-ES settings"[^>]*>(.*?)<\/section>/)?.[1] ?? "";
+  expect(live.match(/type="range"/g)).toHaveLength(2);
+  expect(live).toContain("Initial σ₀");
+  expect(live).toContain("Population λ");
+  expect(live).toContain("6 · Auto");
+  expect(html).not.toContain("Good KDE");
+});
+
+it("builds a clipped CMA-ES bell with exact Gaussian heights and ring levels", () => {
+  const settings = { ...cmaEs.twoParamCmaEsDefaults, sigma0: 5, x0: { x1: 4.5, x2: -4.5 } };
+  const playback = cmaEs.moveTwoParamCmaEsPlayback(cmaEs.emptyTwoParamCmaEsPlayback(), 18, 42, settings);
+  const { fitted, snapshot } = cmaEs.buildTwoParamCmaEsView(playback.trials, settings);
+  const bell = buildCmaEsBell(snapshot.ellipse);
+  const logPeak = fitted.logDensity([snapshot.mean])[0];
+  const vertices = bell.flat();
+  expect(vertices.some(({ height }) => height === 1)).toBe(true);
+  expect(vertices.some(({ x1, x2 }) => Math.abs(x1) === 5 || Math.abs(x2) === 5)).toBe(true);
+  for (const vertex of vertices) {
+    expect(Math.abs(vertex.x1)).toBeLessThanOrEqual(5);
+    expect(Math.abs(vertex.x2)).toBeLessThanOrEqual(5);
+    expect(vertex.height).toBeCloseTo(Math.exp(fitted.logDensity([{ x1: vertex.x1, x2: vertex.x2 }])[0] - logPeak), 12);
+  }
+
+  const project = (x1: number, x2: number, height: number) => ({ x: x1, y: x2, depth: height });
+  const inspect = vi.fn();
+  const scene = buildCmaEsScene(snapshot, bell, project, false, true, true, inspect);
+  const triangles = scene.filter((item) => item.kind === "triangle");
+  expect(triangles).toHaveLength(bell.length);
+  expect(triangles.every(({ layer }) => layer === "cmaes")).toBe(true);
+  const [a, b, c] = bell[0];
+  const centroid = { x1: (a.x1 + b.x1 + c.x1) / 3, x2: (a.x2 + b.x2 + c.x2) / 3 };
+  const logDensity = fitted.logDensity([centroid])[0];
+  triangles[0].inspect();
+  expect(inspect).toHaveBeenCalledWith(
+    `CMA-ES N(m, σ²C) · x₁ = ${centroid.x1.toFixed(2)}, x₂ = ${centroid.x2.toFixed(2)} · rel. density = ${Math.exp(logDensity - logPeak).toPrecision(4)} · log p(x) = ${logDensity.toPrecision(4)}`,
+  );
+  for (const level of [1, 2]) {
+    const raised = scene.filter((item) => item.kind === "ellipse-segment")
+      .filter((item) => item.sigmaLevel === level && !item.footprint);
+    expect(raised.length).toBeGreaterThan(0);
+    for (const item of raised) {
+      expect(item.depth - 0.02).toBeCloseTo(Math.exp(-0.5 * level * level), 12);
+      expect(item.points.every((coordinate) => Math.abs(coordinate) <= 5 + 1e-12)).toBe(true);
+    }
+  }
+  expect(scene.filter(({ kind }) => kind === "mean-step")).toHaveLength(snapshot.generation);
+  expect(scene.find(({ kind }) => kind === "mean-drop")).toBeDefined();
+  const withoutDistribution = buildCmaEsScene(snapshot, [], project, false, false, true, inspect);
+  expect(withoutDistribution.map(({ kind }) => kind)).toEqual([
+    "mean-path", "mean-path", "mean-path", "mean-step", "mean-step", "mean-step", "mean-marker",
+  ]);
+});
+
+it("retains the full CMA-ES polar mesh at the minimum initial sigma", () => {
+  const settings = { ...cmaEs.twoParamCmaEsDefaults, sigma0: 0.1 };
+  const { snapshot } = cmaEs.buildTwoParamCmaEsView([], settings);
+  const bell = buildCmaEsBell(snapshot.ellipse);
+  expect(bell).toHaveLength(612);
+  const vertices = new Set(bell.flat());
+  expect(vertices.size).toBe(1 + 9 * 36);
+  for (const level of [1, 2]) {
+    expect([...vertices].filter(({ height }) => height === Math.exp(-0.5 * level * level))).toHaveLength(36);
+  }
+});
+
+it("paints five nested CMA-ES density bands before the Top contours", () => {
+  const { snapshot } = cmaEs.buildTwoParamCmaEsView([]);
+  const scene = buildCmaEsScene(snapshot, [], (x1, x2) => ({ x: x1, y: x2, depth: 0 }), true, true, false, vi.fn());
+  expect(scene.map(({ kind }) => kind)).toEqual([
+    "ellipse-fill", "ellipse-fill", "ellipse-fill", "ellipse-fill", "ellipse-fill", "ellipse-segment", "ellipse-segment",
+  ]);
+  const bands = scene.filter((item) => item.kind === "ellipse-fill");
+  for (const [index, level] of [2.6, 2, 1.5, 1, 0.5].entries()) {
+    expect(bands[index].points[0]).toBeCloseTo(level * snapshot.ellipse.radii1Sigma[0], 12);
+  }
+});
+
+it("highlights the last complete generation until a new observation arrives", () => {
+  const settings = new URLSearchParams("sampler=cmaes");
+  const empty = cmaEs.emptyTwoParamCmaEsPlayback();
+  const six = cmaEs.moveTwoParamCmaEsPlayback(empty, 6);
+  const seven = cmaEs.moveTwoParamCmaEsPlayback(six, 7);
+  const initialPlayback = vi.spyOn(cmaEs, "emptyTwoParamCmaEsPlayback").mockReturnValueOnce(six).mockReturnValueOnce(seven);
+  try {
+    const finished = renderToStaticMarkup(<Play3D sharedSettings={settings} />);
+    expect(finished.match(/aria-label="Trial \d+ · Highlighted generation/g)).toHaveLength(6);
+    const started = renderToStaticMarkup(<Play3D sharedSettings={settings} />);
+    expect(started.match(/aria-label="Trial \d+ · Highlighted generation/g)).toEqual(['aria-label="Trial 7 · Highlighted generation']);
+  } finally {
+    initialPlayback.mockRestore();
+  }
+});
+
+it("opens a constrained CMA-ES link with playback blocked and without fitting CMA-ES", () => {
+  const cmaEsView = vi.spyOn(cmaEs, "buildTwoParamCmaEsView");
+  try {
+    const html = renderToStaticMarkup(<Play3D sharedSettings={new URLSearchParams("sampler=cmaes&constraint=circle")} />);
+    expect(html).toContain('class="cmaes-constraint-notice" role="status"');
+    expect(html).toContain("CMA-ES does not support constraints.");
+    expect(html).toContain(">Remove constraint</button>");
+    expect(html).toContain(">Switch to TPE</button>");
+    expect(html).toContain('<option value="disk" selected="">Small disk</option>');
+    expect(html).toMatch(/<button[^>]+aria-label="Play"[^>]+disabled=""/);
+    expect(html).toMatch(/<button[^>]+aria-label="Next trial"[^>]+disabled=""/);
+    expect(html).not.toContain("Next evaluation ·");
+    expect(cmaEsView).not.toHaveBeenCalled();
+  } finally {
+    cmaEsView.mockRestore();
+  }
 });
 
 it("describes random-only playback without a TPE start trial", () => {

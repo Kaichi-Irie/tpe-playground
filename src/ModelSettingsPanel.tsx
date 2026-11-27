@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ResponsiveSettings } from "./ResponsiveSettings";
-import { bandwidthRules, type BandwidthRule } from "./model/bandwidth";
-import type { WeightStrategy } from "./model/types";
+import { bandwidthRules, type BandwidthRule } from "./model/tpe/bandwidth";
+import type { WeightStrategy } from "./model/tpe/types";
 import { Help } from "./Help";
 import { HelpMath } from "./HelpMath";
 import { ShareSearchLink } from "./ShareSearchLink";

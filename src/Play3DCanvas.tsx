@@ -1,7 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useRef } from "react";
 import { measurePlay3D } from "./play3dProfiling";
 
-export type Play3DSurfaceLayer = "objective" | "good" | "bad" | "acquisition";
+export type Play3DSurfaceLayer = "objective" | "good" | "bad" | "acquisition" | "cmaes";
 // Plain drawing commands in SVG viewBox units. Thousands of these
 // are painted into one canvas, so no per-item DOM nodes, layout or style exist.
 export type Play3DSceneItem = { id: string; depth: number } & (
@@ -14,7 +14,11 @@ export type Play3DSceneItem = { id: string; depth: number } & (
   | { kind: "floor-anchor"; x: number; y: number }
   | { kind: "candidate"; x: number; y: number; selected: boolean; inspect: () => void }
   | { kind: "axis-candidate"; points: readonly number[]; x: number; y: number; selected: boolean; inspect: () => void }
-  | { kind: "trial"; feasible?: boolean; x: number; y: number; group: "good" | "bad" | "unclassified" }
+  | { kind: "trial"; feasible?: boolean; x: number; y: number; group: "good" | "bad" | "unclassified" | "cmaes-current" | "cmaes-past" }
+  | { kind: "ellipse-segment"; sigmaLevel: 1 | 2; points: readonly number[]; footprint?: boolean; dashOffset?: number }
+  | { kind: "ellipse-fill"; points: readonly number[]; alpha: number }
+  | { kind: "mean-path" | "mean-drop"; points: readonly number[] }
+  | { kind: "mean-marker" | "mean-step"; x: number; y: number }
   | { kind: "proposal"; x: number; y: number; floorX: number; floorY: number }
 );
 export interface Play3DViewBox { x: number; y: number; width: number; height: number }
@@ -25,8 +29,9 @@ const surfaceStyles: Record<Play3DSurfaceLayer, { color: string; fill: number; s
   good: { color: "--good", fill: 0.45, stroke: 0.3 },
   bad: { color: "--bad", fill: 0.35, stroke: 0.3 },
   acquisition: { color: "--acquisition", fill: 0.3, stroke: 0.4 },
+  cmaes: { color: "--cmaes", fill: 0.36, stroke: 0.28 },
 };
-const trialColors = { good: "--good", bad: "--bad", unclassified: "--muted" } as const;
+const trialColors = { good: "--good", bad: "--bad", unclassified: "--muted", "cmaes-current": "--cmaes-gen", "cmaes-past": "--muted" } as const;
 // Mobile screens report DPR 3; 2 keeps lines crisp at less than half the pixels.
 const maxPixelRatio = 2;
 
@@ -118,8 +123,9 @@ export function hitTestPlay3DScene(
 }
 
 type Play3DFloor = readonly (readonly [number, number, number, number])[];
+type FloorOutline = readonly { x: number; y: number }[];
 
-export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[], floor: Play3DFloor, viewBox: Play3DViewBox, clipRect?: Play3DViewBox) {
+export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[], floor: Play3DFloor, viewBox: Play3DViewBox, clipRect?: Play3DViewBox, floorOutline?: FloorOutline) {
   const width = canvas.clientWidth, height = canvas.clientHeight;
   const ctx = canvas.getContext("2d");
   if (!ctx || !width || !height) return;
@@ -163,6 +169,7 @@ export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DScene
     good: { token: "--good", alpha: 0.8, width: 1.1 },
     bad: { token: "--bad", alpha: 0.8, width: 1.1 },
     acquisition: { token: "--acquisition", alpha: 0.8, width: 1.1 },
+    cmaes: { token: "--cmaes", alpha: 0.8, width: 1.1 },
   };
   let lineStyle: keyof typeof lineStyles | undefined;
   const flushContour = () => {
@@ -200,6 +207,52 @@ export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DScene
       const value = color(item.muted ? "--neutral-point" : surface.color);
       ctx.globalAlpha = item.muted ? 0.035 : surface.fill; ctx.fillStyle = value; ctx.fill();
       if (surface.stroke) { ctx.globalAlpha = surface.stroke; ctx.strokeStyle = value; ctx.lineWidth = 0.35; ctx.stroke(); }
+    } else if (item.kind === "ellipse-fill" || item.kind === "ellipse-segment" || item.kind === "mean-path" || item.kind === "mean-drop") {
+      const ellipse = item.kind === "ellipse-segment" ? item : undefined;
+      const outer = ellipse?.sigmaLevel === 2;
+      const clipFloor = ellipse?.footprint && floorOutline;
+      if (clipFloor) {
+        ctx.save();
+        ctx.beginPath();
+        floorOutline.forEach(({ x, y }, index) => index === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+        ctx.closePath();
+        ctx.clip();
+      }
+      ctx.beginPath();
+      ctx.moveTo(item.points[0], item.points[1]);
+      for (let i = 2; i < item.points.length; i += 2) ctx.lineTo(item.points[i], item.points[i + 1]);
+      if (item.kind === "ellipse-fill") {
+        ctx.closePath();
+        ctx.globalAlpha = item.alpha; ctx.fillStyle = color("--cmaes"); ctx.fill();
+        continue;
+      }
+      const drop = item.kind === "mean-drop";
+      ctx.globalAlpha = drop ? 0.5 : item.kind === "mean-path" ? 0.8
+        : ellipse?.footprint ? (outer ? 0.35 : 0.45) : (outer ? 0.9 : 0.95);
+      ctx.strokeStyle = color(outer ? "--cmaes-soft" : "--cmaes");
+      ctx.lineWidth = (drop ? 1 : item.kind === "mean-path" ? 1.8 : outer ? 1.5 : 2) / fit.scale;
+      if (outer || drop) {
+        ctx.setLineDash([5 / fit.scale, 4 / fit.scale]);
+        ctx.lineDashOffset = ellipse?.dashOffset ?? 0;
+      }
+      ctx.stroke();
+      if (outer || drop) {
+        ctx.setLineDash([]);
+        ctx.lineDashOffset = 0;
+      }
+      if (clipFloor) ctx.restore();
+    } else if (item.kind === "mean-step") {
+      ctx.beginPath(); ctx.arc(item.x, item.y, 2.5 / fit.scale, 0, 2 * Math.PI);
+      ctx.globalAlpha = 0.9; ctx.fillStyle = color("--cmaes"); ctx.fill();
+      ctx.strokeStyle = color("--surface"); ctx.lineWidth = 1 / fit.scale; ctx.stroke();
+    } else if (item.kind === "mean-marker") {
+      const { x, y } = item;
+      const r = 5 / fit.scale;
+      ctx.beginPath();
+      ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y);
+      ctx.closePath();
+      ctx.globalAlpha = 1; ctx.fillStyle = color("--cmaes"); ctx.fill();
+      ctx.strokeStyle = color("--surface"); ctx.lineWidth = 1.5 / fit.scale; ctx.stroke();
     } else if (item.kind === "guide") {
       const [ax, ay, bx, by] = item.points;
       ctx.globalAlpha = 0.65;
@@ -276,15 +329,15 @@ export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DScene
 
 // One bitmap replaces ~10k SVG paths. Each update costs one redraw instead of
 // thousands of DOM mutations, style/layout passes and retained render objects.
-export const Play3DCanvas = memo(function Play3DCanvas({ items, floor, viewBox, clipRect }: { items: readonly Play3DSceneItem[]; floor: Play3DFloor; viewBox: Play3DViewBox; clipRect?: Play3DViewBox }) {
+export const Play3DCanvas = memo(function Play3DCanvas({ items, floor, viewBox, clipRect, floorOutline }: { items: readonly Play3DSceneItem[]; floor: Play3DFloor; viewBox: Play3DViewBox; clipRect?: Play3DViewBox; floorOutline?: FloorOutline }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const latest = useRef({ items, floor, viewBox, clipRect });
+  const latest = useRef({ items, floor, viewBox, clipRect, floorOutline });
   const frame = useRef<number | null>(null);
   useLayoutEffect(() => {
-    latest.current = { items, floor, viewBox, clipRect };
+    latest.current = { items, floor, viewBox, clipRect, floorOutline };
     const element = canvas.current;
-    if (element) measurePlay3D("canvas-draw", () => drawScene(element, items, floor, viewBox, clipRect));
-  }, [items, floor, viewBox, clipRect]);
+    if (element) measurePlay3D("canvas-draw", () => drawScene(element, items, floor, viewBox, clipRect, floorOutline));
+  }, [items, floor, viewBox, clipRect, floorOutline]);
   useEffect(() => {
     const element = canvas.current;
     if (!element) return;
@@ -293,8 +346,8 @@ export const Play3DCanvas = memo(function Play3DCanvas({ items, floor, viewBox, 
       if (frame.current !== null) return;
       frame.current = requestAnimationFrame(() => {
         frame.current = null;
-        const { items, floor, viewBox, clipRect } = latest.current;
-        drawScene(element, items, floor, viewBox, clipRect);
+        const { items, floor, viewBox, clipRect, floorOutline } = latest.current;
+        drawScene(element, items, floor, viewBox, clipRect, floorOutline);
       });
     };
     const resize = new ResizeObserver(redraw);

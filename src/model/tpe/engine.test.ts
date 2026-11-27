@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import trajectories from "./fixtures/trajectories.json";
+import trajectories from "../fixtures/trajectories.json";
 import { createDensity, logDensity } from "./density";
 import { fitTpe, proposeTpe, restoreModel, validateInput } from "./engine";
 import { evaluateField } from "./visualization";
-import { emptyPlayback, movePlayback } from "../playback";
-import { buildOneParamView, defaults, proposeTrial } from "../oneParamTpe";
-import { buildTwoParamView, twoParamConfig, emptyTwoParamPlayback, moveTwoParamPlayback, twoParamProblem, proposeTwoParamTrial } from "../twoParamTpe";
-import type { Observation } from "./types";
+import { emptyPlayback, movePlayback } from "../../playback";
+import { buildOneParamView, defaults, proposeTrial } from "../../oneParamTpe";
+import { buildTwoParamView, twoParamConfig, emptyTwoParamPlayback, moveTwoParamPlayback, twoParamProblem, proposeTwoParamTrial } from "../../twoParamTpe";
+import type { Observation } from "../types";
 
 const trials: Observation[] = [[-2, -2], [2, 2], [-3, 3], [3, -3]].map(([x1, x2], i) => ({ id: i + 1, params: { x1, x2 }, objectives: [i], constraints: [] }));
 const config = { ...twoParamConfig(), gamma: 0.5, bandwidth: 0.5, startupTrials: 2 };

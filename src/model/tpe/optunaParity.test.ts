@@ -1,9 +1,10 @@
 import { expect, it } from "vitest";
-import { optunaPreset } from "../searchSettings";
+import { optunaPreset } from "../../searchSettings";
 import { logDensity } from "./density";
 import { fitTpe } from "./engine";
-import fixture from "./fixtures/optuna-5.1-parity.json";
-import type { DensityMode, Observation, Point, Problem } from "./types";
+import fixture from "../fixtures/optuna-5.1-parity.json";
+import type { Observation, Point, Problem } from "../types";
+import type { DensityMode } from "./types";
 
 interface ReferenceCase {
   name: string;

@@ -1,6 +1,6 @@
 # Shared TPE model contract
 
-The engine in [src/model](../src/model/) has no React, objective evaluator, DOM,
+The engine in [src/model/tpe](../src/model/tpe/) has no React, objective evaluator, DOM,
 plot resolution, or camera dependencies. [oneParamTpe.ts](../src/oneParamTpe.ts) and
 [twoParamTpe.ts](../src/twoParamTpe.ts) adapt one- and two-parameter searches to that engine.
 

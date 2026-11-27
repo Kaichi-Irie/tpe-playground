@@ -16,6 +16,9 @@
   --bad: #d55e00;
   --objective: #454545;
   --acquisition: #a34780;
+  --cmaes: #0f9d58;
+  --cmaes-soft: #34a853;
+  --cmaes-gen: #059669;
   --proposal: #626c7c;
   --focus: #52659e;
   --grid: #dfe3e9;
@@ -61,6 +64,9 @@
   --bad: #e69f00;
   --objective: #e5e5e5;
   --acquisition: #cc79a7;
+  --cmaes: #34d399;
+  --cmaes-soft: #6ee7b7;
+  --cmaes-gen: #34d399;
   --proposal: #abb2bf;
   --focus: #bdc9f2;
   --grid: #383e49;
@@ -1103,6 +1109,57 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
 .play-3d .view-mode-toggle button + button { border-radius: 0 5px 5px 0; border-left: 1px solid var(--border); }
 .play-3d .view-mode-toggle button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 .play-3d .view-mode-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; z-index: 1; }
+
+.play-3d .sampler-toggle { display: flex; flex: none; padding: 3px; gap: 2px; border-radius: 9px; background: var(--control); }
+.sampler-toggle button { min-height: 36px; padding: 4px 10px; border: 0; border-radius: 6px; background: transparent; font-size: var(--type-sm); white-space: nowrap; }
+.sampler-toggle button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.sampler-toggle button[aria-pressed="false"]:hover { background: var(--hover); }
+.sampler-toggle button:focus-visible { outline-offset: -2px; }
+.sampler-toggle button[aria-pressed="true"]:focus-visible { outline-color: var(--on-accent); }
+.cmaes-legend .ellipse .swatch { height: 8px; border-block-start: 2px solid var(--cmaes); border-block-end: 2px dashed var(--cmaes-soft); background: transparent; }
+.cmaes-legend .meanPath .swatch { background: var(--cmaes); }
+.canvas-plot .cmaes-legend .generation .swatch { width: 7px; height: 7px; border-radius: 50%; background: var(--cmaes-gen); }
+.cmaes-legend .observations .swatch { background: var(--muted); }
+.progress-panel.is-cmaes { --comparison-tpe: var(--cmaes); }
+.cmaes-constraint-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; margin: 4px 20px 0; padding: 2px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-muted); font-size: var(--type-sm); }
+.cmaes-constraint-actions { display: inline-flex; gap: 2px; }
+.cmaes-constraint-notice button { min-height: 28px; padding: 2px 6px; border: 0; background: transparent; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+.cmaes-model-controls .live-model-controls input { accent-color: var(--cmaes); }
+.settings-dialog .settings-form .cmaes-mean-settings { margin-top: 4px; }
+.settings-dialog .settings-form input[type="number"] { grid-column: 3; grid-row: 1; width: min(12rem, 45vw); min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--control); color: var(--text); font: inherit; font-size: 16px; }
+@media (701px <= width <= 900px) {
+  .visual-workspace.play-3d .canvas-controls { flex-wrap: wrap; gap: 4px; }
+  .play-3d .primary-playback { flex-basis: 100%; }
+  .visual-workspace.play-3d .canvas-plot { padding-top: 110px; }
+}
+@media (max-width: 700px) {
+  .visual-workspace.play-3d .canvas-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; }
+  .visual-workspace.play-3d .primary-playback { display: contents; }
+  .play-3d .playback-capsule { grid-column: 1; grid-row: 1; justify-self: start; }
+  .play-3d .sampler-toggle { grid-column: 2; grid-row: 1; }
+  .sampler-toggle button { min-height: 40px; }
+  .cmaes-model-controls .model-status { display: flex; padding: 2px 12px 0; }
+  .visual-workspace .cmaes-model-controls .live-model-controls { display: grid; gap: 10px; }
+  .cmaes-constraint-notice { margin-inline: 8px; }
+}
+@media (max-width: 480px) {
+  .play-3d .sampler-toggle { grid-row: 2; }
+  .visual-workspace.play-3d .trial-timeline { grid-column: 1; }
+}
+@media (max-width: 380px) {
+  .sampler-toggle button { padding-inline: 7px; }
+  .cmaes-constraint-notice { column-gap: 4px; }
+  .cmaes-constraint-notice button { padding-inline: 3px; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  main .visual-workspace.play-3d { min-height: 520px; }
+  .play-3d .sampler-toggle button { min-height: 32px; }
+}
+@media (max-height: 500px) and (800px <= width <= 900px) {
+  .visual-workspace.play-3d .canvas-controls { flex-wrap: nowrap; gap: 8px; }
+  .play-3d .primary-playback { flex-basis: auto; }
+  .visual-workspace.play-3d .canvas-plot { padding-top: 68px; }
+}
 .play-3d .view-actions { align-items: stretch; }
 .play-3d .view-actions > button { white-space: nowrap; }
 .play-3d:has(.scene-play-3d.is-top) .scene-inspection { max-width: calc(100% - 64px); }

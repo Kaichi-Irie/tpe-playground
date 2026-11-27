@@ -1,5 +1,5 @@
-import { fitTpe } from "../src/model/engine";
-import { createFieldEvaluator, evaluateFieldGrid2D } from "../src/model/visualization";
+import { fitTpe } from "../src/model/tpe/engine";
+import { createFieldEvaluator, evaluateFieldGrid2D } from "../src/model/tpe/visualization";
 import { twoParamConfig, getTwoParamObjective, twoParamObservations, twoParamProblem, type TwoParamTrial } from "../src/twoParamTpe";
 
 // This Node-only entry needs just runtime metadata, not the full Node API types.

@@ -5,7 +5,7 @@ import type { ModelSettings } from "./searchSettings";
 type Props = {
   experiment: ShareExperiment;
   seed: number;
-  settings: ModelSettings;
+  settings?: ModelSettings;
 };
 
 const description = "Opens this search with the current settings at trial 0.";
