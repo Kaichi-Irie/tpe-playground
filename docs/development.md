@@ -49,8 +49,7 @@ Keep secrets and personal data out of the source and examples. Environment varia
 See [CI and Pages protection](../docs/ci-security.md) for workflow permissions,
 required PR checks, repository settings, and publication verification.
 
-See [Agent workflow](agent-workflow.md) for how Claude plans issues, Codex
-implements them, and Claude reviews and merges the PRs.
+See [AGENTS.md](../AGENTS.md) for repository conventions, PR checks, and agent boundaries.
 
 ## References
 

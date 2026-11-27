@@ -4,8 +4,12 @@ dist/
 .DS_Store
 
 # Locally installed agent skills, agent state, and editor settings.
-# AGENTS.md, CLAUDE.md, and .claude/skills/ are shared; see docs/agent-workflow.md.
-/.agents/
+# AGENTS.md, CLAUDE.md, and repo skills in .agents/skills/ (linked from .claude/skills/) are shared; see AGENTS.md.
+/.agents/*
+!/.agents/skills/
+/.agents/skills/*
+!/.agents/skills/plan-issue/
+!/.agents/skills/review-pr/
 /.codex/
 /.claude/*
 !/.claude/skills/
