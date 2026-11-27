@@ -1,14 +1,10 @@
 ## Summary
-
+<!-- What changed and why -->
 -
 
-## Deviations from the issue
-
-None.
-
 ## Validation
-
 - `npm run check`:
-- Manual checks:
+- Manual / browser checks:
 
-Closes #
+## Notes
+<!-- Optional: deviations from the issue, screenshots, benchmarks, follow-ups. Add `Closes #N` when linked to an issue. -->
