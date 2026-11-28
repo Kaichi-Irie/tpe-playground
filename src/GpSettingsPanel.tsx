@@ -16,9 +16,12 @@ interface Props {
   trialLimit: number;
   children?: ReactNode;
   status?: ReactNode;
+  seedLabel?: string;
+  className?: string;
+  seekHelpId?: string;
 }
 
-export function GpSettingsPanel({ experiment, resolvedLengthScale, onChange, seed, onNewSeed, trialLimit, children, status }: Props) {
+export function GpSettingsPanel({ experiment, resolvedLengthScale, onChange, seed, onNewSeed, trialLimit, children, status, seedLabel = "Search seed", className, seekHelpId }: Props) {
   const id = useId();
   const settings = experiment.gpSettings;
   const auto = settings.lengthScaleRule === "auto";
@@ -28,7 +31,7 @@ export function GpSettingsPanel({ experiment, resolvedLengthScale, onChange, see
   const lengthScaleText = auto ? `Auto · ${resolvedLengthScale.toFixed(2)}` : settings.lengthScale.toFixed(2);
   const lengthScaleValue = auto ? resolvedLengthScale : settings.lengthScale;
   return <SamplerSettingsShell
-    experiment={experiment} seed={seed} seedLabel="Search seed" onNewSeed={onNewSeed}
+    experiment={experiment} seed={seed} seedLabel={seedLabel} onNewSeed={onNewSeed} className={className}
     isDefault={matchesGpDefaults(settings)} onReset={() => onChange(gpDefaults)}
     isOptunaPreset={matchesOptunaGpPreset(settings)} onOptunaPreset={() => onChange(applyOptunaGpPreset(settings))}
     optunaPresetHelp={<>Optuna’s GPSampler defaults to Matérn 5/2, LogEI, automatic length scales and 10 startup trials. This playground uses a lightweight isotropic GP with EI and a fixed-seed search in the browser, so trajectories can differ.</>}
@@ -69,7 +72,7 @@ export function GpSettingsPanel({ experiment, resolvedLengthScale, onChange, see
         </div>
       </fieldset>
     </>}
-    status={status}
+    status={seekHelpId ? <>{status}<span id={seekHelpId} className="sr-only">Seeking back discards later trials.</span></> : status}
     liveControlsLabel="Live GP settings"
     liveControls={<>
       <div className="parameter">

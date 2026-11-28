@@ -4,7 +4,7 @@ import { getSampler, samplerList, samplers, samplersForPage, supportsConstraints
 it("lists samplers in display order for each supported page", () => {
   expect(samplerList).toEqual([samplers.tpe, samplers.cmaes, samplers.gp]);
   expect(samplersForPage("play-2d")).toEqual([samplers.tpe, samplers.gp]);
-  expect(samplersForPage("play-3d")).toEqual([samplers.tpe, samplers.cmaes]);
+  expect(samplersForPage("play-3d")).toEqual([samplers.tpe, samplers.cmaes, samplers.gp]);
 });
 
 it.each([

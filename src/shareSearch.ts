@@ -1,5 +1,6 @@
 import { applyOptunaGpPreset, gpAcquisitionOptions, gpBetaRange, gpDefaults, gpKernelOptions, gpLengthScaleRange, gpLengthScaleRules, gpNoiseOptions, gpStartupTrialCounts, gpXiRange, matchesOptunaGpPreset, type GpSettings } from "./gpSettings";
 import { trialLimit as oneParamTrialLimit } from "./oneParamProblem";
+import { twoParamTrialLimit } from "./twoParamProblem";
 import { twoParamConstraintPresets, type TwoParamConstraintPreset } from "./twoParamConstraints";
 import { isBandwidthRule } from "./model/tpe/bandwidth";
 import type { DensityMode } from "./model/tpe/types";
@@ -15,7 +16,8 @@ export type ShareExperiment =
   | { page: "play-2d"; preset: string; sampler?: "tpe"; settings: ModelSettings }
   | { page: "play-2d"; preset: string; sampler: "gp"; gpSettings: GpSettings }
   | { page: "play-3d"; preset: string; mode: DensityMode; constraint: TwoParamConstraintPreset; sampler?: "tpe"; settings: ModelSettings }
-  | { page: "play-3d"; preset: string; mode?: DensityMode; constraint: TwoParamConstraintPreset; sampler: "cmaes"; cmaEsSettings?: TwoParamCmaEsSettings };
+  | { page: "play-3d"; preset: string; mode?: DensityMode; constraint: TwoParamConstraintPreset; sampler: "cmaes"; cmaEsSettings?: TwoParamCmaEsSettings }
+  | { page: "play-3d"; preset: string; mode?: DensityMode; constraint: TwoParamConstraintPreset; sampler: "gp"; gpSettings: GpSettings };
 
 export type SharedSearch<Preset extends string> = {
   seed: number;
@@ -45,7 +47,7 @@ export function createShareUrl(documentUrl: string, experiment: ShareExperiment,
       ls: String(settings.lengthScale), beta: String(settings.beta), xi: String(settings.xi),
       noise: String(settings.noise), startupTrials: String(settings.startupTrials),
     });
-    const validated = readGpSettings(values, oneParamTrialLimit);
+    const validated = readGpSettings(values, experiment.page === "play-3d" ? twoParamTrialLimit : oneParamTrialLimit);
     const params = new URLSearchParams({ sampler: "gp", seed: String(seed), preset: experiment.preset });
     if (matchesOptunaGpPreset(validated)) {
       params.set("gp", "optuna");
@@ -59,6 +61,7 @@ export function createShareUrl(documentUrl: string, experiment: ShareExperiment,
         noise: validated.noise, startupTrials: validated.startupTrials,
       })) params.set(key, String(value));
     }
+    if (experiment.page === "play-3d" && experiment.constraint !== "none") params.set("constraint", experiment.constraint);
     url.hash = `${playShareHashes[experiment.page]}?${params}`;
     return url.href;
   }
@@ -198,19 +201,23 @@ export function readPlay3DSharedSearch<Preset extends string>(
   constraint: TwoParamConstraintPreset;
   sampler: TwoParamSampler;
   cmaEsSettings: TwoParamCmaEsSettings;
+  gpSettings: GpSettings;
 } {
-  const search = readSharedSearch(params, defaults, presets, trialLimit, domainWidth);
+  const samplerParam = params?.get("sampler");
+  const sampler = samplerParam === "cmaes" || samplerParam === "gp" ? samplerParam : "tpe";
+  const searchParams = sampler === "gp" ? new URLSearchParams({ seed: params?.get("seed") ?? "", preset: params?.get("preset") ?? "" }) : params;
+  const search = readSharedSearch(searchParams, defaults, presets, trialLimit, domainWidth);
   const mode = params?.get("mode") === "univariate" ? "univariate" : "multivariate";
-  const sampler = params?.get("sampler") === "cmaes" ? "cmaes" : "tpe";
   const constraintParam = params?.get("constraint");
-  const value = sampler === "cmaes" && constraintParam === "circle" ? "disk" : constraintParam;
+  const value = sampler !== "tpe" && constraintParam === "circle" ? "disk" : constraintParam;
   const constraint = value && Object.hasOwn(twoParamConstraintPresets, value) ? value as TwoParamConstraintPreset : "none";
   const settings = constraint === "none" ? search.settings : constrainSettings({
     ...search.settings,
     infeasibleFilling: search.settings.infeasibleFilling ?? (params?.get("infeasibleFilling") !== "false"),
   });
   const cmaEsSettings = sampler === "cmaes" ? readCmaEsSettings(params) : twoParamCmaEsDefaults;
-  return { ...search, settings, mode, constraint, sampler, cmaEsSettings };
+  const gpSettings = sampler === "gp" && params ? readGpSettings(params, trialLimit) : gpDefaults;
+  return { ...search, settings, mode, constraint, sampler, cmaEsSettings, gpSettings };
 }
 
 function readCmaEsSettings(params: URLSearchParams | null): TwoParamCmaEsSettings {

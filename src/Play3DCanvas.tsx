@@ -1,7 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useRef } from "react";
 import { measurePlay3D } from "./play3dProfiling";
 
-export type Play3DSurfaceLayer = "objective" | "good" | "bad" | "acquisition" | "cmaes";
+export type Play3DSurfaceLayer = "objective" | "good" | "bad" | "acquisition" | "cmaes" | "gp-mean" | "gp-uncertainty" | "gp-acquisition";
 // Plain drawing commands in SVG viewBox units. Thousands of these
 // are painted into one canvas, so no per-item DOM nodes, layout or style exist.
 export type Play3DSceneItem = { id: string; depth: number } & (
@@ -14,7 +14,7 @@ export type Play3DSceneItem = { id: string; depth: number } & (
   | { kind: "floor-anchor"; x: number; y: number }
   | { kind: "candidate"; x: number; y: number; selected: boolean; inspect: () => void }
   | { kind: "axis-candidate"; points: readonly number[]; x: number; y: number; selected: boolean; inspect: () => void }
-  | { kind: "trial"; feasible?: boolean; x: number; y: number; group: "good" | "bad" | "unclassified" | "cmaes-current" | "cmaes-past" }
+  | { kind: "trial"; feasible?: boolean; x: number; y: number; group: "good" | "bad" | "unclassified" | "cmaes-current" | "cmaes-past" | "gp" }
   | { kind: "ellipse-segment"; sigmaLevel: 1 | 2; points: readonly number[]; footprint?: boolean; dashOffset?: number }
   | { kind: "ellipse-fill"; points: readonly number[]; alpha: number }
   | { kind: "mean-path" | "mean-drop"; points: readonly number[] }
@@ -30,8 +30,11 @@ const surfaceStyles: Record<Play3DSurfaceLayer, { color: string; fill: number; s
   bad: { color: "--bad", fill: 0.35, stroke: 0.3 },
   acquisition: { color: "--acquisition", fill: 0.3, stroke: 0.4 },
   cmaes: { color: "--cmaes", fill: 0.36, stroke: 0.28 },
+  "gp-mean": { color: "--gp", fill: 0.42, stroke: 0.3 },
+  "gp-uncertainty": { color: "--gp-soft", fill: 0.34, stroke: 0.25 },
+  "gp-acquisition": { color: "--gp-acq", fill: 0.32, stroke: 0.38 },
 };
-const trialColors = { good: "--good", bad: "--bad", unclassified: "--muted", "cmaes-current": "--cmaes-gen", "cmaes-past": "--muted" } as const;
+const trialColors = { good: "--good", bad: "--bad", unclassified: "--muted", "cmaes-current": "--cmaes-gen", "cmaes-past": "--muted", gp: "--sampler-gp" } as const;
 // Mobile screens report DPR 3; 2 keeps lines crisp at less than half the pixels.
 const maxPixelRatio = 2;
 
@@ -170,6 +173,9 @@ export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DScene
     bad: { token: "--bad", alpha: 0.8, width: 1.1 },
     acquisition: { token: "--acquisition", alpha: 0.8, width: 1.1 },
     cmaes: { token: "--cmaes", alpha: 0.8, width: 1.1 },
+    "gp-mean": { token: "--gp", alpha: 0.8, width: 1.1 },
+    "gp-uncertainty": { token: "--gp-soft", alpha: 0.8, width: 1.1 },
+    "gp-acquisition": { token: "--gp-acq", alpha: 0.8, width: 1.1 },
   };
   let lineStyle: keyof typeof lineStyles | undefined;
   const flushContour = () => {

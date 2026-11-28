@@ -17,7 +17,7 @@ const play2DDefaults: SharedSearch<ObjectivePreset> = {
 const play3DDefaults: SharedSearch<TwoParamObjectivePreset> = {
   seed: twoParamSettings.seed, preset: "multimodal", settings: { ...twoParamDefaultModelSettings, bandwidthRule: "constant" },
 };
-const legacySamplerDefaults = { sampler: "tpe", cmaEsSettings: twoParamCmaEsDefaults };
+const legacySamplerDefaults = { sampler: "tpe", cmaEsSettings: twoParamCmaEsDefaults, gpSettings: gpDefaults };
 
 function roundTripPlay2D(search: SharedSearch<ObjectivePreset>) {
   const url = createShareUrl(pageUrl, { page: "play-2d", preset: search.preset, settings: search.settings }, search.seed);
@@ -34,7 +34,7 @@ describe("share links", () => {
     const hash = new URL(createShareUrl(pageUrl, experiment, 7)).hash;
     expect(hash).toBe("#play-3d?sampler=cmaes&seed=7&preset=quadratic&cmaes=optuna");
     expect(decodePlay3D(readRoute(hash).share)).toEqual({
-      ...play3DDefaults, seed: 7, preset: "quadratic", mode: "multivariate", constraint: "none", sampler: "cmaes", cmaEsSettings: optunaCmaEsPreset,
+      ...play3DDefaults, seed: 7, preset: "quadratic", mode: "multivariate", constraint: "none", sampler: "cmaes", cmaEsSettings: optunaCmaEsPreset, gpSettings: gpDefaults,
     });
   });
 
@@ -349,4 +349,24 @@ describe("Play 2D GP links", () => {
     const legacy = readRoute(new URL(legacyPlay2DUrl).hash).share;
     expect(decode(legacy)).toEqual({ ...readSharedSearch(legacy, play2DDefaults, objectivePresets, trialLimit, 10), sampler: "tpe", gpSettings: gpDefaults });
   });
+});
+
+it("round-trips custom Play 3D GP links with a constraint and keeps TPE defaults", () => {
+  const gpSettings = { ...gpDefaults, kernel: "rbf", lengthScaleRule: "manual", lengthScale: 2.45, noise: 0.001, startupTrials: 200 } as const;
+  const experiment = { page: "play-3d", sampler: "gp", preset: "quadratic", constraint: "disk", gpSettings } as const;
+  const hash = new URL(createShareUrl(pageUrl, experiment, 17)).hash;
+  expect(hash).toBe("#play-3d?sampler=gp&seed=17&preset=quadratic&kernel=rbf&acq=ucb&lsRule=manual&ls=2.45&beta=2&xi=0.01&noise=0.001&startupTrials=200&constraint=disk");
+  expect(decodePlay3D(readRoute(hash).share)).toMatchObject({
+    sampler: "gp", seed: 17, preset: "quadratic", constraint: "disk", gpSettings, settings: { startupTrials: play3DDefaults.settings.startupTrials },
+  });
+  expect(decodePlay3D(new URLSearchParams("sampler=gp&constraint=circle")).constraint).toBe("disk");
+});
+
+it("round-trips the Play 3D Optuna GP preset and defaults invalid GP settings", () => {
+  const gpSettings = applyOptunaGpPreset({ ...gpDefaults, lengthScale: 3, beta: 1.5 });
+  const hash = new URL(createShareUrl(pageUrl, { page: "play-3d", sampler: "gp", preset: "rosenbrock", constraint: "none", gpSettings }, 21)).hash;
+  expect(hash).toBe("#play-3d?sampler=gp&seed=21&preset=rosenbrock&gp=optuna&ls=3&beta=1.5");
+  expect(decodePlay3D(readRoute(hash).share).gpSettings).toEqual(gpSettings);
+  expect(decodePlay3D(new URLSearchParams("sampler=gp&kernel=invalid&ls=42&startupTrials=201")).gpSettings).toEqual(gpDefaults);
+  expect(decodePlay3D(new URLSearchParams("sampler=unknown&acq=ei")).sampler).toBe("tpe");
 });
