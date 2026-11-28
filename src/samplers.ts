@@ -59,3 +59,29 @@ export function samplersForPage(page: SamplerPage): readonly SamplerDefinition[]
 export function supportsConstraints(id: SamplerId): boolean {
   return getSampler(id).supportsConstraints;
 }
+
+export type CompareSamplerId = SamplerId | "random";
+type CompareSamplerDefinition = Omit<SamplerDefinition, "id" | "colorToken"> & {
+  readonly id: CompareSamplerId;
+  readonly colorToken: `--sampler-${CompareSamplerId}`;
+  readonly dashed?: boolean;
+};
+
+const randomSampler = {
+  id: "random",
+  label: "Random",
+  shortLabel: "Rand",
+  pages: ["play-2d", "play-3d"],
+  supportsConstraints: true,
+  colorToken: "--sampler-random",
+  colorName: "gray",
+  dashed: true,
+} as const satisfies CompareSamplerDefinition;
+
+export function getCompareSampler(id: CompareSamplerId): CompareSamplerDefinition {
+  return id === "random" ? randomSampler : getSampler(id);
+}
+
+export function compareOptionsForPage(page: SamplerPage, focus: SamplerId): readonly CompareSamplerDefinition[] {
+  return [...samplersForPage(page).filter(({ id }) => id !== focus), randomSampler];
+}

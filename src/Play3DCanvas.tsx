@@ -1,4 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useRef } from "react";
+import type { CompareSamplerId } from "./samplers";
 import { measurePlay3D } from "./play3dProfiling";
 
 export type Play3DSurfaceLayer = "objective" | "good" | "bad" | "acquisition" | "cmaes" | "gp-mean" | "gp-uncertainty" | "gp-acquisition";
@@ -14,6 +15,8 @@ export type Play3DSceneItem = { id: string; depth: number } & (
   | { kind: "floor-anchor"; x: number; y: number }
   | { kind: "candidate"; x: number; y: number; selected: boolean; inspect: () => void }
   | { kind: "axis-candidate"; points: readonly number[]; x: number; y: number; selected: boolean; inspect: () => void }
+  | { kind: "compare-segment"; sampler: CompareSamplerId; points: readonly number[]; dashed?: boolean }
+  | { kind: "compare-point"; sampler: CompareSamplerId; x: number; y: number; latest?: boolean; feasible?: boolean }
   | { kind: "trial"; feasible?: boolean; x: number; y: number; group: "good" | "bad" | "unclassified" | "cmaes-current" | "cmaes-past" | "gp" }
   | { kind: "ellipse-segment"; sigmaLevel: 1 | 2; points: readonly number[]; footprint?: boolean; dashOffset?: number }
   | { kind: "ellipse-fill"; points: readonly number[]; alpha: number }
@@ -128,7 +131,7 @@ export function hitTestPlay3DScene(
 type Play3DFloor = readonly (readonly [number, number, number, number])[];
 type FloorOutline = readonly { x: number; y: number }[];
 
-export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[], floor: Play3DFloor, viewBox: Play3DViewBox, clipRect?: Play3DViewBox, floorOutline?: FloorOutline) {
+export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DSceneItem[], floor: Play3DFloor, viewBox: Play3DViewBox, clipRect?: Play3DViewBox, floorOutline?: FloorOutline, dimFocus = false) {
   const width = canvas.clientWidth, height = canvas.clientHeight;
   const ctx = canvas.getContext("2d");
   if (!ctx || !width || !height) return;
@@ -177,11 +180,12 @@ export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DScene
     "gp-uncertainty": { token: "--gp-soft", alpha: 0.8, width: 1.1 },
     "gp-acquisition": { token: "--gp-acq", alpha: 0.8, width: 1.1 },
   };
+  const focusOpacity = dimFocus ? 0.7 : 1;
   let lineStyle: keyof typeof lineStyles | undefined;
   const flushContour = () => {
     if (!lineStyle) return;
     const { token, alpha, width } = lineStyles[lineStyle];
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = alpha * (lineStyle === "contour" || lineStyle === "boundary" || lineStyle === "grid" ? 1 : focusOpacity);
     ctx.strokeStyle = color(token);
     ctx.lineWidth = width / fit.scale;
     ctx.stroke();
@@ -203,7 +207,7 @@ export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DScene
     flushContour();
     if (item.kind === "quad") {
       const [ax, ay, bx, by] = item.points;
-      ctx.globalAlpha = item.alpha;
+      ctx.globalAlpha = item.alpha * (item.layer === "objective" ? 1 : focusOpacity);
       ctx.fillStyle = color(item.muted ? "--neutral-point" : surfaceStyles[item.layer].color);
       ctx.fillRect(ax, ay, bx - ax, by - ay);
     } else if (item.kind === "triangle") {
@@ -211,8 +215,9 @@ export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DScene
       const [ax, ay, bx, by, cx, cy] = item.points;
       ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.closePath();
       const value = color(item.muted ? "--neutral-point" : surface.color);
-      ctx.globalAlpha = item.muted ? 0.035 : surface.fill; ctx.fillStyle = value; ctx.fill();
-      if (surface.stroke) { ctx.globalAlpha = surface.stroke; ctx.strokeStyle = value; ctx.lineWidth = 0.35; ctx.stroke(); }
+      const opacity = item.layer === "objective" ? 1 : focusOpacity;
+      ctx.globalAlpha = (item.muted ? 0.035 : surface.fill) * opacity; ctx.fillStyle = value; ctx.fill();
+      if (surface.stroke) { ctx.globalAlpha = surface.stroke * opacity; ctx.strokeStyle = value; ctx.lineWidth = 0.35; ctx.stroke(); }
     } else if (item.kind === "ellipse-fill" || item.kind === "ellipse-segment" || item.kind === "mean-path" || item.kind === "mean-drop") {
       const ellipse = item.kind === "ellipse-segment" ? item : undefined;
       const outer = ellipse?.sigmaLevel === 2;
@@ -229,7 +234,7 @@ export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DScene
       for (let i = 2; i < item.points.length; i += 2) ctx.lineTo(item.points[i], item.points[i + 1]);
       if (item.kind === "ellipse-fill") {
         ctx.closePath();
-        ctx.globalAlpha = item.alpha; ctx.fillStyle = color("--cmaes"); ctx.fill();
+        ctx.globalAlpha = item.alpha * focusOpacity; ctx.fillStyle = color("--cmaes"); ctx.fill();
         continue;
       }
       const drop = item.kind === "mean-drop";
@@ -305,6 +310,35 @@ export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DScene
       } else {
         ctx.globalAlpha = 0.85; ctx.strokeStyle = color("--proposal"); ctx.lineWidth = axisTickWidth(false, fit.scale); ctx.stroke();
       }
+    } else if (item.kind === "compare-segment") {
+      ctx.globalAlpha = 0.48;
+      ctx.beginPath(); ctx.moveTo(item.points[0], item.points[1]);
+      for (let i = 2; i < item.points.length; i += 2) ctx.lineTo(item.points[i], item.points[i + 1]);
+      ctx.strokeStyle = color(`--sampler-${item.sampler}`);
+      ctx.lineWidth = 1.3 / fit.scale;
+      if (item.dashed) ctx.setLineDash([4 / fit.scale, 3 / fit.scale]);
+      ctx.stroke();
+      if (item.dashed) ctx.setLineDash([]);
+    } else if (item.kind === "compare-point") {
+      const { x, y } = item;
+      const r = 3 / fit.scale;
+      const samplerColor = color(`--sampler-${item.sampler}`);
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      if (item.feasible === false) {
+        ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r);
+        ctx.moveTo(x - r, y + r); ctx.lineTo(x + r, y - r);
+        ctx.strokeStyle = color("--surface"); ctx.lineWidth = 3.3 / fit.scale; ctx.stroke();
+        ctx.strokeStyle = samplerColor; ctx.lineWidth = 1.7 / fit.scale; ctx.stroke();
+      } else {
+        ctx.arc(x, y, r, 0, 2 * Math.PI);
+        ctx.fillStyle = samplerColor; ctx.fill();
+        ctx.strokeStyle = color("--surface"); ctx.lineWidth = 0.85 / fit.scale; ctx.stroke();
+      }
+      if (item.latest) {
+        ctx.beginPath(); ctx.arc(x, y, 5.6 / fit.scale, 0, 2 * Math.PI);
+        ctx.strokeStyle = samplerColor; ctx.lineWidth = 1.3 / fit.scale; ctx.stroke();
+      }
     } else if (item.kind === "trial" && item.feasible === false) {
       const { x, y } = item;
       const r = Math.max(4.5, 2.4 / fit.scale);
@@ -335,15 +369,15 @@ export function drawScene(canvas: HTMLCanvasElement, items: readonly Play3DScene
 
 // One bitmap replaces ~10k SVG paths. Each update costs one redraw instead of
 // thousands of DOM mutations, style/layout passes and retained render objects.
-export const Play3DCanvas = memo(function Play3DCanvas({ items, floor, viewBox, clipRect, floorOutline }: { items: readonly Play3DSceneItem[]; floor: Play3DFloor; viewBox: Play3DViewBox; clipRect?: Play3DViewBox; floorOutline?: FloorOutline }) {
+export const Play3DCanvas = memo(function Play3DCanvas({ items, floor, viewBox, clipRect, floorOutline, dimFocus }: { items: readonly Play3DSceneItem[]; floor: Play3DFloor; viewBox: Play3DViewBox; clipRect?: Play3DViewBox; floorOutline?: FloorOutline; dimFocus?: boolean }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const latest = useRef({ items, floor, viewBox, clipRect, floorOutline });
+  const latest = useRef({ items, floor, viewBox, clipRect, floorOutline, dimFocus });
   const frame = useRef<number | null>(null);
   useLayoutEffect(() => {
-    latest.current = { items, floor, viewBox, clipRect, floorOutline };
+    latest.current = { items, floor, viewBox, clipRect, floorOutline, dimFocus };
     const element = canvas.current;
-    if (element) measurePlay3D("canvas-draw", () => drawScene(element, items, floor, viewBox, clipRect, floorOutline));
-  }, [items, floor, viewBox, clipRect, floorOutline]);
+    if (element) measurePlay3D("canvas-draw", () => drawScene(element, items, floor, viewBox, clipRect, floorOutline, dimFocus));
+  }, [items, floor, viewBox, clipRect, floorOutline, dimFocus]);
   useEffect(() => {
     const element = canvas.current;
     if (!element) return;
@@ -352,8 +386,8 @@ export const Play3DCanvas = memo(function Play3DCanvas({ items, floor, viewBox, 
       if (frame.current !== null) return;
       frame.current = requestAnimationFrame(() => {
         frame.current = null;
-        const { items, floor, viewBox, clipRect, floorOutline } = latest.current;
-        drawScene(element, items, floor, viewBox, clipRect, floorOutline);
+        const { items, floor, viewBox, clipRect, floorOutline, dimFocus } = latest.current;
+        drawScene(element, items, floor, viewBox, clipRect, floorOutline, dimFocus);
       });
     };
     const resize = new ResizeObserver(redraw);
