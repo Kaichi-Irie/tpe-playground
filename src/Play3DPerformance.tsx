@@ -3,7 +3,7 @@ import type { GpSettings } from "./gpSettings";
 import type { TwoParamGpProposal } from "./twoParamGp";
 import type { TwoParamConstraintPreset } from "./twoParamConstraints";
 import { currentRunLabel } from "./comparison";
-import { ComparisonPanel } from "./ProgressComparison";
+import { ComparisonPanel, type ComparedTrials } from "./ProgressComparison";
 import { PanelClose } from "./PanelClose";
 import { getSampler, type SamplerId } from "./samplers";
 import type { TwoParamCmaEsProposal, TwoParamCmaEsSettings } from "./twoParamCmaEs";
@@ -11,11 +11,13 @@ import { twoParamDefaultModelSettings, emptyTwoParamPlayback, findTwoParamObject
 
 const asMetricTrials = (values: readonly TwoParamTrial[]) => values.map((trial) => ({ id: trial.id, x: trial.x1, y: trial.value, feasible: trial.violation === 0 }));
 
-export const Play3DPerformance = memo(function Play3DPerformance({ trials, proposals, seed, objectivePreset, constraintPreset = "none", mode = "multivariate", settings = twoParamDefaultModelSettings, sampler = "tpe", gpSettings }: {
+export const Play3DPerformance = memo(function Play3DPerformance({ trials, proposals, seed, objectivePreset, constraintPreset = "none", mode = "multivariate", settings = twoParamDefaultModelSettings, sampler = "tpe", gpSettings, randomTrials: sharedRandomTrials, comparedTrials }: {
   trials: readonly TwoParamTrial[];
   proposals: readonly (TwoParamPlayback["proposals"][number] | TwoParamCmaEsProposal | TwoParamGpProposal)[];
   seed: number;
   objectivePreset: TwoParamObjectivePreset;
+  randomTrials?: readonly TwoParamTrial[];
+  comparedTrials?: readonly ComparedTrials<TwoParamTrial>[];
   constraintPreset?: TwoParamConstraintPreset;
   mode?: DensityMode;
   settings?: TwoParamModelSettings;
@@ -26,9 +28,9 @@ export const Play3DPerformance = memo(function Play3DPerformance({ trials, propo
   const samplerDef = getSampler(sampler);
   const unsupported = !samplerDef.supportsConstraints && constraintPreset !== "none";
   const minimum = useMemo(() => unsupported ? 0 : findTwoParamObjectiveMinimum(objectivePreset, constraintPreset), [unsupported, objectivePreset, constraintPreset]);
-  const randomTrials = useMemo(() => unsupported ? [] : asMetricTrials(moveTwoParamPlayback(emptyTwoParamPlayback(), twoParamSettings.count, seed, "multivariate", {
+  const randomTrials = useMemo(() => unsupported ? [] : asMetricTrials(sharedRandomTrials ?? moveTwoParamPlayback(emptyTwoParamPlayback(), twoParamSettings.count, seed, "multivariate", {
     startupTrials: twoParamSettings.count, objectivePreset, constraintPreset,
-  }).trials), [unsupported, seed, objectivePreset, constraintPreset]);
+  }).trials), [unsupported, sharedRandomTrials, seed, objectivePreset, constraintPreset]);
   const { bandwidth, bandwidthRule = "constant", gamma, weights, priorWeight, startupTrials, candidates, infeasibleFilling: filling = true } = settings;
   const flippedTrials = useMemo(() => constraintPreset === "none" || unsupported ? null : asMetricTrials(moveTwoParamPlayback(emptyTwoParamPlayback(), twoParamSettings.count, seed, mode, {
     bandwidth, bandwidthRule, gamma, weights, priorWeight, startupTrials, candidates, objectivePreset, constraintPreset, infeasibleFilling: !filling,
@@ -47,5 +49,6 @@ export const Play3DPerformance = memo(function Play3DPerformance({ trials, propo
     : sampler === "gp" ? (gpSettings && gpSettings.startupTrials >= twoParamSettings.count ? "Random only" : "GP")
     : currentRunLabel(proposals.filter((proposal): proposal is TwoParamPlayback["proposals"][number] => "gamma" in proposal.trace.config), startupTrials >= twoParamSettings.count, constrained ? filling : undefined);
   return <ComparisonPanel trials={currentTrials} currentLabel={currentLabel} currentSampler={sampler} randomTrials={randomTrials} minimum={minimum} relative={false}
+    comparedTrials={comparedTrials?.map(({ id, trials: samples }) => ({ id, trials: asMetricTrials(samples) }))}
     approximate={constraintPreset === "none" && objectivePreset === "multimodal"} constrained={constrained} />;
 });

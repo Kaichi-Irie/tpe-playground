@@ -1,11 +1,20 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { comparisonAxis, comparisonFloor, comparisonTrialAxis } from "./comparison";
-import { getSampler, type SamplerId } from "./samplers";
+import { getCompareSampler, getSampler, type SamplerId } from "./samplers";
 import { useChartTypeScale } from "./usePlotSize";
 
 type Series = readonly (number | null)[];
 
-export function ProgressPlot({ title, definition, tpe, random, third, currentLabel, currentSampler = "tpe" }: {
+export type ProgressSeries = {
+  id: string;
+  label: string;
+  values: Series;
+  colorToken: string;
+  colorName: string;
+  dashed?: boolean;
+};
+
+export function ProgressPlot({ title, definition, tpe, random, third, currentLabel, currentSampler = "tpe", extraSeries = [] }: {
   title: string;
   definition: string;
   tpe: Series;
@@ -13,6 +22,7 @@ export function ProgressPlot({ title, definition, tpe, random, third, currentLab
   third?: { label: string; values: Series };
   currentLabel: string;
   currentSampler?: SamplerId;
+  extraSeries?: readonly ProgressSeries[];
 }) {
   const sampler = getSampler(currentSampler);
   const id = useId();
@@ -32,15 +42,23 @@ export function ProgressPlot({ title, definition, tpe, random, third, currentLab
   const height = Math.max(third ? 240 : 280, Math.min(420, width / 1.8));
   const plot = { left: 62 * typeScale, right: width - 20 * typeScale, top: 24 * typeScale, bottom: height - 52 * typeScale };
   const centerX = (plot.left + plot.right) / 2;
-  const step = tpe.length;
+  const step = Math.max(tpe.length, random.length, third?.values.length ?? 0, ...extraSeries.map(({ values }) => values.length));
   const trialAxis = comparisonTrialAxis(step);
   const trialX = (trial: number) => plot.left + (trial - 1) / (trialAxis.upper - 1) * (plot.right - plot.left);
   const randomLabel = third ? "Random" : "Random search";
-  const series = [
-    { name: "random", label: randomLabel, values: random, radius: 5 },
-    ...(third ? [{ name: "third", ...third, radius: 4 }] : []),
-    { name: "tpe", label: currentLabel, values: tpe, radius: 3 },
+  const randomSampler = getCompareSampler("random");
+  const series: { name: string; label: string; values: Series; radius: number; colorName: string; line: string; style?: CSSProperties }[] = [
+    { name: "random", label: randomLabel, values: random, radius: 5, colorName: randomSampler.colorName, line: "dashed" },
+    ...(third ? [{ name: "third", ...third, radius: 4, colorName: "purple", line: "dotted" }] : []),
+    ...[...extraSeries].reverse().map(({ id, label, values, colorName, colorToken, dashed }) => ({
+      name: `extra-${id}`, label, values, radius: 4, colorName, line: dashed ? "dashed" : "solid",
+      style: { "--series-color": `var(${colorToken})`, "--series-dash": dashed ? "7 5" : "none" } as CSSProperties,
+    })),
+    { name: "tpe", label: currentLabel, values: tpe, radius: 3, colorName: sampler.colorName, line: "solid" },
   ];
+  const legend = [...series].reverse();
+  const seriesTitle = third || extraSeries.length ? legend.map(({ label }) => label).join(", ") : `${currentLabel} versus ${randomLabel}`;
+  const chartTitle = `${title}: ${seriesTitle}`;
   const displayedValues = series.flatMap(({ values }) => values);
   const hasInfeasiblePrefix = displayedValues.includes(null);
   const finiteValues = displayedValues.filter((value) => value !== null);
@@ -69,12 +87,12 @@ export function ProgressPlot({ title, definition, tpe, random, third, currentLab
   }).join(" ");
   return <section className="progress-panel" data-sampler={sampler.id} style={{ "--comparison-current": `var(${sampler.colorToken})` } as CSSProperties} aria-label={title}>
     <div className={third ? "comparison-values constrained-values" : "comparison-values"}>
-      {[...series].reverse().map(({ name, label }) => <span key={name} className={`comparison-${name}`}><i aria-hidden="true" />{label}</span>)}
+      {legend.map(({ name, label, style, line }) => <span key={name} className={style ? "comparison-extra" : `comparison-${name}`} style={style} data-dashed={style && line === "dashed" ? true : undefined}><i aria-hidden="true" />{label}</span>)}
       {!third && <span className="comparison-direction">Lower is better ↓</span>}
     </div>
-    <div className="comparison-chart" ref={chartRef}><svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={`${id}-title ${id}-description`}>
-      <title id={`${id}-title`}>{`${title}: ${third ? [currentLabel, third.label, randomLabel].join(", ") : `${currentLabel} versus ${randomLabel}`}`}</title>
-      <desc id={`${id}-description`}>{definition} Shown through trial {step} on a logarithmic vertical axis. {hasInfeasiblePrefix ? "∞ marks trials before each run found its first feasible point. " : ""}The horizontal axis spans trials 1 to {trialAxis.upper} and adjusts in blocks of 10. {currentLabel} is solid {sampler.colorName}. {third && `${third.label} is dotted purple. `}{randomLabel} is dashed orange.</desc>
+    <div className="comparison-chart" ref={chartRef}><svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={chartTitle} aria-describedby={`${id}-description`}>
+      <title>{chartTitle}</title>
+      <desc id={`${id}-description`}>{definition} Shown through trial {step} on a logarithmic vertical axis. {hasInfeasiblePrefix ? "∞ marks trials before each run found its first feasible point. " : ""}The horizontal axis spans trials 1 to {trialAxis.upper} and adjusts in blocks of 10. {legend.map(({ label, line, colorName }) => `${label} is ${line} ${colorName}.`).join(" ")}</desc>
       {yTicks.map(({ value, label }) => <g key={label}>
         <line className="grid" x1={plot.left} x2={plot.right} y1={scaleY(value)} y2={scaleY(value)} />
         <text x={plot.left - 10 * typeScale} y={scaleY(value) + 4 * typeScale} textAnchor="end">{label}</text>
@@ -83,10 +101,10 @@ export function ProgressPlot({ title, definition, tpe, random, third, currentLab
       <text x={centerX} y={height - 8 * typeScale} textAnchor="middle" className="axis-title">Evaluations</text>
       {step === 0 ? <text x={centerX} y={(plot.top + plot.bottom) / 2} textAnchor="middle"><tspan x={centerX}>Play or step forward</tspan><tspan x={centerX} dy={18 * typeScale}>to compare progress.</tspan></text> : <>
         <line className="comparison-cursor" x1={trialX(step)} x2={trialX(step)} y1={plot.top} y2={plot.bottom} />
-        {series.map(({ name, values }) => values.length > 0 && <path key={name} d={staircase(values)} className={`${name}-progress-line`} />)}
-        {series.map(({ name, values, radius }) => {
-          const value = values[step - 1];
-          return value === undefined ? null : <circle key={name} cx={trialX(step)} cy={scaleY(value)} r={radius} className={`${name}-progress-point`} />;
+        {series.map(({ name, values, style }) => values.length > 0 && <path key={name} d={staircase(values)} style={style} className={style ? "extra-progress-line" : `${name}-progress-line`} />)}
+        {series.map(({ name, values, radius, style }) => {
+          const value = values.at(-1);
+          return value === undefined ? null : <circle key={name} cx={trialX(values.length)} cy={scaleY(value)} r={radius} style={style} className={style ? "extra-progress-point" : `${name}-progress-point`} />;
         })}
       </>}
     </svg></div>

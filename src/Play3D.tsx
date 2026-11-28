@@ -23,13 +23,14 @@ import { Help } from "./Help";
 import { HelpMath } from "./HelpMath";
 import { constrainSettings } from "./searchSettings";
 import { readPlay3DSharedSearch, type SharedSearch } from "./shareSearch";
-import { useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent } from "react";
-import { buildTwoParamView, twoParamDefaultModelSettings, getTwoParamObjective, twoParamObjectivePresets, emptyTwoParamPlayback, moveTwoParamPlayback, proposeTwoParamTrial, twoParamProposalFromTrace, twoParamSettings, type DensityMode, type TwoParamObjectivePreset, type TwoParamModelSettings, type TwoParamPlayback } from "./twoParamTpe";
-import { getSampler, samplersForPage } from "./samplers";
+import { useCallback, useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent } from "react";
+import { buildTwoParamView, twoParamDefaultModelSettings, getTwoParamObjective, twoParamObjectivePresets, emptyTwoParamPlayback, moveTwoParamPlayback, proposeTwoParamTrial, twoParamProposalFromTrace, twoParamSettings, type DensityMode, type TwoParamObjectivePreset, type TwoParamModelSettings, type TwoParamTrial } from "./twoParamTpe";
+import { getCompareSampler, getSampler, samplersForPage, type CompareSamplerId } from "./samplers";
 import { buildTwoParamCmaEsView, emptyTwoParamCmaEsPlayback, moveTwoParamCmaEsPlayback, type TwoParamCmaEsSettings, type TwoParamSampler } from "./twoParamCmaEs";
 import { buildCmaEsBell, buildCmaEsScene } from "./play3dCmaEsScene";
 import { buildPlay3DCandidateScene } from "./play3dTpeScene";
 import { Play3DConstraintSettings } from "./Play3DConstraintSettings";
+import { CompareLegend, ComparePicker } from "./ComparePicker";
 import { PlotLegend, type PlotLayerItem } from "./PlotLegend";
 
 export { buildPlay3DCandidateScene, type Play3DCandidateInspectorEntry } from "./play3dTpeScene";
@@ -85,6 +86,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
   const [gpPlayback, setGpPlayback] = useState(emptyTwoParamGpPlayback);
   const [gpSettings, setGpSettings] = useState(initialSearch.gpSettings);
   const [sampler, setSampler] = useState(initialSearch.sampler);
+  const [compare, setCompare] = useState(initialSearch.compare);
   const [cmaEsSettings, setCmaEsSettings] = useState(initialSearch.cmaEsSettings);
   const isCmaEs = sampler === "cmaes";
   const isGp = sampler === "gp";
@@ -123,6 +125,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     if (preset === "none") setConstraintHint(false);
     else {
       setSettings(constrainSettings);
+      setCompare((current) => current.filter((id) => getCompareSampler(id).supportsConstraints));
       if (samplerDef.supportsConstraints && !constraintHintSeen) {
         setConstraintHintSeen(true);
         setConstraintHint(true);
@@ -157,6 +160,16 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
   const activePlayback = isGp ? gpPlayback : isCmaEs ? cmaEsPlayback : playback;
   const step = activePlayback.trials.length;
   const complete = step === twoParamSettings.count;
+  const randomTrials = useMemo(() => moveTwoParamPlayback(emptyTwoParamPlayback(), twoParamSettings.count, seed, "multivariate", {
+    startupTrials: twoParamSettings.count, objectivePreset, constraintPreset,
+  }).trials, [seed, objectivePreset, constraintPreset]);
+  const compareRuns = useMemo(() => {
+    const trialsBySampler: Record<CompareSamplerId, readonly TwoParamTrial[]> = {
+      tpe: playback.trials, cmaes: cmaEsPlayback.trials, gp: gpPlayback.trials, random: randomTrials,
+    };
+    return compare.map((id) => ({ id, trials: trialsBySampler[id].slice(0, step) }));
+  }, [compare, playback.trials, cmaEsPlayback.trials, gpPlayback.trials, randomTrials, step]);
+  const comparedTrials = compareRuns.flatMap(({ id, trials }) => id === "random" ? [] : [{ id, trials }]);
   // Slider drags and seeks emit many updates per second. Rebuilding the model and
   // scene for each one queued more work than a phone could finish, freezing the
   // page. The deferred copy is rendered at low priority, interrupted by newer
@@ -195,55 +208,86 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     if (!cmaEsModel) return proposal;
     return complete ? null : cmaEsModel.fitted.propose(seed).selected;
   }, [isGp, gpProposal, cmaEsModel, complete, proposal, seed]);
+  const moveTpe = useCallback((current: typeof playback, target: number) => moveTwoParamPlayback(current, target, seed, mode, searchSettings),
+    [seed, mode, searchSettings]);
+  const moveCmaEs = useCallback((current: typeof cmaEsPlayback, target: number) => moveTwoParamCmaEsPlayback(current, target, seed, cmaEsSettings, objectivePreset),
+    [seed, cmaEsSettings, objectivePreset]);
+  const moveGp = useCallback((current: typeof gpPlayback, target: number) => moveTwoParamGpPlayback(current, target, seed, gpSettings, objectivePreset),
+    [seed, gpSettings, objectivePreset]);
   useEffect(() => {
     if (!playing || unsupported) return;
     if (complete) { setPlaying(false); return; }
     const timer = window.setTimeout(() => {
-      if (isCmaEs) setCmaEsPlayback((current) => moveTwoParamCmaEsPlayback(current, current.trials.length + 1, seed, cmaEsSettings, objectivePreset));
-      else if (isGp) setGpPlayback((current) => moveTwoParamGpPlayback(current, current.step + 1, seed, gpSettings, objectivePreset));
-      else setPlayback((current) => moveTwoParamPlayback(current, current.trials.length + 1, seed, mode, searchSettings));
+      if (isCmaEs || compare.includes("cmaes")) setCmaEsPlayback((current) => moveCmaEs(current, step + 1));
+      if (isGp || compare.includes("gp")) setGpPlayback((current) => moveGp(current, step + 1));
+      if (sampler === "tpe" || compare.includes("tpe")) setPlayback((current) => moveTpe(current, step + 1));
       setInspection("");
     }, 1000 / playbackSpeed);
     return () => window.clearTimeout(timer);
-  }, [playing, playbackSpeed, complete, step, seed, mode, searchSettings, isCmaEs, isGp, unsupported, cmaEsSettings, gpSettings, objectivePreset]);
-  function runSeek<State>(next: number, seek: (signal: AbortSignal) => Promise<State | null>, onComplete: (result: State) => void) {
+  }, [playing, playbackSpeed, complete, step, sampler, isCmaEs, isGp, compare, unsupported, moveTpe, moveCmaEs, moveGp]);
+
+  function moveRuns(next: number, ids: readonly CompareSamplerId[], onComplete?: () => void, resetCmaEs = false) {
+    const immediate: (() => void)[] = [];
+    const seeks: ((signal: AbortSignal) => Promise<(() => void) | null>)[] = [];
+    function queue<State>(state: State, from: number, set: (result: State) => void,
+      move: (state: State, target: number) => State, seek: (signal: AbortSignal) => Promise<State | null>) {
+      if (next <= from + 1) immediate.push(() => set(move(state, next)));
+      else seeks.push(async (signal) => {
+        const result = await seek(signal);
+        return result === null ? null : () => set(result);
+      });
+    }
+    if (ids.includes("tpe")) queue(playback, playback.trials.length, setPlayback, moveTpe,
+      (signal) => seekTwoParamPlayback(playback, next, seed, mode, searchSettings, signal));
+    if (ids.includes("gp")) queue(gpPlayback, gpPlayback.step, setGpPlayback, moveGp,
+      (signal) => seekPlayback(gpPlayback, (state) => state.step, next, twoParamSettings.count, moveGp, signal));
+    if (ids.includes("cmaes")) {
+      const from = resetCmaEs ? emptyTwoParamCmaEsPlayback() : cmaEsPlayback;
+      queue(from, from.trials.length, setCmaEsPlayback, moveCmaEs,
+        (signal) => seekPlayback(from, (state) => state.trials.length, next, twoParamSettings.count, moveCmaEs, signal));
+    }
+    const commit = () => {
+      immediate.forEach((publish) => publish());
+      onComplete?.();
+    };
+    if (!seeks.length) {
+      commit();
+      return;
+    }
+
+    setPlaying(false);
     const controller = new AbortController();
     seekController.current = controller;
     setSeekTarget(next);
-    void seek(controller.signal).then((result) => {
-      if (result && !controller.signal.aborted) onComplete(result);
+    void Promise.all(seeks.map((seek) => seek(controller.signal))).then((results) => {
+      if (controller.signal.aborted || results.some((publish) => publish === null)) return;
+      results.forEach((publish) => publish?.());
+      commit();
     }).catch((error: unknown) => {
-      if (!controller.signal.aborted) setInspection(error instanceof Error ? error.message : "Could not complete the seek.");
+      if (!controller.signal.aborted) {
+        controller.abort();
+        setInspection(error instanceof Error ? error.message : "Could not complete the seek.");
+      }
     }).finally(() => {
       if (seekController.current !== controller) return;
       seekController.current = null;
       setSeekTarget(null);
     });
   }
-  function moveTpeTo(next: number, onComplete: (result: TwoParamPlayback) => void) {
-    if (next <= playback.trials.length + 1) {
-      onComplete(moveTwoParamPlayback(playback, next, seed, mode, searchSettings));
-      return;
-    }
-    runSeek(next, (signal) => seekTwoParamPlayback(playback, next, seed, mode, searchSettings, signal), onComplete);
-  }
-  function moveGpTo(next: number, onComplete: (result: typeof gpPlayback) => void) {
-    const move = (current: typeof gpPlayback, target: number) => moveTwoParamGpPlayback(current, target, seed, gpSettings, objectivePreset);
-    if (next <= gpPlayback.step + 1) {
-      onComplete(move(gpPlayback, next));
-      return;
-    }
-    runSeek(next, (signal) => seekPlayback(gpPlayback, (state) => state.step, next, twoParamSettings.count, move, signal), onComplete);
-  }
+
   function moveTo(next: number) {
     if (unsupported) return;
     setPlaying(false);
     cancelSeek();
     setInspection("");
-    if (isCmaEs) setCmaEsPlayback(moveTwoParamCmaEsPlayback(cmaEsPlayback, next, seed, cmaEsSettings, objectivePreset));
-    else if (isGp) moveGpTo(next, setGpPlayback);
-    else moveTpeTo(next, setPlayback);
+    moveRuns(next, [sampler, ...compare]);
   }
+
+  function changeCompare(next: CompareSamplerId[]) {
+    cancelSeek();
+    moveRuns(step, next.filter((id) => !compare.includes(id)), () => setCompare(next));
+  }
+
   function changeSampler(next: TwoParamSampler) {
     cancelSeek();
     if (next === sampler) return;
@@ -251,25 +295,18 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     setInspection("");
     setFocusedCandidate(null);
     setConstraintHint(false);
-    if (next === "cmaes") {
-      const from = emptyTwoParamCmaEsPlayback();
-      setCmaEsPlayback(constrained ? from : moveTwoParamCmaEsPlayback(from, step, seed, cmaEsSettings, objectivePreset));
+    const commit = () => {
+      setCompare((current) => current.flatMap((id) => id !== next ? [id] : unsupported ? [] : [sampler]));
       setSampler(next);
-    } else if (next === "gp") {
-      if (constrained) {
-        setGpPlayback(emptyTwoParamGpPlayback());
-        setSampler(next);
-      } else moveGpTo(step, (result) => {
-        setGpPlayback(result);
-        setSampler(next);
-      });
-    } else {
-      moveTpeTo(step, (result) => {
-        setPlayback(result);
-        setSampler(next);
-      });
-    }
+    };
+    if (constrained && !getSampler(next).supportsConstraints) {
+      if (next === "cmaes") setCmaEsPlayback(emptyTwoParamCmaEsPlayback());
+      if (next === "gp") setGpPlayback(emptyTwoParamGpPlayback());
+      commit();
+    } else if (compare.includes(next)) commit();
+    else moveRuns(step, [next], commit, next === "cmaes");
   }
+
   function editCmaEsSettings(next: TwoParamCmaEsSettings) {
     cancelSeek();
     setPlaying(false);
@@ -540,10 +577,33 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
       const floor = projectFloor(nextPoint.x1, nextPoint.x2);
       items.push({ id: "next-trial", kind: "proposal", depth: p.depth + 0.03, x: p.x, y: p.y, floorX: floor.x, floorY: floor.y });
     }
-    if (isTop) return items;
-    return measurePlay3D("merge-sort", () => mergeDepthSorted(objectiveScene, items.sort((a, b) => a.depth - b.depth)));
+    const compareSegments: Play3DSceneItem[] = [];
+    const comparePoints: Play3DSceneItem[] = [];
+    if (observationsVisible) for (const { id: sampler, trials } of compareRuns) {
+      const { dashed } = getCompareSampler(sampler);
+      let points: number[] = [];
+      const finishSegment = () => {
+        if (points.length >= 4) compareSegments.push({ id: `compare-${sampler}-segment-${compareSegments.length}`,
+          kind: "compare-segment", sampler, depth: 0, points, dashed });
+        points = [];
+      };
+      trials.forEach((trial, index) => {
+        const p = projectTrial(trial.x1, trial.x2, trial.value);
+        if (isTop && !topLayout.contains(p.x, p.y)) {
+          finishSegment();
+          return;
+        }
+        points.push(p.x, p.y);
+        comparePoints.push({ id: `compare-${sampler}-${trial.id}`, kind: "compare-point", sampler, depth: p.depth, x: p.x, y: p.y,
+          latest: index === trials.length - 1, feasible: trial.violation === 0 });
+      });
+      finishSegment();
+    }
+    const focusScene = isTop ? items
+      : measurePlay3D("merge-sort", () => mergeDepthSorted(objectiveScene, items.sort((a, b) => a.depth - b.depth)));
+    return comparePoints.length ? [...focusScene, ...compareSegments, ...comparePoints] : focusScene;
   // Projection and scaling depend exclusively on these immutable inputs.
-  }), [model, isGp, sceneTrials, preparedGp, view, visible, cmaEsModel, cmaEsSnapshot, cmaEsBell, cmaEsVisible, objectiveVisible, observationsVisible, highlightedGenIds, nextPoint, objectiveView, heightScale, objectiveScene, preparedDensities, candidateScene, isTop, topLayout, topTint, topFields]);
+  }), [model, isGp, sceneTrials, preparedGp, view, visible, cmaEsModel, cmaEsSnapshot, cmaEsBell, cmaEsVisible, objectiveVisible, observationsVisible, highlightedGenIds, nextPoint, objectiveView, heightScale, objectiveScene, preparedDensities, candidateScene, isTop, topLayout, topTint, topFields, compareRuns]);
   // Painted markers live in the canvas; these invisible SVG twins keep trials
   // focusable, labelled and hoverable without adding per-frame paint work.
   const markerTargets = observationsVisible ? sceneTrials.map((trial) => {
@@ -724,10 +784,14 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     <div className="canvas-controls">
     <PlaybackControls targetStep={seekTarget} step={step} limit={twoParamSettings.count} playing={playing} speed={playbackSpeed} onSpeedChange={setPlaybackSpeed} guidePlay={guide.active === "playback"} guideDescribedBy={guide.textId} idSuffix="-play-3d" labelPrefix="Play 3D " describedBy="trial-seek-help-play-3d" onMove={moveTo} disabled={unsupported}
       onToggle={() => { cancelSeek(); if (complete) moveTo(0); setPlaying(!playing || complete); }} />
-    <div className="sampler-toggle" role="group" aria-label="Play 3D sampler">
-      {samplersForPage("play-3d").map(({ id, label }) => <button key={id} type="button" aria-pressed={sampler === id} onClick={() => changeSampler(id)}>{label}</button>)}
+    <div className="sampler-controls">
+      <div className="sampler-toggle" role="group" aria-label="Play 3D sampler">
+        {samplersForPage("play-3d").map(({ id, label }) => <button key={id} type="button" aria-pressed={sampler === id} onClick={() => changeSampler(id)}>{label}</button>)}
+      </div>
+      <ComparePicker page="play-3d" focus={sampler} selected={compare} constrained={constrained} onChange={changeCompare} />
     </div>
     </div>
+    {compare.length > 0 && <CompareLegend focus={sampler} selected={compare} />}
     {isCmaEs
       ? <PlotLegend ariaLabel="Play 3D plot layers" className="cmaes-legend" items={cmaEsLayers} visible={cmaEsVisible}
         onToggle={(key) => { setCmaEsVisible((current) => ({ ...current, [key]: !current[key] })); setInspection(""); }} />
@@ -748,7 +812,7 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
       </span>
     </div>}
     <div className="scene-stage">
-    <Play3DCanvas items={scene} floor={isTop ? emptyFloor : floor} viewBox={viewBox} clipRect={isTop ? topClip : undefined} floorOutline={floorOutline} />
+    <Play3DCanvas dimFocus={compare.length > 0} items={scene} floor={isTop ? emptyFloor : floor} viewBox={viewBox} clipRect={isTop ? topClip : undefined} floorOutline={floorOutline} />
     <svg className={`scene-play-3d${isTop ? " is-top" : ""}${pannable ? " is-pannable" : ""}`} ref={sceneRef} viewBox={sceneBox} style={{ "--chart-zoom": chartZoom } as CSSProperties} role="group" aria-label={isCmaEs ? `Interactive ${isTop ? "top-down" : "3D"} objective and CMA-ES view` : isGp ? `Interactive ${isTop ? "top-down" : "3D"} objective and GP view` : isTop ? "Interactive top-down objective and density contours" : "Interactive 3D landscape and KDE surfaces"} data-guide-target={showRotateGuide || undefined} aria-describedby={showRotateGuide ? `view-help ${guide.textId}` : "view-help"} tabIndex={0}
       onPointerDown={onScenePointerDown} onPointerMove={onScenePointerMove}
       onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={endDrag}
@@ -838,15 +902,15 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
     </div>
 
     <h2 id="play-3d-heading" className="sr-only">Explore two dimensions</h2>
-    {isCmaEs ? <CmaEsSettingsPanel experiment={{ page: "play-3d", sampler, preset: objectivePreset, constraint: constraintPreset, cmaEsSettings }}
+    {isCmaEs ? <CmaEsSettingsPanel experiment={{ page: "play-3d", sampler, preset: objectivePreset, constraint: constraintPreset, cmaEsSettings, compare }}
       onChange={editCmaEsSettings} seed={seed} onNewSeed={newSeed} status={cmaEsStatus}>{experimentSettings}</CmaEsSettingsPanel>
-    : isGp ? <GpSettingsPanel experiment={{ page: "play-3d", sampler, preset: objectivePreset, constraint: constraintPreset, gpSettings }}
+    : isGp ? <GpSettingsPanel experiment={{ page: "play-3d", sampler, preset: objectivePreset, constraint: constraintPreset, gpSettings, compare }}
       seedLabel="Play 3D Search seed" seekHelpId="trial-seek-help-play-3d"
       resolvedLengthScale={gpModel?.resolvedLengthScale ?? gpSettings.lengthScale} onChange={editGpSettings}
       seed={seed} onNewSeed={newSeed} trialLimit={twoParamSettings.count}
       status={unsupported ? "GP · constraints unsupported" : complete ? "Search complete"
         : step < gpSettings.startupTrials ? `Random start · ${step + 1} / ${gpSettings.startupTrials}` : `GP · trial ${step + 1}`}>{experimentSettings}</GpSettingsPanel>
-    : <ModelSettingsPanel experiment={{ page: "play-3d", preset: objectivePreset, mode, constraint: constraintPreset, settings }} className="settings-play-3d" idSuffix="-play-3d" labelPrefix="Play 3D " defaultSettings={constrained ? constrainedModelDefaults : twoParamDefaultModelSettings} trialLimit={twoParamSettings.count} domainWidth={domainWidth} widths={goodWidths} disableEi={constrained} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={newSeed}
+    : <ModelSettingsPanel experiment={{ page: "play-3d", preset: objectivePreset, mode, constraint: constraintPreset, settings, compare }} className="settings-play-3d" idSuffix="-play-3d" labelPrefix="Play 3D " defaultSettings={constrained ? constrainedModelDefaults : twoParamDefaultModelSettings} trialLimit={twoParamSettings.count} domainWidth={domainWidth} widths={goodWidths} disableEi={constrained} guide={guide.settingsGuide} onChange={editSettings} seed={seed} onNewSeed={newSeed}
       status={<div className="proposal">
         <span>{!proposal ? "Search complete" : noFeasibleGood ? `Uniform random · trial ${step + 1}` : proposal.method === "random" ? `Random start · ${step + 1} / ${settings.startupTrials}` : `TPE · trial ${step + 1}`}</span>
         <Help label="Play 3D trial playback">
@@ -863,8 +927,8 @@ export default function Play3D({ sharedSettings = null, initialViewMode = "3d" }
         </div>
     </ModelSettingsPanel>}
     <details className="performance-monitor" onToggle={(event) => setComparisonOpen(event.currentTarget.open)}>
-      <summary><span className="performance-caption">Best f(x) <strong title={bestValue}>{bestValue}</strong></span><span>Performance <span aria-hidden="true">⌄</span></span></summary>
-      {comparisonOpen && <Play3DPerformance trials={activePlayback.trials} proposals={activePlayback.proposals} seed={seed} objectivePreset={objectivePreset} constraintPreset={constraintPreset} mode={mode} settings={settings} sampler={sampler} cmaEsSettings={cmaEsSettings} gpSettings={gpSettings} />}
+      <summary><span className="performance-caption">Best f(x) <strong title={bestValue}>{bestValue}</strong></span><span>Performance{compare.length > 0 && ` · vs ${compare.length}`} <span aria-hidden="true">⌄</span></span></summary>
+      {comparisonOpen && <Play3DPerformance randomTrials={randomTrials} comparedTrials={comparedTrials} trials={activePlayback.trials} proposals={activePlayback.proposals} seed={seed} objectivePreset={objectivePreset} constraintPreset={constraintPreset} mode={mode} settings={settings} sampler={sampler} cmaEsSettings={cmaEsSettings} gpSettings={gpSettings} />}
     </details>
   </section>;
 }

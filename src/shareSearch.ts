@@ -1,3 +1,4 @@
+import { compareOptionsForPage, type CompareSamplerId, type SamplerId, type SamplerPage } from "./samplers";
 import { applyOptunaGpPreset, gpAcquisitionOptions, gpBetaRange, gpDefaults, gpKernelOptions, gpLengthScaleRange, gpLengthScaleRules, gpNoiseOptions, gpStartupTrialCounts, gpXiRange, matchesOptunaGpPreset, type GpSettings } from "./gpSettings";
 import { trialLimit as oneParamTrialLimit } from "./oneParamProblem";
 import { twoParamTrialLimit } from "./twoParamProblem";
@@ -12,12 +13,12 @@ import {
 export const playPageHrefs = { "play-2d": import.meta.env.BASE_URL, "play-3d": "#play-3d" } as const;
 const playShareHashes = { "play-2d": "#play-2d", "play-3d": playPageHrefs["play-3d"] } as const;
 export type Page = keyof typeof playPageHrefs | "lab" | "about";
-export type ShareExperiment =
+export type ShareExperiment = { compare?: readonly CompareSamplerId[] } & (
   | { page: "play-2d"; preset: string; sampler?: "tpe"; settings: ModelSettings }
   | { page: "play-2d"; preset: string; sampler: "gp"; gpSettings: GpSettings }
   | { page: "play-3d"; preset: string; mode: DensityMode; constraint: TwoParamConstraintPreset; sampler?: "tpe"; settings: ModelSettings }
   | { page: "play-3d"; preset: string; mode?: DensityMode; constraint: TwoParamConstraintPreset; sampler: "cmaes"; cmaEsSettings?: TwoParamCmaEsSettings }
-  | { page: "play-3d"; preset: string; mode?: DensityMode; constraint: TwoParamConstraintPreset; sampler: "gp"; gpSettings: GpSettings };
+  | { page: "play-3d"; preset: string; mode?: DensityMode; constraint: TwoParamConstraintPreset; sampler: "gp"; gpSettings: GpSettings });
 
 export type SharedSearch<Preset extends string> = {
   seed: number;
@@ -40,6 +41,11 @@ export function readRoute(hash: string): Route {
 export function createShareUrl(documentUrl: string, experiment: ShareExperiment, seed: number) {
   const url = new URL(documentUrl);
   url.search = "";
+  const finish = (params: URLSearchParams) => {
+    if (experiment.compare?.length) params.set("compare", experiment.compare.join(","));
+    url.hash = `${playShareHashes[experiment.page]}?${params}`;
+    return url.href;
+  };
   if (experiment.sampler === "gp") {
     const settings = experiment.gpSettings;
     const values = new URLSearchParams({
@@ -62,8 +68,7 @@ export function createShareUrl(documentUrl: string, experiment: ShareExperiment,
       })) params.set(key, String(value));
     }
     if (experiment.page === "play-3d" && experiment.constraint !== "none") params.set("constraint", experiment.constraint);
-    url.hash = `${playShareHashes[experiment.page]}?${params}`;
-    return url.href;
+    return finish(params);
   }
   if (experiment.sampler === "cmaes") {
     const cmaEsSettings = experiment.cmaEsSettings ?? twoParamCmaEsDefaults;
@@ -77,8 +82,7 @@ export function createShareUrl(documentUrl: string, experiment: ShareExperiment,
       params.set("x0x2", String(x0.x2));
     }
     if (experiment.constraint !== "none") params.set("constraint", experiment.constraint);
-    url.hash = `${playShareHashes[experiment.page]}?${params}`;
-    return url.href;
+    return finish(params);
   }
   const { settings } = experiment;
   const model = {
@@ -101,8 +105,7 @@ export function createShareUrl(documentUrl: string, experiment: ShareExperiment,
       if (!optuna) params.set("infeasibleFilling", String(settings.infeasibleFilling ?? true));
     }
   }
-  url.hash = `${playShareHashes[experiment.page]}?${params}`;
-  return url.href;
+  return finish(params);
 }
 
 function decimal(value: string | null): number {
@@ -171,22 +174,31 @@ function readGpSettings(params: URLSearchParams, trialLimit: number): GpSettings
   return params.get("gp") === "optuna" ? applyOptunaGpPreset(settings) : settings;
 }
 
+function readCompare(params: URLSearchParams | null, page: SamplerPage, focus: SamplerId, constrained = false): CompareSamplerId[] {
+  const options = compareOptionsForPage(page, focus).filter((option) => !constrained || option.supportsConstraints);
+  return [...new Set(params?.get("compare")?.split(","))].flatMap((value) => {
+    const option = options.find(({ id }) => id === value);
+    return option ? [option.id] : [];
+  });
+}
+
 export function readPlay2DSharedSearch<Preset extends string>(
   params: URLSearchParams | null,
   defaults: SharedSearch<Preset>,
   presets: Record<Preset, unknown>,
   trialLimit: number,
   domainWidth: number,
-): SharedSearch<Preset> & { sampler: "tpe" | "gp"; gpSettings: GpSettings } {
+): SharedSearch<Preset> & { sampler: "tpe" | "gp"; gpSettings: GpSettings; compare: CompareSamplerId[] } {
   if (params?.get("sampler") === "gp") {
     const experiment = new URLSearchParams({ seed: params.get("seed") ?? "", preset: params.get("preset") ?? "" });
     return {
       ...readSharedSearch(experiment, defaults, presets, trialLimit, domainWidth),
       sampler: "gp",
+      compare: readCompare(params, "play-2d", "gp"),
       gpSettings: readGpSettings(params, trialLimit),
     };
   }
-  return { ...readSharedSearch(params, defaults, presets, trialLimit, domainWidth), sampler: "tpe", gpSettings: gpDefaults };
+  return { ...readSharedSearch(params, defaults, presets, trialLimit, domainWidth), sampler: "tpe", gpSettings: gpDefaults, compare: readCompare(params, "play-2d", "tpe") };
 }
 
 export function readPlay3DSharedSearch<Preset extends string>(
@@ -202,6 +214,7 @@ export function readPlay3DSharedSearch<Preset extends string>(
   sampler: TwoParamSampler;
   cmaEsSettings: TwoParamCmaEsSettings;
   gpSettings: GpSettings;
+  compare: CompareSamplerId[];
 } {
   const samplerParam = params?.get("sampler");
   const sampler = samplerParam === "cmaes" || samplerParam === "gp" ? samplerParam : "tpe";
@@ -217,7 +230,7 @@ export function readPlay3DSharedSearch<Preset extends string>(
   });
   const cmaEsSettings = sampler === "cmaes" ? readCmaEsSettings(params) : twoParamCmaEsDefaults;
   const gpSettings = sampler === "gp" && params ? readGpSettings(params, trialLimit) : gpDefaults;
-  return { ...search, settings, mode, constraint, sampler, cmaEsSettings, gpSettings };
+  return { ...search, settings, mode, constraint, sampler, cmaEsSettings, gpSettings, compare: readCompare(params, "play-3d", sampler, constraint !== "none") };
 }
 
 function readCmaEsSettings(params: URLSearchParams | null): TwoParamCmaEsSettings {

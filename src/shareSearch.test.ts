@@ -17,7 +17,7 @@ const play2DDefaults: SharedSearch<ObjectivePreset> = {
 const play3DDefaults: SharedSearch<TwoParamObjectivePreset> = {
   seed: twoParamSettings.seed, preset: "multimodal", settings: { ...twoParamDefaultModelSettings, bandwidthRule: "constant" },
 };
-const legacySamplerDefaults = { sampler: "tpe", cmaEsSettings: twoParamCmaEsDefaults, gpSettings: gpDefaults };
+const legacySamplerDefaults = { sampler: "tpe", cmaEsSettings: twoParamCmaEsDefaults, gpSettings: gpDefaults, compare: [] };
 
 function roundTripPlay2D(search: SharedSearch<ObjectivePreset>) {
   const url = createShareUrl(pageUrl, { page: "play-2d", preset: search.preset, settings: search.settings }, search.seed);
@@ -34,7 +34,7 @@ describe("share links", () => {
     const hash = new URL(createShareUrl(pageUrl, experiment, 7)).hash;
     expect(hash).toBe("#play-3d?sampler=cmaes&seed=7&preset=quadratic&cmaes=optuna");
     expect(decodePlay3D(readRoute(hash).share)).toEqual({
-      ...play3DDefaults, seed: 7, preset: "quadratic", mode: "multivariate", constraint: "none", sampler: "cmaes", cmaEsSettings: optunaCmaEsPreset, gpSettings: gpDefaults,
+      ...play3DDefaults, seed: 7, preset: "quadratic", mode: "multivariate", constraint: "none", sampler: "cmaes", cmaEsSettings: optunaCmaEsPreset, gpSettings: gpDefaults, compare: [],
     });
   });
 
@@ -330,7 +330,7 @@ describe("Play 2D GP links", () => {
     const experiment = { page: "play-2d", preset: "boundary", sampler: "gp", gpSettings } as const;
     const hash = new URL(createShareUrl(pageUrl, experiment, 25)).hash;
     expect(hash).toBe("#play-2d?sampler=gp&seed=25&preset=boundary&gp=optuna");
-    expect(decode(readRoute(hash).share)).toEqual({ ...play2DDefaults, seed: 25, preset: "boundary", sampler: "gp", gpSettings });
+    expect(decode(readRoute(hash).share)).toEqual({ ...play2DDefaults, seed: 25, preset: "boundary", sampler: "gp", gpSettings, compare: [] });
     const edited = { ...gpSettings, beta: 3.1, lengthScale: 4.25 };
     const editedHash = new URL(createShareUrl(pageUrl, { ...experiment, gpSettings: edited }, 25)).hash;
     expect(decode(readRoute(editedHash).share).gpSettings).toEqual(edited);
@@ -340,14 +340,14 @@ describe("Play 2D GP links", () => {
     const gpSettings = { kernel: "rbf", acquisition: "ei", lengthScaleRule: "manual", lengthScale: 0.25, beta: 0, xi: 0.23, noise: 0.001, startupTrials: 5 } as const;
     const hash = new URL(createShareUrl(pageUrl, { page: "play-2d", preset: "quadratic", sampler: "gp", gpSettings }, 7)).hash;
     expect(hash).toBe("#play-2d?sampler=gp&seed=7&preset=quadratic&kernel=rbf&acq=ei&lsRule=manual&ls=0.25&beta=0&xi=0.23&noise=0.001&startupTrials=5");
-    expect(decode(readRoute(hash).share)).toEqual({ ...play2DDefaults, seed: 7, preset: "quadratic", sampler: "gp", gpSettings });
+    expect(decode(readRoute(hash).share)).toEqual({ ...play2DDefaults, seed: 7, preset: "quadratic", sampler: "gp", gpSettings, compare: [] });
   });
 
   it("validates individual GP values and preserves v1.0.0 TPE links", () => {
     const invalid = new URLSearchParams("sampler=gp&kernel=invalid&acq=invalid&lsRule=invalid&ls=0.24&beta=5&xi=0.005&noise=0.003&startupTrials=11");
     expect(decode(invalid).gpSettings).toEqual(gpDefaults);
     const legacy = readRoute(new URL(legacyPlay2DUrl).hash).share;
-    expect(decode(legacy)).toEqual({ ...readSharedSearch(legacy, play2DDefaults, objectivePresets, trialLimit, 10), sampler: "tpe", gpSettings: gpDefaults });
+    expect(decode(legacy)).toEqual({ ...readSharedSearch(legacy, play2DDefaults, objectivePresets, trialLimit, 10), sampler: "tpe", gpSettings: gpDefaults, compare: [] });
   });
 });
 

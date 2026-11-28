@@ -8,7 +8,7 @@ import { usePlayGuide } from "./usePlayGuide";
 import { ModelSettingsPanel } from "./ModelSettingsPanel";
 import { readPlay2DSharedSearch, type SharedSearch } from "./shareSearch";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { trialLimit, buildOneParamView, prior, searchDefaults, defaults, domain, proposeTrial, oneParamProposalFromTrace, type Trial } from "./oneParamTpe";
+import { trialLimit, buildOneParamView, prior, searchDefaults, defaults, domain, runSearch, proposeTrial, oneParamProposalFromTrace, type Trial } from "./oneParamTpe";
 
 import { getObjective, objectivePresets, type ObjectivePreset } from "./objectives";
 
@@ -22,7 +22,8 @@ import { logTruncatedNormalPeak } from "./model/tpe/truncnorm";
 import { GpSettingsPanel } from "./GpSettingsPanel";
 import type { GpSettings } from "./gpSettings";
 import { buildOneParamGpView, emptyOneParamGpPlayback, keepOneParamGpObservations, moveOneParamGpPlayback, proposeOneParamGp } from "./oneParamGp";
-import { samplersForPage } from "./samplers";
+import { getCompareSampler, samplersForPage, type CompareSamplerId } from "./samplers";
+import { CompareLegend, ComparePicker } from "./ComparePicker";
 import { seekPlayback } from "./seekPlayback";
 
 const grid = Array.from({ length: 501 }, (_, i) => domain[0] + i / 50);
@@ -95,13 +96,20 @@ export default function Play2D({ active, hidden, sharedSettings, visit, navigati
   const [search, setSearch] = useState(() => readPlay2DSharedSearch(
     sharedSettings, defaultSearch, objectivePresets, trialLimit, domainWidth,
   ));
-  const { seed, preset: objectivePreset, settings, gpSettings, sampler } = search;
+  const { seed, preset: objectivePreset, settings, gpSettings, sampler, compare } = search;
   const isGp = sampler === "gp";
   const { priorWeight, startupTrials, candidates, gamma, weights, bandwidthRule, bandwidth } = settings;
   const objectiveDefinition = getObjective(objectivePreset);
   const objectiveValues = useMemo(() => grid.map(objectiveDefinition.evaluate), [objectiveDefinition]);
   const [playback, setPlayback] = useState(emptyPlayback);
   const [gpPlayback, setGpPlayback] = useState(emptyOneParamGpPlayback);
+  const randomTrials = useMemo(() => runSearch(seed, trialLimit, 0, { ...defaults, startupTrials: trialLimit, objectivePreset }).trials, [seed, objectivePreset]);
+  const tpeConfig = useMemo(() => ({ gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }),
+    [gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
+  const moveTpe = useCallback((current: typeof playback, target: number) => movePlayback(current, target, seed, priorWeight, tpeConfig),
+    [seed, priorWeight, tpeConfig]);
+  const moveGp = useCallback((current: typeof gpPlayback, target: number) => moveOneParamGpPlayback(current, target, seed, gpSettings, objectivePreset),
+    [seed, gpSettings, objectivePreset]);
   const step = isGp ? gpPlayback.step : playback.step;
   const activeStartupTrials = isGp ? gpSettings.startupTrials : startupTrials;
   const [playing, setPlaying] = useState(false);
@@ -136,13 +144,13 @@ export default function Play2D({ active, hidden, sharedSettings, visit, navigati
   useLayoutEffect(() => {
     if (!active || !playing || step >= trialLimit) return;
     const timer = window.setTimeout(() => {
-      if (isGp) setGpPlayback((current) => moveOneParamGpPlayback(current, current.step + 1, seed, gpSettings, objectivePreset));
-      else setPlayback((current) => movePlayback(current, current.step + 1, seed, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }));
+      if (isGp || compare.includes("gp")) setGpPlayback((current) => moveGp(current, step + 1));
+      if (!isGp || compare.includes("tpe")) setPlayback((current) => moveTpe(current, step + 1));
       setSelected(null);
       if (step + 1 === trialLimit) setPlaying(false);
     }, 1000 / playbackSpeed);
     return () => window.clearTimeout(timer);
-  }, [active, playing, playbackSpeed, step, isGp, gpSettings, seed, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
+  }, [active, playing, playbackSpeed, step, isGp, compare, moveGp, moveTpe]);
 
   function cancelSeek() {
     seekController.current?.abort();
@@ -152,9 +160,8 @@ export default function Play2D({ active, hidden, sharedSettings, visit, navigati
   }
 
   function seekGp(next: number, onComplete?: () => void) {
-    const move = (current: typeof gpPlayback, target: number) => moveOneParamGpPlayback(current, target, seed, gpSettings, objectivePreset);
     if (next <= gpPlayback.step + 1) {
-      setGpPlayback(move(gpPlayback, next));
+      setGpPlayback(moveGp(gpPlayback, next));
       onComplete?.();
       return;
     }
@@ -162,7 +169,7 @@ export default function Play2D({ active, hidden, sharedSettings, visit, navigati
     const controller = new AbortController();
     seekController.current = controller;
     setSeekTarget(next);
-    void seekPlayback(gpPlayback, (state) => state.step, next, trialLimit, move, controller.signal)
+    void seekPlayback(gpPlayback, (state) => state.step, next, trialLimit, moveGp, controller.signal)
       .then((result) => {
         if (!result || controller.signal.aborted) return;
         setGpPlayback(result);
@@ -180,8 +187,23 @@ export default function Play2D({ active, hidden, sharedSettings, visit, navigati
     cancelSeek();
     setPlaying(false);
     setSelected(null);
-    if (isGp) seekGp(next);
-    else setPlayback((current) => movePlayback(current, next, seed, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }));
+    const moveTpeToTarget = () => {
+      if (!isGp || compare.includes("tpe")) setPlayback((current) => moveTpe(current, next));
+    };
+    if (isGp || compare.includes("gp")) seekGp(next, moveTpeToTarget);
+    else moveTpeToTarget();
+  }
+
+  function changeCompare(next: CompareSamplerId[]) {
+    cancelSeek();
+    const commit = () => {
+      if (next.includes("tpe") && !compare.includes("tpe")) setPlayback((current) => moveTpe(current, step));
+      setSearch((current) => ({ ...current, compare: next }));
+    };
+    if (next.includes("gp") && !compare.includes("gp")) {
+      if (step > gpPlayback.step + 1) setPlaying(false);
+      seekGp(step, commit);
+    } else commit();
   }
 
   function changeSampler(next: Play2DSampler) {
@@ -190,10 +212,13 @@ export default function Play2D({ active, hidden, sharedSettings, visit, navigati
     setPlaying(false);
     setSelected(null);
     setHoverX(null);
-    const commit = () => setSearch((current) => ({ ...current, sampler: next }));
-    if (next === "gp") seekGp(step, commit);
+    const commit = () => setSearch((current) => ({
+      ...current, sampler: next, compare: compare.map((id) => id === next ? sampler : id),
+    }));
+    if (compare.includes(next)) commit();
+    else if (next === "gp") seekGp(step, commit);
     else {
-      setPlayback((current) => movePlayback(current, step, seed, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }));
+      setPlayback((current) => moveTpe(current, step));
       commit();
     }
   }
@@ -220,6 +245,11 @@ export default function Play2D({ active, hidden, sharedSettings, visit, navigati
   const guide = usePlayGuide<HTMLDivElement>({ page: "play-2d", step, startupTrials, acquisitionVisible: visible.acquisition, seeking: seekTarget !== null }, active && !isGp);
   const guideAcquisition = guide.active === "acquisition";
   const tpeTrials = useMemo(() => isGp ? noTrials : playback.trials.slice(0, playback.step), [isGp, playback]);
+  const compareRuns = useMemo(() => compare.map((id) => ({
+    id, trials: id === "gp" ? gpPlayback.trials.slice(0, step)
+      : id === "tpe" ? playback.trials.slice(0, step) : randomTrials.slice(0, step),
+  })), [compare, gpPlayback.trials, playback.trials, randomTrials, step]);
+  const comparedTrials = compareRuns.flatMap(({ id, trials }) => id === "random" ? [] : [{ id, trials }]);
   const proposals = useMemo(() => playback.proposals.slice(0, playback.step), [playback]);
   const trials = isGp ? gpPlayback.trials : tpeTrials;
   const model = useMemo(() => buildOneParamView(tpeTrials, grid, priorWeight, { gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset }), [tpeTrials, priorWeight, gamma, bandwidth, bandwidthRule, weights, startupTrials, candidates, objectivePreset]);
@@ -321,7 +351,7 @@ export default function Play2D({ active, hidden, sharedSettings, visit, navigati
   const newSeed = () => restartSearch({ ...search, seed: Math.floor(Math.random() * 100) });
 
   return (
-    <div hidden={hidden} className="visual-workspace play-2d" data-sampler={sampler} ref={guide.workspaceRef} onKeyDown={(event) => {
+    <div hidden={hidden} className={`visual-workspace play-2d${compare.length ? " is-comparing" : ""}`} data-sampler={sampler} ref={guide.workspaceRef} onKeyDown={(event) => {
       if (seekTarget !== null && event.key === "Escape" && !event.defaultPrevented && !(event.target as Element).closest("dialog")) {
         event.preventDefault();
         cancelSeek();
@@ -331,12 +361,16 @@ export default function Play2D({ active, hidden, sharedSettings, visit, navigati
         <div className="canvas-controls">
           <PlaybackControls targetStep={seekTarget} step={step} limit={trialLimit} playing={playing} speed={playbackSpeed} onSpeedChange={setPlaybackSpeed} guidePlay={guide.active === "playback"} guideDescribedBy={guide.textId} onMove={moveTo}
             onToggle={() => { cancelSeek(); if (step === trialLimit) moveTo(0); setPlaying(!playing); }} />
-          <div className="sampler-toggle" role="group" aria-label="Play 2D sampler">
-            {samplersForPage("play-2d").map(({ id, label }) => <button key={id} type="button" aria-pressed={sampler === id} onClick={() => changeSampler(id)}>{label}</button>)}
+          <div className="sampler-controls">
+            <div className="sampler-toggle" role="group" aria-label="Play 2D sampler">
+              {samplersForPage("play-2d").map(({ id, label }) => <button key={id} type="button" aria-pressed={sampler === id} onClick={() => changeSampler(id)}>{label}</button>)}
+            </div>
+            <ComparePicker page="play-2d" focus={sampler} selected={compare} onChange={changeCompare} />
           </div>
         </div>
 
         <h2 id="plot-heading" className="sr-only">Minimize the objective function</h2>
+        {compare.length > 0 && <CompareLegend focus={sampler} selected={compare} />}
         <div className="plot-tools">
           {isGp ? <PlotLegend ariaLabel="Plot layers" className="gp-legend" visible={gpVisible} items={gpLayers}
             onToggle={(key) => { setHoverX(null); setGpVisible((current) => ({ ...current, [key]: !current[key] })); }} />
@@ -402,6 +436,19 @@ export default function Play2D({ active, hidden, sharedSettings, visit, navigati
               <circle cx={sx(hoverX)} cy={sy(hoverPrediction.mean)} r={3.5} className="gp-hover-dot" />
             </g>}
             {(isGp ? gpVisible.observations : visible.observations) && trials.map((trial) => <circle key={trial.id} cx={sx(trial.x)} cy={sy(trial.y)} r={selected?.id === trial.id ? 7 : 4.5} className={`point ${isGp ? "gp-point" : step < 2 ? "unclassified-point" : goodIds.has(trial.id) ? "good-point" : "bad-point"}`} tabIndex={0} role="button" aria-label={`Trial ${trial.id}, x ${trial.x.toFixed(3)}, objective ${trial.y.toFixed(3)}, ${isGp ? "" : `, ${groupName(trial)}`}`} onMouseEnter={() => { setHoverX(null); setSelected(trial); }} onFocus={() => { setHoverX(null); setSelected(trial); }} onClick={() => { setHoverX(null); setSelected(trial); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelected(trial); } }}><title>Trial {trial.id}: x = {trial.x.toFixed(3)}, f(x) = {trial.y.toFixed(3)}</title></circle>)}
+            {(isGp ? gpVisible.observations : visible.observations) && compareRuns.map(({ id, trials: samples }) => {
+              const color = `var(${getCompareSampler(id).colorToken})`;
+              return <g key={id} className="compare-observations" data-sampler={id} aria-hidden="true">
+                {samples.map((trial, index) => {
+                  const x = sx(trial.x), y = sy(trial.y);
+                  return <g key={trial.id}>
+                    <line x1={x} x2={x} y1={box.bottom - 6} y2={box.bottom} stroke={color} opacity={0.48} />
+                    <circle cx={x} cy={y} r={3.2} fill={color} className="compare-point" />
+                    {index === samples.length - 1 && <circle cx={x} cy={y} r={6.5} fill="none" stroke={color} className="compare-latest" />}
+                  </g>;
+                })}
+              </g>;
+            })}
           </g>
           <text x={(box.left + box.right) / 2} y={H - 6 * typeScale} textAnchor="middle" className="axis-title">Search parameter · x</text>
         </svg></div>
@@ -416,7 +463,7 @@ export default function Play2D({ active, hidden, sharedSettings, visit, navigati
         {guide.active && <LabHintBubble textId={guide.textId} message={playGuides[guide.active].action} phase="action" placement="bottom" onDismiss={guide.dismiss} />}
       </section>
       {isGp ? <GpSettingsPanel key={active ? visit : "hidden"}
-        experiment={{ page: "play-2d", preset: objectivePreset, sampler: "gp", gpSettings }}
+        experiment={{ page: "play-2d", preset: objectivePreset, sampler: "gp", gpSettings, compare }}
         seed={seed} onNewSeed={newSeed} trialLimit={trialLimit} onChange={editGp}
         resolvedLengthScale={gpModel?.resolvedLengthScale ?? gpSettings.lengthScale}
         status={<div className="proposal">
@@ -425,7 +472,7 @@ export default function Play2D({ active, hidden, sharedSettings, visit, navigati
         </div>}>
         {objectivePicker}
       </GpSettingsPanel> : <ModelSettingsPanel key={active ? visit : "hidden"}
-        experiment={{ page: "play-2d", preset: objectivePreset, settings }}
+        experiment={{ page: "play-2d", preset: objectivePreset, settings, compare }}
         defaultSettings={defaultSearch.settings} guide={guide.settingsGuide}
         onChange={(next) => {
           if (next.gamma !== gamma) guide.retire("gamma");
@@ -452,9 +499,9 @@ export default function Play2D({ active, hidden, sharedSettings, visit, navigati
         {objectivePicker}
       </ModelSettingsPanel>}
       <details className="performance-monitor">
-        <summary><span className="performance-caption">Best f(x) <strong title={bestValue}>{bestValue}</strong></span><span>Performance <span aria-hidden="true">⌄</span></span></summary>
+        <summary><span className="performance-caption">Best f(x) <strong title={bestValue}>{bestValue}</strong></span><span>Performance{compare.length > 0 && ` · vs ${compare.length}`} <span aria-hidden="true">⌄</span></span></summary>
         <ProgressComparison trials={trials} proposals={isGp ? undefined : proposals} randomOnly={activeStartupTrials >= trialLimit} seed={seed}
-          objectivePreset={objectivePreset} currentSampler={sampler} currentLabel={isGp ? (gpSettings.startupTrials >= trialLimit ? "Random only" : "GP") : undefined} />
+          objectivePreset={objectivePreset} randomTrials={randomTrials} comparedTrials={comparedTrials} currentSampler={sampler} currentLabel={isGp ? (gpSettings.startupTrials >= trialLimit ? "Random only" : "GP") : undefined} />
       </details>
     </div>
   );
