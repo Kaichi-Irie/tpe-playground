@@ -25,7 +25,7 @@ interface Props {
   children?: ReactNode;
   disableEi?: boolean;
   status?: ReactNode;
-  experiment: Exclude<ShareExperiment, { sampler: "cmaes" }>;
+  experiment: Extract<ShareExperiment, { settings: ModelSettings }>;
   defaultSettings: ModelSettings;
   onChange: (settings: ModelSettings) => void;
   seed: number;

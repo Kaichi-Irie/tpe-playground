@@ -2,6 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import App from "./App";
 import { defaults, trialLimit } from "./oneParamTpe";
+import { gpDefaults } from "./gpSettings";
+import * as gp from "./oneParamGp";
 import * as playback from "./playback";
 import * as plotSize from "./usePlotSize";
 
@@ -138,6 +140,37 @@ it.each([380, 800])("mentions candidate ticks only when shown at plot width %i",
     expect(html).toContain("The dashed line marks the pick.");
   } finally {
     size.mockRestore();
+    initialPlayback.mockRestore();
+  }
+});
+
+it("renders GP settings at trial zero when opening a GP link", () => {
+  const html = renderToStaticMarkup(<App initialRoute={{ page: "play-2d", share: new URLSearchParams("sampler=gp&gp=optuna") }} />);
+  expect(html).toContain('aria-pressed="true">GP</button>');
+  expect(html).toContain("Explore ξ");
+  expect(html).toContain("Random start · 1 / 10");
+  expect(html).not.toContain('class="gp-mean-line"');
+});
+
+it("shows the GP posterior after stepping and uses live exploration for the next point", () => {
+  const settings = { ...gpDefaults, startupTrials: 2 };
+  const observed = gp.moveOneParamGpPlayback(gp.emptyOneParamGpPlayback(), 2, 42, settings, "multimodal");
+  const initialPlayback = vi.spyOn(gp, "emptyOneParamGpPlayback").mockReturnValue(observed);
+  try {
+    const render = (beta: number) => renderToStaticMarkup(<App initialRoute={{
+      page: "play-2d", share: new URLSearchParams(`sampler=gp&startupTrials=2&beta=${beta}`),
+    }} />);
+    const exploring = render(2);
+    const exploiting = render(0);
+    for (const layer of ["gp-band-outer", "gp-band-inner", "gp-mean-line", "gp-acq-line"]) {
+      expect(exploring).toContain(`class="${layer}"`);
+    }
+    expect(exploring.match(/class="gp-sample-line"/g)).toHaveLength(4);
+    expect(exploring.match(/class="point gp-point"/g)).toHaveLength(2);
+    expect(exploring).toContain("Explore β");
+    expect(exploring).toContain("UCB ↑");
+    expect(exploring.match(/Next x = [-.\d]+/)?.[0]).not.toBe(exploiting.match(/Next x = [-.\d]+/)?.[0]);
+  } finally {
     initialPlayback.mockRestore();
   }
 });

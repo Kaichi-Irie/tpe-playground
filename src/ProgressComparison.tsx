@@ -8,10 +8,10 @@ import { ProgressPlot } from "./ProgressPlot";
 import type { SamplerId } from "./samplers";
 import { trialLimit, defaults, runSearch, type Proposal, type Trial } from "./oneParamTpe";
 
-export const ProgressComparison = memo(function ProgressComparison({ trials, proposals, randomOnly, seed, objectivePreset }: { trials: readonly Trial[]; proposals: readonly Proposal[]; randomOnly: boolean; seed: number; objectivePreset: ObjectivePreset }) {
+export const ProgressComparison = memo(function ProgressComparison({ trials, proposals, randomOnly, seed, objectivePreset, currentSampler = "tpe", currentLabel }: { trials: readonly Trial[]; proposals?: readonly Proposal[]; randomOnly: boolean; seed: number; objectivePreset: ObjectivePreset; currentSampler?: SamplerId; currentLabel?: string }) {
   const minimum = useMemo(() => findObjectiveMinimum(objectivePreset), [objectivePreset]);
   const randomTrials = useMemo(() => runSearch(seed, trialLimit, 0, { ...defaults, startupTrials: trialLimit, objectivePreset }).trials, [seed, objectivePreset]);
-  return <ComparisonPanel trials={trials} currentLabel={currentRunLabel(proposals, randomOnly)} randomTrials={randomTrials} minimum={minimum.y} />;
+  return <ComparisonPanel trials={trials} currentSampler={currentSampler} currentLabel={currentLabel ?? currentRunLabel(proposals ?? [], randomOnly)} randomTrials={randomTrials} minimum={minimum.y} />;
 });
 
 type MetricTrial = Trial & { feasible?: boolean };

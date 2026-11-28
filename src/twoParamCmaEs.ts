@@ -3,7 +3,7 @@ import type { CmaEsProposalTrace } from "./model/cmaes/types";
 import { advanceHistory } from "./model/history";
 import { getTwoParamObjective, twoParamObservations, twoParamProblem, twoParamDefaultSeed, twoParamTrialLimit, type TwoParamObjectivePreset, type TwoParamTrial } from "./twoParamProblem";
 
-export type { SamplerId as TwoParamSampler } from "./samplers";
+export type TwoParamSampler = "tpe" | "cmaes";
 
 export interface TwoParamCmaEsSettings {
   sigma0: number;

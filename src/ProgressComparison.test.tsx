@@ -38,3 +38,10 @@ it.each([
   expect(html).toContain(`data-sampler="${sampler}" style="--comparison-current:var(--sampler-${sampler})"`);
   expect(html).toContain(`${currentLabel} is solid ${color}.`);
 });
+
+it.each(["GP", "Random only"])("renders the Play 2D %s performance series in purple", (currentLabel) => {
+  const html = renderToStaticMarkup(<ProgressComparison trials={[{ id: 1, x: 0, y: 3 }]}
+    currentSampler="gp" currentLabel={currentLabel} randomOnly={currentLabel === "Random only"} seed={42} objectivePreset="multimodal" />);
+  expect(html).toContain('data-sampler="gp" style="--comparison-current:var(--sampler-gp)"');
+  expect(html).toContain(`${currentLabel} is solid purple.`);
+});
