@@ -1123,6 +1123,7 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
 .sampler-toggle button { min-height: 36px; padding: 4px 10px; border: 0; border-radius: 6px; background: transparent; font-size: var(--type-sm); white-space: nowrap; }
 .sampler-toggle button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 .sampler-toggle button[aria-pressed="false"]:hover { background: var(--hover); }
+.play-3d .sampler-toggle button { padding-inline: 8px; }
 .sampler-toggle button:focus-visible { outline-offset: -2px; }
 .sampler-toggle button[aria-pressed="true"]:focus-visible { outline-color: var(--on-accent); }
 .cmaes-legend .ellipse .swatch { height: 8px; border-block-start: 2px solid var(--cmaes); border-block-end: 2px dashed var(--cmaes-soft); background: transparent; }
@@ -1155,7 +1156,7 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
   .visual-workspace.play-3d .trial-timeline { grid-column: 1; }
 }
 @media (max-width: 380px) {
-  .sampler-toggle button { padding-inline: 7px; }
+  .sampler-toggle button, .play-3d .sampler-toggle button { padding-inline: 7px; }
   .cmaes-constraint-notice { column-gap: 4px; }
   .cmaes-constraint-notice button { padding-inline: 3px; }
 }
@@ -1192,12 +1193,14 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
 .gp-hover-dot { fill: var(--gp); stroke: var(--surface); stroke-width: 1.2; }
 .gp-legend .mean .swatch, .gp-legend .observations .swatch { background: var(--gp); }
 .gp-legend .band .swatch { height: 9px; border-block: 2px solid transparent; background: color-mix(in srgb, var(--gp) 30%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gp) 55%, transparent); }
+.gp-legend .uncertainty .swatch { background: var(--gp-soft); }
 .gp-legend .acquisition .swatch { background: var(--gp-acq); }
 [data-sampler="gp"] .live-model-controls input { accent-color: var(--sampler-gp); }
 .visual-workspace [data-sampler="gp"] .live-model-controls { align-items: start; }
 [data-sampler="gp"] .live-model-controls output { color: var(--gp); }
 .gp-length-rule { display: block; color: var(--muted); font-size: var(--type-xs); }
 .gp-seek-status { position: absolute; z-index: 3; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; gap: 8px; align-items: center; padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: var(--type-sm); white-space: nowrap; }
+.play-3d .scene-inspection button { pointer-events: auto; min-height: 32px; }
 .gp-seek-status button { min-height: 36px; }
 @media (701px <= width <= 900px) {
   .visual-workspace.play-2d .canvas-controls { gap: 8px; }
@@ -1209,7 +1212,9 @@ main > header.app-header { height: 56px; padding: 4px 0; gap: 16px; flex-wrap: n
   .visual-workspace.play-2d .primary-playback { display: contents; }
   .play-2d .playback-capsule { grid-column: 1; grid-row: 1; justify-self: start; }
   .play-2d .sampler-toggle { grid-column: 2; grid-row: 1; }
-  .play-2d .model-controls[data-sampler="gp"] .model-status { display: flex; padding: 2px 12px 0; }
+  .play-2d .model-controls[data-sampler="gp"] .model-status,
+  .play-3d .model-controls[data-sampler="gp"] .model-status { display: flex; padding: 2px 12px 0; }
+  .visual-workspace.play-3d .model-controls[data-sampler="gp"] .live-model-controls { display: grid; gap: 10px; }
   .visual-workspace [data-sampler="gp"] .live-model-controls { align-items: stretch; }
 }
 @media (max-width: 480px) {

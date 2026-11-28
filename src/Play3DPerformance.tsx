@@ -1,4 +1,6 @@
 import { memo, useMemo } from "react";
+import type { GpSettings } from "./gpSettings";
+import type { TwoParamGpProposal } from "./twoParamGp";
 import type { TwoParamConstraintPreset } from "./twoParamConstraints";
 import { currentRunLabel } from "./comparison";
 import { ComparisonPanel } from "./ProgressComparison";
@@ -9,15 +11,16 @@ import { twoParamDefaultModelSettings, emptyTwoParamPlayback, findTwoParamObject
 
 const asMetricTrials = (values: readonly TwoParamTrial[]) => values.map((trial) => ({ id: trial.id, x: trial.x1, y: trial.value, feasible: trial.violation === 0 }));
 
-export const Play3DPerformance = memo(function Play3DPerformance({ trials, proposals, seed, objectivePreset, constraintPreset = "none", mode = "multivariate", settings = twoParamDefaultModelSettings, sampler = "tpe" }: {
+export const Play3DPerformance = memo(function Play3DPerformance({ trials, proposals, seed, objectivePreset, constraintPreset = "none", mode = "multivariate", settings = twoParamDefaultModelSettings, sampler = "tpe", gpSettings }: {
   trials: readonly TwoParamTrial[];
-  proposals: readonly (TwoParamPlayback["proposals"][number] | TwoParamCmaEsProposal)[];
+  proposals: readonly (TwoParamPlayback["proposals"][number] | TwoParamCmaEsProposal | TwoParamGpProposal)[];
   seed: number;
   objectivePreset: TwoParamObjectivePreset;
   constraintPreset?: TwoParamConstraintPreset;
   mode?: DensityMode;
   settings?: TwoParamModelSettings;
   sampler?: SamplerId;
+  gpSettings?: GpSettings;
   cmaEsSettings?: TwoParamCmaEsSettings;
 }) {
   const samplerDef = getSampler(sampler);
@@ -41,7 +44,8 @@ export const Play3DPerformance = memo(function Play3DPerformance({ trials, propo
     feasibleCount: `${currentTrials.filter((trial) => trial.feasible).length} / ${trials.length} feasible`,
   } : undefined;
   const currentLabel = sampler === "cmaes" ? samplerDef.label
-    : currentRunLabel(proposals.filter((proposal) => proposal.method !== "cmaes"), startupTrials >= twoParamSettings.count, constrained ? filling : undefined);
+    : sampler === "gp" ? (gpSettings && gpSettings.startupTrials >= twoParamSettings.count ? "Random only" : "GP")
+    : currentRunLabel(proposals.filter((proposal): proposal is TwoParamPlayback["proposals"][number] => "gamma" in proposal.trace.config), startupTrials >= twoParamSettings.count, constrained ? filling : undefined);
   return <ComparisonPanel trials={currentTrials} currentLabel={currentLabel} currentSampler={sampler} randomTrials={randomTrials} minimum={minimum} relative={false}
     approximate={constraintPreset === "none" && objectivePreset === "multimodal"} constrained={constrained} />;
 });

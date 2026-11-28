@@ -3,6 +3,7 @@ import { expect, it, vi } from "vitest";
 import Play3D, { Play3DConstraintSettings, buildPlay3DCandidateScene } from "./Play3D";
 import * as twoParam from "./twoParamTpe";
 import * as cmaEs from "./twoParamCmaEs";
+import * as gp from "./twoParamGp";
 import { buildCmaEsBell, buildCmaEsScene } from "./play3dCmaEsScene";
 
 it("starts a sequential Play 3D search with no observations and a preview of its first proposal", () => {
@@ -371,4 +372,43 @@ it("renders clipped markers, 2D axes and contextual help in Top view", () => {
   expect(html).toMatch(/<g clip-path="url\(#[^"]+\)">.*class="optimum-play-3d"/);
   expect(html).not.toContain("Objective height scale");
   expect(html).not.toContain("Objective / Density · 1");
+});
+
+it.each(["3d", "top"] as const)("opens a GP shared search at trial zero in %s view", (initialViewMode) => {
+  const sharedSettings = new URLSearchParams("sampler=gp&seed=17&preset=quadratic&lsRule=manual&ls=3&startupTrials=5");
+  const html = renderToStaticMarkup(<Play3D sharedSettings={sharedSettings} initialViewMode={initialViewMode} />);
+  expect(html).toContain('aria-pressed="true">GP</button>');
+  expect(html).toContain('aria-label="Play 3D Search seed">17</output>');
+  expect(html).toContain("Trial 0 / 200");
+  expect(html).toContain("Random start · 1 / 5");
+  expect(html).toContain("Next evaluation ·");
+  expect(html).toContain('aria-label="Live GP settings"');
+  expect(html).toContain('aria-valuetext="3.00"');
+  expect(html).toContain('aria-describedby="trial-seek-help-play-3d"');
+  expect(html).toContain('id="trial-seek-help-play-3d" class="sr-only">Seeking back discards later trials.</span>');
+  expect(html).toContain(`Interactive ${initialViewMode === "3d" ? "3D" : "top-down"} objective and GP view`);
+  const legend = html.match(/<div class="legend gp-legend"[^>]*>(.*?)<\/div>/)?.[1] ?? "";
+  expect(legend.match(/aria-pressed="true"/g)).toHaveLength(4);
+  for (const label of ["Objective contours", "Mean μ(x)", "Uncertainty σ(x)", "Observations", "Acquisition"]) {
+    expect(legend).toContain(`aria-label="${label}"`);
+  }
+  expect(legend).toContain('class="layer acquisition" aria-pressed="false"');
+  expect(html).toContain("same Linear or Log1p height scale");
+  expect(html).toContain("fog of war");
+});
+
+it("opens a constrained GP link with the objective visible and GP playback blocked", () => {
+  const buildView = vi.spyOn(gp, "buildTwoParamGpView");
+  try {
+    const html = renderToStaticMarkup(<Play3D sharedSettings={new URLSearchParams("sampler=gp&constraint=disk")} />);
+    expect(html).toContain("GP does not support constraints.");
+    expect(html).toContain("Constrained optimum");
+    expect(html).toContain(">Remove constraint</button>");
+    expect(html).toContain(">Switch to TPE</button>");
+    expect(html).toMatch(/<button[^>]+aria-label="Next trial"[^>]+disabled=""/);
+    expect(html).not.toContain("Next evaluation ·");
+    expect(buildView).not.toHaveBeenCalled();
+  } finally {
+    buildView.mockRestore();
+  }
 });

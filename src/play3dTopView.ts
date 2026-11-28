@@ -2,6 +2,7 @@ import { scalarContours } from "./contours";
 import type { Play3DSceneItem } from "./Play3DCanvas";
 import type { createTwoParamObjectiveView } from "./twoParamObjectiveView";
 import type { buildTwoParamView } from "./twoParamTpe";
+import type { buildTwoParamGpView } from "./twoParamGp";
 
 export type Play3DViewMode = "3d" | "top";
 export type TopViewState = { zoom: number; panX: number; panY: number };
@@ -109,4 +110,53 @@ export function createTopFieldItems(model: Model, visible: FieldVisibility) {
     });
   }
   return items;
+}
+
+type GpModel = ReturnType<typeof buildTwoParamGpView>;
+const gpFields = [
+  { key: "uncertainty", value: "std", layer: "gp-uncertainty", peak: 0.48 },
+  { key: "mean", value: "mean", layer: "gp-mean", peak: 0.3 },
+  { key: "acquisition", value: "acquisition", layer: "gp-acquisition", peak: 0.32 },
+] as const;
+type GpVisibility = Record<(typeof gpFields)[number]["key"], boolean>;
+
+export function createTopGpFieldItems(model: GpModel, visible: GpVisibility) {
+  if (!model.hasModel) return [];
+  const shading: Quad[] = [];
+  const contours: FieldContour[] = [];
+  for (const { key, value, layer, peak } of gpFields) {
+    if (!visible[key]) continue;
+    const { grid, scales } = model;
+    const [low, high] = scales[key];
+    const valueAt = (point: GpModel["grid"][number][number]) => (point[value] - low) / (high - low);
+    for (let i = 0; i < grid.length - 1; i++) for (let j = 0; j < grid[i].length - 1; j++) {
+      const a = grid[i][j], b = grid[i + 1][j], c = grid[i + 1][j + 1], d = grid[i][j + 1];
+      const t = (valueAt(a) + valueAt(b) + valueAt(c) + valueAt(d)) / 4;
+      if (t < 0.02) continue;
+      shading.push({ id: `${layer}-cell-${i}-${j}`, depth: 0, kind: "quad", layer, alpha: peak * t,
+        points: [a.x1, a.x2, c.x1, c.x2] });
+    }
+    scalarContours(grid, contourLevels, valueAt).forEach(({ a, b }, index) => {
+      contours.push({ id: `${layer}-iso-${index}`, depth: 0, kind: "field-contour", layer, points: [a.x1, a.x2, b.x1, b.x2] });
+    });
+  }
+  return [...shading, ...contours];
+}
+
+export function formatTopGpInspection(
+  { x1, x2 }: { x1: number; x2: number },
+  model: Pick<GpModel, "evaluate" | "hasModel">,
+  visible: GpVisibility,
+  acquisitionName: string,
+  feasible?: ObjectiveView["feasible"],
+) {
+  const { objective, mean, std, acquisition } = model.evaluate(x1, x2);
+  const parts = [`x₁ = ${x1.toFixed(3)}, x₂ = ${x2.toFixed(3)}`, `f(x) = ${objective.toPrecision(4)}`];
+  if (feasible?.(x1, x2) === false) parts.push("Infeasible");
+  if (model.hasModel) {
+    if (visible.mean) parts.push(`μ = ${mean.toPrecision(4)}`);
+    if (visible.uncertainty) parts.push(`2σ = ${(2 * std).toPrecision(4)}`);
+    if (visible.acquisition) parts.push(`${acquisitionName} = ${acquisition.toPrecision(4)}`);
+  }
+  return parts.join(" · ");
 }

@@ -34,7 +34,7 @@ export const samplers = {
     id: "gp",
     label: "GP",
     shortLabel: "GP",
-    pages: ["play-2d"],
+    pages: ["play-2d", "play-3d"],
     supportsConstraints: false,
     colorToken: "--sampler-gp",
     colorName: "purple",

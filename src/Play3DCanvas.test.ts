@@ -140,3 +140,33 @@ it("clips flat scene items and paints field colors without a proposal drop-line"
     vi.unstubAllGlobals();
   }
 });
+
+it.each([
+  ["gp-mean", "--gp", 0.42, 0.3],
+  ["gp-uncertainty", "--gp-soft", 0.34, 0.25],
+  ["gp-acquisition", "--gp-acq", 0.32, 0.38],
+] as const)("paints the %s surface, Top shading and isolines, and purple observations", (layer, color, fill, stroke) => {
+  const fills: [string, number][] = [], strokes: [string, number][] = [];
+  const ctx = {
+    setTransform: vi.fn(), clearRect: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), closePath: vi.fn(), arc: vi.fn(),
+    fillStyle: "", strokeStyle: "", globalAlpha: 1,
+    fill: () => fills.push([ctx.fillStyle, ctx.globalAlpha]),
+    fillRect: () => fills.push([ctx.fillStyle, ctx.globalAlpha]),
+    stroke: () => strokes.push([ctx.strokeStyle, ctx.globalAlpha]),
+  };
+  const canvas = { clientWidth: 100, clientHeight: 100, getContext: () => ctx } as unknown as HTMLCanvasElement;
+  vi.stubGlobal("getComputedStyle", () => ({ getPropertyValue: (token: string) => token }));
+  try {
+    drawScene(canvas, [
+      { id: "surface", kind: "triangle", layer, depth: 0, points: [0, 0, 10, 10, 20, 0], inspect: vi.fn() },
+      { id: "shade", kind: "quad", layer, depth: 0, alpha: 0.16, points: [0, 10, 20, 0] },
+      { id: "iso", kind: "field-contour", layer, depth: 0, points: [0, 0, 10, 10] },
+      { id: "trial", kind: "trial", depth: 0, x: 5, y: 5, group: "gp" },
+    ], [], { x: 0, y: 0, width: 100, height: 100 });
+    expect(fills).toEqual([[color, fill], [color, 0.16], ["--sampler-gp", 1]]);
+    expect(strokes).toContainEqual([color, stroke]);
+    expect(strokes).toContainEqual([color, 0.8]);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

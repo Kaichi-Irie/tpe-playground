@@ -2,6 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { Play3DPerformance } from "./Play3DPerformance";
 import { ProgressPlot } from "./ProgressPlot";
+import { gpDefaults } from "./gpSettings";
+import { emptyTwoParamGpPlayback, moveTwoParamGpPlayback } from "./twoParamGp";
 import { emptyTwoParamCmaEsPlayback, moveTwoParamCmaEsPlayback, twoParamCmaEsDefaults } from "./twoParamCmaEs";
 import { twoParamDefaultModelSettings, emptyTwoParamPlayback, findTwoParamObjectiveMinimum, moveTwoParamPlayback, twoParamObjectivePresets, twoParamSettings } from "./twoParamTpe";
 
@@ -134,4 +136,17 @@ it("fits the log axis to the displayed series and expands it when smaller values
   const zero = plot([0.4, 0], [3, 2]);
   expect(zero).toContain(">≤ 1e-2</text>");
   expect(zero).not.toMatch(/NaN|Infinity/);
+});
+
+it("compares GP with Random in purple and labels random-only GP runs", () => {
+  const run = moveTwoParamGpPlayback(emptyTwoParamGpPlayback(), 3, 42);
+  const render = (gpSettings = gpDefaults, constraintPreset: "none" | "disk" = "none") => renderToStaticMarkup(
+    <Play3DPerformance {...run} seed={42} objectivePreset="multimodal" sampler="gp" gpSettings={gpSettings} constraintPreset={constraintPreset} />,
+  );
+  const html = render();
+  expect(html).toContain("Best so far: GP versus Random search");
+  expect(html).toContain("GP is solid purple.");
+  expect(html).toContain('data-sampler="gp" style="--comparison-current:var(--sampler-gp)"');
+  expect(render({ ...gpDefaults, startupTrials: twoParamSettings.count })).toContain("Random only is solid purple.");
+  expect(render(gpDefaults, "disk")).toContain("GP does not support constraints. Remove the constraint to compare GP with Random.");
 });
