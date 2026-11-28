@@ -1,4 +1,4 @@
-export type SamplerId = "tpe" | "cmaes";
+export type SamplerId = "tpe" | "cmaes" | "gp";
 export type SamplerPage = "play-2d" | "play-3d";
 
 export interface SamplerDefinition {
@@ -11,7 +11,7 @@ export interface SamplerDefinition {
   readonly colorName: string;
 }
 
-export const samplers: Readonly<Record<SamplerId, SamplerDefinition>> = {
+export const samplers = {
   tpe: {
     id: "tpe",
     label: "TPE",
@@ -30,7 +30,20 @@ export const samplers: Readonly<Record<SamplerId, SamplerDefinition>> = {
     colorToken: "--sampler-cmaes",
     colorName: "green",
   },
-};
+  gp: {
+    id: "gp",
+    label: "GP",
+    shortLabel: "GP",
+    pages: ["play-2d"],
+    supportsConstraints: false,
+    colorToken: "--sampler-gp",
+    colorName: "purple",
+  },
+} as const satisfies Readonly<Record<SamplerId, SamplerDefinition>>;
+
+type SamplerOnPage<Page extends SamplerPage> = {
+  [Id in SamplerId]: Page extends typeof samplers[Id]["pages"][number] ? typeof samplers[Id] : never;
+}[SamplerId];
 
 export const samplerList: readonly SamplerDefinition[] = Object.values(samplers);
 
@@ -38,6 +51,7 @@ export function getSampler(id: SamplerId): SamplerDefinition {
   return samplers[id];
 }
 
+export function samplersForPage<Page extends SamplerPage>(page: Page): readonly SamplerOnPage<Page>[];
 export function samplersForPage(page: SamplerPage): readonly SamplerDefinition[] {
   return samplerList.filter((sampler) => sampler.pages.includes(page));
 }

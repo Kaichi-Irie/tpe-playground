@@ -1,5 +1,6 @@
+import { applyOptunaGpPreset, gpDefaults } from "./gpSettings";
 import { describe, expect, it } from "vitest";
-import { createShareUrl, readRoute, readSharedSearch, readPlay3DSharedSearch, type SharedSearch } from "./shareSearch";
+import { createShareUrl, readRoute, readSharedSearch, readPlay2DSharedSearch, readPlay3DSharedSearch, type SharedSearch } from "./shareSearch";
 import { applyOptunaPreset, bandwidthRange, candidateCounts, gammaRange, priorWeights, startupTrialCounts, weightOptions } from "./searchSettings";
 import { objectivePresets, type ObjectivePreset } from "./objectives";
 import { defaults, prior, runSearch, searchDefaults, trialLimit } from "./oneParamTpe";
@@ -317,5 +318,35 @@ describe("Optuna share alias", () => {
       expect(individual).not.toContain("tpe=");
       expect(individual).toContain("bandwidth=0.73");
     }
+  });
+});
+
+
+describe("Play 2D GP links", () => {
+  const decode = (params: URLSearchParams | null) => readPlay2DSharedSearch(params, play2DDefaults, objectivePresets, trialLimit, 10);
+
+  it("round-trips the Optuna preset and preserves inactive settings", () => {
+    const gpSettings = applyOptunaGpPreset(gpDefaults);
+    const experiment = { page: "play-2d", preset: "boundary", sampler: "gp", gpSettings } as const;
+    const hash = new URL(createShareUrl(pageUrl, experiment, 25)).hash;
+    expect(hash).toBe("#play-2d?sampler=gp&seed=25&preset=boundary&gp=optuna");
+    expect(decode(readRoute(hash).share)).toEqual({ ...play2DDefaults, seed: 25, preset: "boundary", sampler: "gp", gpSettings });
+    const edited = { ...gpSettings, beta: 3.1, lengthScale: 4.25 };
+    const editedHash = new URL(createShareUrl(pageUrl, { ...experiment, gpSettings: edited }, 25)).hash;
+    expect(decode(readRoute(editedHash).share).gpSettings).toEqual(edited);
+  });
+
+  it("round-trips all custom values independently of inactive TPE settings", () => {
+    const gpSettings = { kernel: "rbf", acquisition: "ei", lengthScaleRule: "manual", lengthScale: 0.25, beta: 0, xi: 0.23, noise: 0.001, startupTrials: 5 } as const;
+    const hash = new URL(createShareUrl(pageUrl, { page: "play-2d", preset: "quadratic", sampler: "gp", gpSettings }, 7)).hash;
+    expect(hash).toBe("#play-2d?sampler=gp&seed=7&preset=quadratic&kernel=rbf&acq=ei&lsRule=manual&ls=0.25&beta=0&xi=0.23&noise=0.001&startupTrials=5");
+    expect(decode(readRoute(hash).share)).toEqual({ ...play2DDefaults, seed: 7, preset: "quadratic", sampler: "gp", gpSettings });
+  });
+
+  it("validates individual GP values and preserves v1.0.0 TPE links", () => {
+    const invalid = new URLSearchParams("sampler=gp&kernel=invalid&acq=invalid&lsRule=invalid&ls=0.24&beta=5&xi=0.005&noise=0.003&startupTrials=11");
+    expect(decode(invalid).gpSettings).toEqual(gpDefaults);
+    const legacy = readRoute(new URL(legacyPlay2DUrl).hash).share;
+    expect(decode(legacy)).toEqual({ ...readSharedSearch(legacy, play2DDefaults, objectivePresets, trialLimit, 10), sampler: "tpe", gpSettings: gpDefaults });
   });
 });

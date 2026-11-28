@@ -1,3 +1,5 @@
+import { applyOptunaGpPreset, gpAcquisitionOptions, gpBetaRange, gpDefaults, gpKernelOptions, gpLengthScaleRange, gpLengthScaleRules, gpNoiseOptions, gpStartupTrialCounts, gpXiRange, matchesOptunaGpPreset, type GpSettings } from "./gpSettings";
+import { trialLimit as oneParamTrialLimit } from "./oneParamProblem";
 import { twoParamConstraintPresets, type TwoParamConstraintPreset } from "./twoParamConstraints";
 import { isBandwidthRule } from "./model/tpe/bandwidth";
 import type { DensityMode } from "./model/tpe/types";
@@ -11,6 +13,7 @@ const playShareHashes = { "play-2d": "#play-2d", "play-3d": playPageHrefs["play-
 export type Page = keyof typeof playPageHrefs | "lab" | "about";
 export type ShareExperiment =
   | { page: "play-2d"; preset: string; sampler?: "tpe"; settings: ModelSettings }
+  | { page: "play-2d"; preset: string; sampler: "gp"; gpSettings: GpSettings }
   | { page: "play-3d"; preset: string; mode: DensityMode; constraint: TwoParamConstraintPreset; sampler?: "tpe"; settings: ModelSettings }
   | { page: "play-3d"; preset: string; mode?: DensityMode; constraint: TwoParamConstraintPreset; sampler: "cmaes"; cmaEsSettings?: TwoParamCmaEsSettings };
 
@@ -35,6 +38,30 @@ export function readRoute(hash: string): Route {
 export function createShareUrl(documentUrl: string, experiment: ShareExperiment, seed: number) {
   const url = new URL(documentUrl);
   url.search = "";
+  if (experiment.sampler === "gp") {
+    const settings = experiment.gpSettings;
+    const values = new URLSearchParams({
+      kernel: settings.kernel, acq: settings.acquisition, lsRule: settings.lengthScaleRule,
+      ls: String(settings.lengthScale), beta: String(settings.beta), xi: String(settings.xi),
+      noise: String(settings.noise), startupTrials: String(settings.startupTrials),
+    });
+    const validated = readGpSettings(values, oneParamTrialLimit);
+    const params = new URLSearchParams({ sampler: "gp", seed: String(seed), preset: experiment.preset });
+    if (matchesOptunaGpPreset(validated)) {
+      params.set("gp", "optuna");
+      // Keep the inactive values available when switching back to manual or UCB.
+      if (validated.lengthScale !== gpDefaults.lengthScale) params.set("ls", String(validated.lengthScale));
+      if (validated.beta !== gpDefaults.beta) params.set("beta", String(validated.beta));
+    } else {
+      for (const [key, value] of Object.entries({
+        kernel: validated.kernel, acq: validated.acquisition, lsRule: validated.lengthScaleRule,
+        ls: validated.lengthScale, beta: validated.beta, xi: validated.xi,
+        noise: validated.noise, startupTrials: validated.startupTrials,
+      })) params.set(key, String(value));
+    }
+    url.hash = `${playShareHashes[experiment.page]}?${params}`;
+    return url.href;
+  }
   if (experiment.sampler === "cmaes") {
     const cmaEsSettings = experiment.cmaEsSettings ?? twoParamCmaEsDefaults;
     const { sigma0, populationSize, x0 } = cmaEsSettings;
@@ -118,6 +145,45 @@ export function readSharedSearch<Preset extends string>(
       candidates: readOption("candidates", candidateCounts),
     },
   };
+}
+
+function readGpSettings(params: URLSearchParams, trialLimit: number): GpSettings {
+  const readRange = (key: string, range: { min: number; max: number; step: number }, fallback: number) => {
+    const value = decimal(params.get(key));
+    return onStep(value, range.min, range.max, range.step) ? value : fallback;
+  };
+  const noiseParam = params.get("noise");
+  const noise = noiseParam !== null && /^\d+(?:\.\d{1,3})?$/.test(noiseParam) ? Number(noiseParam) : NaN;
+  const startupTrials = decimal(params.get("startupTrials"));
+  const settings: GpSettings = {
+    kernel: gpKernelOptions.find(({ value }) => value === params.get("kernel"))?.value ?? gpDefaults.kernel,
+    acquisition: gpAcquisitionOptions.find(({ value }) => value === params.get("acq"))?.value ?? gpDefaults.acquisition,
+    lengthScaleRule: gpLengthScaleRules.find((rule) => rule === params.get("lsRule")) ?? gpDefaults.lengthScaleRule,
+    lengthScale: readRange("ls", gpLengthScaleRange, gpDefaults.lengthScale),
+    beta: readRange("beta", gpBetaRange, gpDefaults.beta),
+    xi: readRange("xi", gpXiRange, gpDefaults.xi),
+    noise: gpNoiseOptions.includes(noise) ? noise : gpDefaults.noise,
+    startupTrials: gpStartupTrialCounts(trialLimit).includes(startupTrials) ? startupTrials : gpDefaults.startupTrials,
+  };
+  return params.get("gp") === "optuna" ? applyOptunaGpPreset(settings) : settings;
+}
+
+export function readPlay2DSharedSearch<Preset extends string>(
+  params: URLSearchParams | null,
+  defaults: SharedSearch<Preset>,
+  presets: Record<Preset, unknown>,
+  trialLimit: number,
+  domainWidth: number,
+): SharedSearch<Preset> & { sampler: "tpe" | "gp"; gpSettings: GpSettings } {
+  if (params?.get("sampler") === "gp") {
+    const experiment = new URLSearchParams({ seed: params.get("seed") ?? "", preset: params.get("preset") ?? "" });
+    return {
+      ...readSharedSearch(experiment, defaults, presets, trialLimit, domainWidth),
+      sampler: "gp",
+      gpSettings: readGpSettings(params, trialLimit),
+    };
+  }
+  return { ...readSharedSearch(params, defaults, presets, trialLimit, domainWidth), sampler: "tpe", gpSettings: gpDefaults };
 }
 
 export function readPlay3DSharedSearch<Preset extends string>(
